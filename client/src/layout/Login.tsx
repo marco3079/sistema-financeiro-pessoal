@@ -51,8 +51,8 @@ export function Login() {
           </p>
           <ul className="entrada-destaques">
             <li>
-              <Icone nome="conexoes" tamanho={20} />
-              <span>Contas e cartões conectados pelo Open Finance</span>
+              <Icone nome="importar" tamanho={20} />
+              <span>Fatura e extrato importados do arquivo do banco</span>
             </li>
             <li>
               <Icone nome="cartao" tamanho={20} />
@@ -60,7 +60,7 @@ export function Login() {
             </li>
             <li>
               <Icone nome="investimentos" tamanho={20} />
-              <span>Investimentos e patrimônio sempre atualizados</span>
+              <span>Carteira da B3 com cotações atualizadas</span>
             </li>
           </ul>
         </div>

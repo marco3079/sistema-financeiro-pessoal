@@ -42,6 +42,8 @@ const ROTULOS_MODULO: Record<string, string> = {
   orcamentos: 'Orçamento',
   metas: 'Metas',
   openfinance: 'Open Finance',
+  importacao: 'Importação',
+  cotacoes: 'Cotações',
   notificacoes: 'Avisos',
   painel: 'Painel',
   busca: 'Busca',
@@ -53,6 +55,9 @@ const ROTULOS_MODULO: Record<string, string> = {
 // Ações: POST ou PUT cujo último segmento do caminho está aqui vira ALTERACAO com frase própria.
 const ACOES = new Set([
   'sincronizar',
+  'analisar',
+  'confirmar',
+  'atualizar',
   'pagar',
   'reabrir',
   'saldo',
@@ -65,6 +70,11 @@ const ACOES = new Set([
 const FRASES_ACAO: Record<string, string> = {
   'openfinance/sincronizar': 'Sincronizou os dados do Open Finance',
   'openfinance/credenciais': 'Alterou as credenciais do Open Finance',
+  'importacao/analisar': 'Leu um arquivo para importar',
+  'importacao/confirmar': 'Importou um arquivo',
+  'b3/analisar': 'Leu uma planilha da B3',
+  'b3/confirmar': 'Importou uma planilha da B3',
+  'cotacoes/atualizar': 'Atualizou as cotações',
   'faturas/pagar': 'Marcou uma fatura como paga',
   'faturas/reabrir': 'Reabriu uma fatura',
   'contas/saldo': 'Ajustou o saldo de uma conta',

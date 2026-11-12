@@ -50,7 +50,7 @@ Se o instalador parar com uma mensagem, leia a mensagem: ela diz o que fazer. Os
 2. Entre com o e-mail e a senha mostrados no fim da instalação.
 3. Troque a senha em **Meu perfil**, no menu do seu nome.
 4. Comece por um destes caminhos:
-   - **Open Finance**: abra **Conexões**, informe as credenciais da Pluggy (veja "Open Finance" no README) e conecte seu banco, seu cartão e sua corretora. Contas, faturas, lançamentos e investimentos chegam sozinhos.
+   - **Importar arquivos**: abra **Importar** e envie a fatura do cartão (CSV, OFX ou PDF) e a planilha de movimentação da B3. O sistema detecta o banco e o mês, mostra uma prévia e grava.
    - **Manual**: cadastre suas contas em **Contas**, seus cartões em **Cartões** e seus investimentos em **Investimentos**, e registre os gastos em **Lançamentos**.
 5. Defina limites de gasto em **Orçamento** e objetivos em **Metas**.
 

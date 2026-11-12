@@ -25,6 +25,7 @@ Na subida, a API aplica o modelo de dados (`prisma db push`), e, se o banco esti
 | `cartoes` | cartões, faturas e pagamento de fatura |
 | `investimentos` | investimentos e movimentos |
 | `planejamento` | orçamento e metas |
+| `importacao` | leitura e gravação de fatura, extrato e planilha da B3; cotações |
 | `openfinance` | credenciais da Pluggy, token do widget, conexões e sincronização |
 | `painel` | resumo do painel, avisos do sino e busca |
 | `plataforma` | identidade visual e e-mail |
@@ -68,6 +69,34 @@ Convenções:
 - Compra parcelada gera uma transação por mês; a última parcela absorve o resto do arredondamento.
 - Pagar uma fatura a marca como paga, reduz a dívida do cartão e, se uma conta for indicada, lança nela a saída como transferência.
 - As faturas mudam de situação sozinhas: aberta, fechada depois do fechamento, atrasada depois do vencimento.
+
+## Importação de arquivos
+
+O navegador abre o arquivo (`client/src/modules/importar/lerArquivo.ts`): CSV e OFX viram texto; o PDF vira texto com uma linha por linha da página (pdf.js); o XLSX vira uma matriz por aba. Só esse conteúdo vai para a API, em dois passos:
+
+1. **Analisar** (`POST /importacao/analisar` ou `/importacao/b3/analisar`): interpreta e devolve uma prévia. Nada é gravado.
+2. **Confirmar** (`POST /importacao/confirmar` ou `/importacao/b3/confirmar`): grava os itens que o usuário deixou marcados.
+
+Fatura e extrato (`server/src/lib/importacao/extrato.ts`):
+
+- O banco sai do nome do arquivo ou do texto; o vencimento sai do nome do arquivo, do texto do PDF ou, na falta, é estimado.
+- CSV: o cabeçalho é a primeira linha com coluna de data e de valor; há leitura de parcela ("Parcela 2/5", "5 de 6").
+- Em fatura, valor positivo é compra e negativo é pagamento ou estorno; o pagamento da fatura anterior entra como transferência.
+- Compra parcelada que vem com a data original avança mês a mês até cair no ciclo da fatura.
+- Cada lançamento recebe uma chave (`Transacao.chaveImportacao`, um hash de conta, data, descrição, valor e ordem): o que já existe é ignorado.
+- Todos os lançamentos do arquivo vão para a fatura daquele vencimento; a dívida do cartão passa a ser a soma das faturas não pagas.
+- O registro gravado é `MANUAL`: pode ser editado e recategorizado.
+
+Planilha da B3 (`server/src/lib/importacao/b3.ts`):
+
+- Movimentação: processa as linhas em ordem de data. "Transferência - Liquidação" é compra ou venda (custo médio); desdobro, bonificação, atualização, cisão e incorporação mudam a quantidade; rendimento, dividendo e JCP viram movimentos de rendimento. Direitos e recibos de subscrição ficam de fora.
+- A quantidade de cada provento informa quantas cotas havia naquele dia: quando ela não bate com a conta, ou o ativo não tem evento há mais de um ano, a posição é marcada como suspeita.
+- Posição: lê cada aba pelo nome das colunas.
+- Os investimentos gravados são `MANUAL`, reconhecidos pelo código de negociação; os movimentos têm chave própria (`MovimentoInvestimento.chaveImportacao`).
+
+Cotações (`server/src/lib/cotacoes.ts`): para cada investimento manual com código de bolsa e quantidade, busca o preço na brapi.dev e grava saldo = quantidade × preço. Roda ao importar a planilha, pelo botão e a cada 8 horas.
+
+O histórico fica em `Importacao` (arquivo, tipo, banco, referência, quantos novos e repetidos).
 
 ## Open Finance (Pluggy)
 

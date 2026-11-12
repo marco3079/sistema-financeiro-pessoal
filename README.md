@@ -2,7 +2,7 @@
 
 <h1 align="center">Sistema Financeiro Pessoal</h1>
 
-<p align="center">Contas, faturas do cartão e investimentos em um único app web, com dados trazidos do banco pelo Open Finance.</p>
+<p align="center">Contas, faturas do cartão e investimentos em um único app web. Você envia o arquivo do banco e a planilha da B3, e o sistema organiza.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/licen%C3%A7a-MIT-blue" alt="Licença MIT">
@@ -22,7 +22,8 @@
 - [Telas](#telas)
 - [Instalação rápida](#instalação-rápida)
 - [Primeiro acesso](#primeiro-acesso)
-- [Open Finance](#open-finance)
+- [Importar arquivos](#importar-arquivos)
+- [Open Finance (opcional)](#open-finance-opcional)
 - [Configuração](#configuração)
 - [Arquitetura](#arquitetura)
 - [Desenvolvimento](#desenvolvimento)
@@ -32,13 +33,23 @@
 
 ## Visão geral
 
-O Sistema Financeiro Pessoal reúne, num painel só, o saldo das contas, as faturas do cartão de crédito, a carteira de investimentos, o orçamento do mês e as metas. Os dados podem ser digitados à mão ou chegar sozinhos do banco, do cartão e da corretora pelo **Open Finance**, por meio da [Pluggy](https://pluggy.ai). Funciona no computador e no celular, com tema claro e escuro.
+O Sistema Financeiro Pessoal reúne, num painel só, o saldo das contas, as faturas do cartão de crédito, a carteira de investimentos, o orçamento do mês e as metas. Os dados entram de três jeitos: **importando o arquivo** que o banco exporta (fatura e extrato em CSV, OFX ou PDF) e a planilha da Área do Investidor da B3; digitando à mão; ou, para quem tiver acesso, pelo Open Finance da [Pluggy](https://pluggy.ai). Funciona no computador e no celular, com tema claro e escuro.
 
 Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam no seu banco PostgreSQL.
 
 ## Funcionalidades
 
-**Open Finance**
+**Importação de arquivos**
+
+- Fatura do cartão e extrato da conta em **CSV, OFX ou PDF**: o sistema detecta o banco, o mês da fatura, as parcelas e o pagamento da fatura anterior, e mostra uma prévia antes de gravar.
+- Formatos conferidos com arquivos reais: CSV de fatura do Nubank e da XP. Os demais bancos passam pelo leitor genérico (colunas de data, descrição e valor; OFX; PDF por aproximação).
+- Reenviar o mesmo arquivo não duplica lançamentos.
+- Categoria automática pela descrição e pelo que você já classificou antes.
+- **Planilha da B3** (movimentação ou posição, em XLSX): monta a carteira com quantidade e custo médio, importa compras, vendas e proventos, e traz desmarcados os ativos que parecem ter saído da carteira.
+- **Cotações automáticas** de ações, fundos imobiliários e ETFs pela brapi.dev, a cada 8 horas.
+- O arquivo é lido no navegador; o servidor recebe só o conteúdo e não guarda o arquivo.
+
+**Open Finance (opcional)**
 
 - Conexão com bancos, cartões e corretoras pelo widget da Pluggy. A senha do banco é digitada na janela da Pluggy e nunca passa pelo sistema.
 - Traz contas e saldos, cartões com limite e datas, **faturas do cartão** com cada compra e parcela, lançamentos dos últimos 12 meses e a **carteira de investimentos** com posição e movimentos.
@@ -85,7 +96,7 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 |---|---|
 | ![Lançamentos](docs/imagens/lancamentos.png) | ![Cartões e faturas](docs/imagens/cartoes.png) |
 | ![Investimentos](docs/imagens/investimentos.png) | ![Orçamento](docs/imagens/orcamento.png) |
-| ![Conexões Open Finance](docs/imagens/conexoes.png) | ![Painel no tema escuro](docs/imagens/painel-escuro.png) |
+| ![Importar arquivos](docs/imagens/importar.png) | ![Painel no tema escuro](docs/imagens/painel-escuro.png) |
 
 Os dados dos prints são fictícios. O sistema é instalado vazio, só com a conta demo e as categorias padrão.
 
@@ -110,9 +121,37 @@ O passo a passo completo, com perguntas frequentes, está em [INSTALAR.md](INSTA
 - E-mail: `demo@financas.local`
 - Senha: `demo1234`
 
-Troque a senha em **Meu perfil** logo no primeiro acesso. Depois, conecte seu banco em **Conexões** ou cadastre suas contas à mão em **Contas**.
+Troque a senha em **Meu perfil** logo no primeiro acesso. Depois, envie a fatura do cartão e a planilha da B3 em **Importar**, ou cadastre suas contas à mão em **Contas**.
 
-## Open Finance
+## Importar arquivos
+
+Abra **Importar** e arraste os arquivos (pode enviar vários de uma vez).
+
+**Fatura do cartão e extrato da conta**
+
+1. No aplicativo ou no site do banco, exporte a fatura (ou o extrato) em CSV ou OFX. Se só houver PDF, envie o PDF.
+2. O sistema mostra o banco detectado, o vencimento, o total e cada lançamento. Confira, escolha o cartão (ou deixe criar um) e confirme.
+3. Fatura com vencimento já passado entra como paga; as demais ficam em aberto e somam na dívida do cartão.
+
+O nome do arquivo ajuda: `Nubank_2026-11-08.csv` já diz o banco e o vencimento. PDF é lido por aproximação e não funciona com PDF protegido por senha nem com imagem digitalizada.
+
+**Investimentos (B3)**
+
+A B3 não oferece API para pessoa física (a API da Área do Investidor é vendida só a empresas), mas deixa baixar planilhas:
+
+1. Entre em [investidor.b3.com.br](https://www.investidor.b3.com.br), abra **Extratos > Movimentação**, filtre o período mais longo possível e baixe em Excel.
+2. Envie o XLSX em **Importar**. O sistema calcula a posição de cada ativo somando compras, vendas, desdobramentos e bonificações, e importa os proventos.
+3. Confira a lista: ativos sem movimento há mais de um ano, ou cuja quantidade não bate com o último provento, vêm desmarcados.
+
+A planilha de **Posição** também é aceita (carteira do dia, com o valor atualizado). O leitor dela foi escrito pelo formato conhecido e ainda não foi conferido com um arquivo real.
+
+**Cotações**
+
+Crie um token gratuito em [brapi.dev](https://brapi.dev) e cole no cartão **Cotações automáticas** da tela Importar (ou em `BRAPI_TOKEN` no `.env`). O saldo de cada ação, fundo imobiliário e ETF passa a ser quantidade × preço, atualizado a cada 8 horas. Renda fixa e Tesouro não têm cotação: o saldo fica o que você informar.
+
+## Open Finance (opcional)
+
+Para puxar dados reais, a Pluggy exige uma conta com acesso de produção (contas de teste só conectam o banco fictício). Se você tiver esse acesso, a tela **Conexões** continua disponível.
 
 A conexão com os bancos é feita pela Pluggy, uma empresa de agregação de dados financeiros. Você precisa de um par de credenciais dela (Client ID e Client Secret):
 
@@ -147,6 +186,7 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 | `WEB_PORT` | Porta do site | `8092` |
 | `API_PORT` | Porta da API (só neste computador) | `3092` |
 | `DB_PORT` | Porta do banco (só neste computador) | `5434` |
+| `BRAPI_TOKEN` | Token das cotações (opcional; também dá para informar na tela) | vazio |
 | `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET` | Credenciais do Open Finance (opcional; também dá para informar na tela) | vazias |
 | `PLUGGY_SANDBOX` | `true` mostra os bancos de teste da Pluggy | `false` |
 
@@ -162,6 +202,8 @@ Três contêineres: `db` (PostgreSQL 16), `api` (Node 20, Express, Prisma) e `we
 server/
   prisma/schema.prisma            modelo de dados
   src/lib/financas.ts             regras de saldo, fatura e patrimônio
+  src/lib/importacao/             leitura de fatura, extrato e planilha da B3
+  src/lib/cotacoes.ts             cotações (brapi.dev)
   src/lib/pluggy.ts               cliente HTTP da Pluggy
   src/lib/sincronizacao.ts        importação do Open Finance
   src/modules/<modulo>/routes.ts  rotas de cada módulo
@@ -186,7 +228,7 @@ Como contribuir: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Origem
 
-Este projeto usa a mesma estrutura e a mesma interface do [Sistema Escolar](https://github.com/marco3079/sistema-escolar) e do [Sistema de Restaurante](https://github.com/marco3079/sistema-restaurante): a casca (menu lateral, topo, painel, login), os componentes, o log de atividades, os usuários e as configurações vêm de lá. Os módulos financeiros e a integração com o Open Finance são novos.
+Este projeto usa a mesma estrutura e a mesma interface do [Sistema Escolar](https://github.com/marco3079/sistema-escolar) e do [Sistema de Restaurante](https://github.com/marco3079/sistema-restaurante): a casca (menu lateral, topo, painel, login), os componentes, o log de atividades, os usuários e as configurações vêm de lá. Os módulos financeiros, a importação de arquivos e a integração com o Open Finance são novos.
 
 ## Segurança
 

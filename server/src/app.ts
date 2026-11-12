@@ -107,6 +107,8 @@ export function criarApp() {
   const app = express();
   app.set('trust proxy', 1);
   app.use(cors());
+  // A importação manda o texto do arquivo (ou as abas da planilha da B3): precisa de um corpo maior.
+  app.use('/api/importacao', express.json({ limit: '12mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(registrarAtividade);
   iniciarLimpezaDeLogs();

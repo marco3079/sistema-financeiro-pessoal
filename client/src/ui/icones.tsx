@@ -12,7 +12,7 @@ export type NomeIcone =
   | 'chat' | 'email' | 'paleta' | 'visto' | 'visto-duplo' | 'responder' | 'lixeira' | 'grupo'
   | 'mais-circulo' | 'seta-esquerda' | 'pedidos' | 'mesas' | 'cardapio' | 'menos' | 'somar'
   | 'contas' | 'cartao' | 'transacoes' | 'investimentos' | 'orcamento' | 'metas' | 'conexoes' | 'categorias'
-  | 'sincronizar';
+  | 'sincronizar' | 'importar';
 
 export const NOMES_ICONES: NomeIcone[] = [
   'inicio', 'alunos', 'professores', 'usuarios', 'cursos', 'periodos', 'turmas',
@@ -26,13 +26,21 @@ export const NOMES_ICONES: NomeIcone[] = [
   'chat', 'email', 'paleta', 'visto', 'visto-duplo', 'responder', 'lixeira', 'grupo',
   'mais-circulo', 'seta-esquerda', 'pedidos', 'mesas', 'cardapio', 'menos', 'somar',
   'contas', 'cartao', 'transacoes', 'investimentos', 'orcamento', 'metas', 'conexoes', 'categorias',
-  'sincronizar',
+  'sincronizar', 'importar',
 ];
 
 // Desenhos sólidos em grade 24 x 24 (área útil 2.5 a 21.5). Preenchidos com currentColor.
 // Recortes internos: subcaminhos dentro do mesmo <path> com fillRule="evenodd".
 // Ícones de linha pura (menu, fechar, busca, setas, chevron) usam traço no próprio elemento.
 const DESENHOS: Record<NomeIcone, ReactNode> = {
+  // Importar: seta para cima saindo de uma bandeja.
+  importar: (
+    <>
+      <path d="M12 2.5L18 8.8H13.6V15.5H10.4V8.8H6Z" />
+      <path d="M3 13.5H5.4V19.1H18.6V13.5H21V21.5H3Z" />
+    </>
+  ),
+
   // Banco: frontão, três colunas e a base.
   contas: (
     <>

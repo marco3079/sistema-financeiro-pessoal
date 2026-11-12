@@ -1,0 +1,27 @@
+.importar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border: 2px dashed var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+}
+
+.importar-area-ativa {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-suave);
+}
+
+.importar-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}

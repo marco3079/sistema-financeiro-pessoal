@@ -172,12 +172,15 @@ model Transacao {
 
   origem              Origem   @default(MANUAL)
   pluggyTransactionId String?  @unique
+  // Lançamento que veio de um arquivo (CSV, OFX, PDF): impede importar o mesmo duas vezes. O registro continua MANUAL.
+  chaveImportacao     String?
   criadoEm            DateTime @default(now())
 
   @@index([contaId, data])
   @@index([data])
   @@index([categoriaId, data])
   @@index([faturaId])
+  @@index([chaveImportacao])
 }
 
 // Fatura de um cartão de crédito (Conta do tipo CARTAO). Uma por vencimento.
@@ -224,6 +227,7 @@ model Investimento {
   conexaoId          Int?
   conexao            ConexaoBancaria? @relation(fields: [conexaoId], references: [id], onDelete: SetNull)
   pluggyInvestmentId String?          @unique
+  cotadoEm           DateTime? // última vez em que o saldo foi atualizado pela cotação
   criadoEm           DateTime         @default(now())
 
   movimentos MovimentoInvestimento[]
@@ -232,18 +236,20 @@ model Investimento {
 }
 
 model MovimentoInvestimento {
-  id             Int                       @id @default(autoincrement())
-  investimentoId Int
-  investimento   Investimento              @relation(fields: [investimentoId], references: [id], onDelete: Cascade)
-  data           DateTime                  @db.Date
-  tipo           TipoMovimentoInvestimento
-  valor          Decimal                   @db.Decimal(14, 2) // sempre positivo
-  quantidade     Decimal?                  @db.Decimal(20, 8)
-  descricao      String?
-  pluggyId       String?                   @unique
-  criadoEm       DateTime                  @default(now())
+  id              Int                       @id @default(autoincrement())
+  investimentoId  Int
+  investimento    Investimento              @relation(fields: [investimentoId], references: [id], onDelete: Cascade)
+  data            DateTime                  @db.Date
+  tipo            TipoMovimentoInvestimento
+  valor           Decimal                   @db.Decimal(14, 2) // sempre positivo
+  quantidade      Decimal?                  @db.Decimal(20, 8)
+  descricao       String?
+  pluggyId        String?                   @unique
+  chaveImportacao String? // movimento que veio da planilha da B3
+  criadoEm        DateTime                  @default(now())
 
   @@index([investimentoId, data])
+  @@index([chaveImportacao])
 }
 
 // Fotografia diária do patrimônio (uma por dia), para o gráfico de evolução.
@@ -253,6 +259,25 @@ model PosicaoPatrimonio {
   contas        Decimal  @db.Decimal(14, 2) // soma das contas que não são cartão
   investimentos Decimal  @db.Decimal(14, 2)
   cartoes       Decimal  @db.Decimal(14, 2) // dívida somada dos cartões (positivo)
+}
+
+// ---------- Importação de arquivos ----------
+
+// Histórico do que foi importado de arquivo (fatura, extrato ou planilha da B3).
+model Importacao {
+  id         Int      @id @default(autoincrement())
+  criadoEm   DateTime @default(now())
+  arquivo    String // nome do arquivo enviado
+  tipo       String // FATURA, EXTRATO ou B3
+  banco      String? // banco detectado (ou "B3")
+  referencia String? // FATURA: vencimento AAAA-MM-DD; EXTRATO e B3: período
+  contaId    Int? // sem relação: o histórico sobrevive à exclusão da conta
+  contaNome  String?
+  novos      Int // registros gravados
+  repetidos  Int // registros que já existiam e foram ignorados
+  total      Decimal? @db.Decimal(14, 2)
+
+  @@index([criadoEm])
 }
 
 // ---------- Planejamento ----------
@@ -328,6 +353,9 @@ model ConfiguracaoPlataforma {
   pluggyClientId            String?
   pluggyClientSecretCifrado String? // AES-256-GCM; nunca sai pela API
   pluggySandbox             Boolean @default(false) // mostra os bancos de teste da Pluggy
+
+  // Cotações (brapi.dev). Se vazio, vale BRAPI_TOKEN do .env.
+  brapiTokenCifrado String? // AES-256-GCM; nunca sai pela API
 
   atualizadoEm DateTime @updatedAt
 }

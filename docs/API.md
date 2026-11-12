@@ -96,6 +96,22 @@ O cartão é uma conta de tipo `CARTAO`: criar, alterar e excluir é pelas rotas
 | PUT | `/metas/:id` | `{ nome?, valorAlvo?, valorAtual?, prazo?, cor?, concluida? }` |
 | DELETE | `/metas/:id` | apaga a meta |
 
+## Importação e cotações
+
+| Método | Rota | O que faz |
+|---|---|---|
+| POST | `/importacao/analisar` | `{ nome, formato, texto, documento?, contaId? }` (`formato`: `csv`, `ofx` ou `pdf`) → prévia com banco, vencimento, total, itens e conta sugerida |
+| POST | `/importacao/confirmar` | `{ arquivo, documento, banco, contaId ou novaConta, vencimento?, saldoFinal?, itens }` → `{ novos, repetidos, contaId, faturaId }` |
+| GET | `/importacao/historico` | últimos 50 arquivos importados |
+| POST | `/importacao/b3/analisar` | `{ nome, planilhas: [{ nome, linhas }] }` → posições, movimentos e avisos |
+| POST | `/importacao/b3/confirmar` | `{ arquivo, tipo, periodo, posicoes, movimentos, encerradas }` → quantos criados, atualizados e movimentos novos |
+| GET | `/cotacoes/estado` | `{ configurado, origemToken, ativosComCodigo, ultimaAtualizacao }` |
+| PUT | `/cotacoes/token` | `{ token }`; testa na brapi antes de gravar |
+| DELETE | `/cotacoes/token` | apaga o token gravado no banco |
+| POST | `/cotacoes/atualizar` | atualiza o saldo dos ativos com código de bolsa |
+
+O corpo das rotas de importação pode ter até 12 MB. O token das cotações nunca é devolvido pela API.
+
 ## Open Finance
 
 | Método | Rota | O que faz |

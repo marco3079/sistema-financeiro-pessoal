@@ -65,7 +65,7 @@ const ATALHOS: Atalho[] = [
   { rotulo: 'Investimentos', icone: 'investimentos', caminho: '/app/investimentos' },
   { rotulo: 'Orçamento', icone: 'orcamento', caminho: '/app/orcamento' },
   { rotulo: 'Metas', icone: 'metas', caminho: '/app/metas' },
-  { rotulo: 'Conexões', icone: 'conexoes', caminho: '/app/conexoes' },
+  { rotulo: 'Importar arquivo', icone: 'importar', caminho: '/app/importar' },
   { rotulo: 'Categorias', icone: 'categorias', caminho: '/app/categorias' },
   { rotulo: 'Configurações', icone: 'engrenagem', caminho: '/app/configuracoes' },
 ];

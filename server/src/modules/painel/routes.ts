@@ -171,12 +171,12 @@ router.get(
         subtitulo: 'Vencimento em ' + dataBR(proxima.vencimento),
         caminho: '/app/cartoes',
       };
-    } else if ((await prisma.conexaoBancaria.count()) === 0) {
+    } else if ((await prisma.transacao.count()) === 0) {
       destaque = {
-        etiqueta: 'Open Finance',
-        titulo: 'Conecte seu banco',
-        subtitulo: 'Traga contas, faturas e investimentos automaticamente.',
-        caminho: '/app/conexoes',
+        etiqueta: 'Comece por aqui',
+        titulo: 'Importe sua fatura',
+        subtitulo: 'Envie o arquivo do banco ou a planilha da B3 e veja tudo organizado.',
+        caminho: '/app/importar',
       };
     }
 

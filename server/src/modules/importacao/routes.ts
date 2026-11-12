@@ -1,0 +1,584 @@
+import crypto from 'crypto';
+import { Router } from 'express';
+import { z } from 'zod';
+import type { Conta, Prisma } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
+import { asyncHandler, HttpError, validar } from '../../lib/erros';
+import { cifrar } from '../../lib/cripto';
+import {
+  arredondar,
+  contaDTO,
+  dataISO,
+  dataSchema,
+  dinheiroComSinalSchema,
+  efeitoNoSaldo,
+  hoje,
+  num,
+  paraData,
+  recalcularFatura,
+  registrarPosicaoPatrimonio,
+} from '../../lib/financas';
+import { analisarArquivo } from '../../lib/importacao/extrato';
+import type { ItemLido } from '../../lib/importacao/extrato';
+import { analisarPlanilhaB3 } from '../../lib/importacao/b3';
+import { atualizarCotacoes, buscarCotacao, iniciarCotacoesAutomaticas, tokenDasCotacoes } from '../../lib/cotacoes';
+
+// Importação de arquivos: fatura do cartão e extrato da conta (CSV, OFX ou PDF), planilhas da B3
+// e cotações automáticas. As rotas ficam sob /api/importacao e /api/cotacoes.
+// O navegador lê o arquivo e manda o texto (ou as abas da planilha); o arquivo em si não é guardado.
+
+const router = Router();
+
+iniciarCotacoesAutomaticas();
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+function hash(texto: string): string {
+  return crypto.createHash('sha1').update(texto, 'utf8').digest('hex');
+}
+
+// ---------- Fatura e extrato ----------
+
+const itemSchema = z.object({
+  data: dataSchema,
+  descricao: z.string().trim().min(1).max(200),
+  valor: z.number().finite().positive().max(999999999999),
+  tipo: z.enum(['RECEITA', 'DESPESA']),
+  transferencia: z.boolean(),
+  parcela: z.number().int().min(1).max(60).nullable(),
+  totalParcelas: z.number().int().min(2).max(60).nullable(),
+});
+
+// Uma chave por lançamento do arquivo: importar o mesmo arquivo (ou outro que repita a linha) não duplica.
+// Linhas idênticas dentro do mesmo arquivo (duas corridas iguais no mesmo dia) recebem um número de ordem.
+function chavesDosItens(contaId: number, itens: ItemLido[]): string[] {
+  const vistos = new Map<string, number>();
+  return itens.map((i) => {
+    const base = [contaId, i.data, i.descricao.toLowerCase(), i.valor.toFixed(2), i.tipo, i.parcela ?? '', i.totalParcelas ?? ''].join('|');
+    const ordem = vistos.get(base) ?? 0;
+    vistos.set(base, ordem + 1);
+    return hash(`arquivo|${base}|${ordem}`);
+  });
+}
+
+async function chavesExistentes(chaves: string[]): Promise<Set<string>> {
+  const achadas = new Set<string>();
+  for (let i = 0; i < chaves.length; i += 500) {
+    const lote = await prisma.transacao.findMany({
+      where: { chaveImportacao: { in: chaves.slice(i, i + 500) } },
+      select: { chaveImportacao: true },
+    });
+    for (const t of lote) if (t.chaveImportacao) achadas.add(t.chaveImportacao);
+  }
+  return achadas;
+}
+
+function semAcento(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+// Conta manual que parece ser do banco detectado (pelo nome ou pela instituição).
+function contaDoBanco(contas: Conta[], banco: string | null): Conta | null {
+  if (!banco) return contas.length === 1 ? contas[0] : null;
+  const alvo = semAcento(banco);
+  return contas.find((c) => semAcento(c.nome).includes(alvo) || semAcento(c.instituicao ?? '').includes(alvo)) ?? null;
+}
+
+const analisarSchema = z.object({
+  nome: z.string().trim().min(1).max(200),
+  formato: z.enum(['csv', 'ofx', 'pdf']),
+  texto: z.string().min(1).max(4_000_000),
+  documento: z.enum(['FATURA', 'EXTRATO']).nullable().optional(),
+  contaId: z.number().int().positive().nullable().optional(),
+});
+
+router.post(
+  '/importacao/analisar',
+  asyncHandler(async (req, res) => {
+    const dados = validar(analisarSchema, req.body);
+    const analise = analisarArquivo({ nome: dados.nome, formato: dados.formato, texto: dados.texto, documento: dados.documento ?? null });
+    const candidatas = await prisma.conta.findMany({
+      where: { ativo: true, origem: 'MANUAL', tipo: analise.documento === 'FATURA' ? 'CARTAO' : { not: 'CARTAO' } },
+      orderBy: { nome: 'asc' },
+    });
+    const escolhida =
+      (dados.contaId ? candidatas.find((c) => c.id === dados.contaId) : undefined) ?? contaDoBanco(candidatas, analise.banco);
+    let jaImportados: boolean[] = analise.itens.map(() => false);
+    if (escolhida) {
+      const chaves = chavesDosItens(escolhida.id, analise.itens);
+      const existentes = await chavesExistentes(chaves);
+      jaImportados = chaves.map((c) => existentes.has(c));
+    }
+    res.json({
+      documento: analise.documento,
+      banco: analise.banco,
+      vencimento: analise.vencimento,
+      total: analise.total,
+      avisos: analise.avisos,
+      itens: analise.itens.map((item, i) => ({ ...item, jaImportado: jaImportados[i] })),
+      contaSugeridaId: escolhida?.id ?? null,
+      contas: candidatas.map(contaDTO),
+    });
+  })
+);
+
+// Categoria pelo que o próprio usuário já fez (mesma descrição) e, na falta disso, por palavras conhecidas.
+const PALAVRAS: { nome: string; trechos: string[] }[] = [
+  { nome: 'Transporte', trechos: ['uber', '99app', '99 app', '99pop', 'posto', 'combustivel', 'estacionamento', 'pedagio', 'sem parar', 'patinete', 'metro', 'pneus', 'shell', 'ipiranga'] },
+  { nome: 'Restaurantes', trechos: ['ifood', 'restaurante', 'pizza', 'lanchonete', 'burger', 'padaria', 'panificadora', 'cafeteria', 'bar ', 'churrascaria', 'rappi', 'sushi'] },
+  { nome: 'Mercado', trechos: ['supermercado', 'mercado ', 'atacadao', 'assai', 'carrefour', 'pao de acucar', 'hortifruti', 'conveniencia', 'mercadinho'] },
+  { nome: 'Assinaturas', trechos: ['netflix', 'spotify', 'apple.com/bill', 'amazon prime', 'amazonprime', 'amazon music', 'globoplay', 'disney', 'hbo', 'youtube', 'microsoft', 'google', 'canva', 'melimais', 'chatgpt', 'openai', 'icloud', 'deezer'] },
+  { nome: 'Saúde', trechos: ['farmacia', 'drogaria', 'drogasil', 'pague menos', 'hospital', 'clinica', 'laboratorio', 'otica', 'dentista', 'unimed', 'hapvida'] },
+  { nome: 'Contas da casa', trechos: ['neoenergia', 'energia', 'enel', 'cemig', 'copel', 'celpe', 'telefonica', 'vivo', 'claro', 'tim ', 'oi fibra', 'saneamento', 'compesa', 'sabesp', 'condominio', 'gas '] },
+  { nome: 'Educação', trechos: ['escola', 'faculdade', 'universidade', 'curso', 'udemy', 'alura', 'hotmart', 'livraria'] },
+  { nome: 'Lazer', trechos: ['cinema', 'ingresso', 'show', 'steam', 'playstation', 'xbox', 'xsolla', 'gamers club', 'hotel', 'airbnb', 'booking'] },
+  { nome: 'Compras', trechos: ['mercadolivre', 'mercado livre', 'amazon', 'shopee', 'tiktok shop', 'magazine', 'magalu', 'renner', 'riachuelo', 'c&a', 'aliexpress', 'shein', 'americanas', 'casas bahia'] },
+  { nome: 'Impostos e taxas', trechos: ['iof', 'anuidade', 'juros', 'multa', 'tarifa', 'encargo'] },
+];
+
+async function montarClassificador(): Promise<(item: ItemLido) => number | null> {
+  const categorias = await prisma.categoria.findMany({ select: { id: true, nome: true, tipo: true } });
+  const idDespesa = new Map(categorias.filter((c) => c.tipo === 'DESPESA').map((c) => [c.nome, c.id]));
+  const cache = new Map<string, number | null>();
+  return (item) => {
+    if (item.transferencia || item.tipo !== 'DESPESA') return null;
+    const d = semAcento(item.descricao);
+    if (cache.has(d)) return cache.get(d) ?? null;
+    const achada = PALAVRAS.find((p) => p.trechos.some((t) => d.includes(t)));
+    const id = achada ? (idDespesa.get(achada.nome) ?? null) : null;
+    cache.set(d, id);
+    return id;
+  };
+}
+
+// Categorias que o usuário já deu a lançamentos com a mesma descrição (a mais recente vence).
+async function categoriasPorHistorico(descricoes: string[]): Promise<Map<string, number>> {
+  const mapa = new Map<string, number>();
+  const unicas = [...new Set(descricoes)];
+  for (let i = 0; i < unicas.length; i += 300) {
+    const lote = await prisma.transacao.findMany({
+      where: { descricao: { in: unicas.slice(i, i + 300) }, categoriaId: { not: null } },
+      select: { descricao: true, categoriaId: true },
+      orderBy: { id: 'asc' },
+    });
+    for (const t of lote) if (t.categoriaId !== null) mapa.set(t.descricao, t.categoriaId);
+  }
+  return mapa;
+}
+
+const confirmarSchema = z.object({
+  arquivo: z.string().trim().min(1).max(200),
+  documento: z.enum(['FATURA', 'EXTRATO']),
+  banco: z.string().trim().max(60).nullable().optional(),
+  contaId: z.number().int().positive().nullable().optional(),
+  novaConta: z.object({ nome: z.string().trim().min(1).max(120) }).nullable().optional(),
+  vencimento: dataSchema.nullable().optional(),
+  saldoFinal: dinheiroComSinalSchema.nullable().optional(),
+  itens: z.array(itemSchema).min(1).max(5000),
+});
+
+router.post(
+  '/importacao/confirmar',
+  asyncHandler(async (req, res) => {
+    const dados = validar(confirmarSchema, req.body);
+    const fatura = dados.documento === 'FATURA';
+    if (fatura && !dados.vencimento) {
+      throw new HttpError(400, 'Informe o vencimento da fatura');
+    }
+    if (!dados.contaId && !dados.novaConta) {
+      throw new HttpError(400, fatura ? 'Escolha o cartão desta fatura' : 'Escolha a conta deste extrato');
+    }
+
+    let conta: Conta;
+    if (dados.contaId) {
+      const achada = await prisma.conta.findUnique({ where: { id: dados.contaId } });
+      if (!achada) throw new HttpError(404, 'Conta não encontrada');
+      if (achada.origem !== 'MANUAL') {
+        throw new HttpError(400, 'Esta conta vem do Open Finance: os lançamentos dela chegam sozinhos pela sincronização.');
+      }
+      if (fatura !== (achada.tipo === 'CARTAO')) {
+        throw new HttpError(400, fatura ? 'Fatura só pode ser importada num cartão' : 'Extrato não pode ser importado num cartão');
+      }
+      conta = achada;
+    } else {
+      conta = await prisma.conta.create({
+        data: {
+          nome: dados.novaConta?.nome ?? 'Conta',
+          tipo: fatura ? 'CARTAO' : 'CORRENTE',
+          instituicao: dados.banco ?? null,
+          diaVencimento: fatura && dados.vencimento ? Number(dados.vencimento.slice(8, 10)) : null,
+        },
+      });
+    }
+
+    const chaves = chavesDosItens(conta.id, dados.itens);
+    const existentes = await chavesExistentes(chaves);
+    const classificar = await montarClassificador();
+    const historico = await categoriasPorHistorico(dados.itens.map((i) => i.descricao));
+    const agora = hoje();
+
+    const resultado = await prisma.$transaction(
+      async (db) => {
+        let faturaId: number | null = null;
+        if (fatura && dados.vencimento) {
+          const vencimento = paraData(dados.vencimento);
+          const existente = await db.fatura.findUnique({ where: { contaId_vencimento: { contaId: conta.id, vencimento } } });
+          if (existente) {
+            faturaId = existente.id;
+          } else {
+            const fechamento = new Date(vencimento.getTime() - 7 * MS_DIA);
+            const criada = await db.fatura.create({
+              data: {
+                contaId: conta.id,
+                vencimento,
+                fechamento,
+                // Fatura já vencida entra como paga; a do mês seguinte traz o pagamento.
+                status: vencimento.getTime() < agora.getTime() ? 'PAGA' : fechamento.getTime() < agora.getTime() ? 'FECHADA' : 'ABERTA',
+                pagaEm: vencimento.getTime() < agora.getTime() ? vencimento : null,
+              },
+            });
+            faturaId = criada.id;
+          }
+        }
+
+        const novos: Prisma.TransacaoCreateManyInput[] = [];
+        let efeito = 0;
+        dados.itens.forEach((item, i) => {
+          if (existentes.has(chaves[i])) return;
+          novos.push({
+            contaId: conta.id,
+            data: paraData(item.data),
+            descricao: item.descricao,
+            valor: item.valor,
+            tipo: item.tipo,
+            transferencia: item.transferencia,
+            categoriaId: item.transferencia ? null : item.tipo === 'DESPESA' ? (historico.get(item.descricao) ?? classificar(item)) : (historico.get(item.descricao) ?? null),
+            faturaId,
+            parcela: item.parcela,
+            totalParcelas: item.totalParcelas,
+            chaveImportacao: chaves[i],
+          });
+          efeito += efeitoNoSaldo(conta.tipo, item.tipo, item.valor);
+        });
+        if (novos.length > 0) await db.transacao.createMany({ data: novos });
+
+        let totalDaReferencia: number;
+        if (fatura && faturaId !== null) {
+          await recalcularFatura(db, faturaId);
+          // A dívida do cartão é o que está nas faturas ainda não pagas.
+          const aberto = await db.fatura.aggregate({ where: { contaId: conta.id, status: { not: 'PAGA' } }, _sum: { total: true } });
+          const saldo = Math.max(0, num(aberto._sum.total));
+          await db.conta.update({
+            where: { id: conta.id },
+            data: {
+              saldo,
+              ...(conta.limite !== null ? { limiteDisponivel: Math.max(0, arredondar(num(conta.limite) - saldo)) } : {}),
+              ...(conta.diaVencimento === null && dados.vencimento ? { diaVencimento: Number(dados.vencimento.slice(8, 10)) } : {}),
+            },
+          });
+          totalDaReferencia = num((await db.fatura.findUnique({ where: { id: faturaId }, select: { total: true } }))?.total);
+        } else {
+          if (dados.saldoFinal !== null && dados.saldoFinal !== undefined) {
+            await db.conta.update({ where: { id: conta.id }, data: { saldo: dados.saldoFinal } });
+          } else if (efeito !== 0) {
+            await db.conta.update({ where: { id: conta.id }, data: { saldo: { increment: arredondar(efeito) } } });
+          }
+          totalDaReferencia = arredondar(novos.reduce((soma, t) => soma + (t.tipo === 'RECEITA' ? Number(t.valor) : -Number(t.valor)), 0));
+        }
+
+        const datas = dados.itens.map((i) => i.data).sort();
+        const registro = await db.importacao.create({
+          data: {
+            arquivo: dados.arquivo,
+            tipo: dados.documento,
+            banco: dados.banco ?? conta.instituicao,
+            referencia: fatura ? dados.vencimento : `${datas[0]} a ${datas[datas.length - 1]}`,
+            contaId: conta.id,
+            contaNome: conta.nome,
+            novos: novos.length,
+            repetidos: dados.itens.length - novos.length,
+            total: totalDaReferencia,
+          },
+        });
+        return { importacaoId: registro.id, faturaId, novos: novos.length, repetidos: dados.itens.length - novos.length };
+      },
+      { timeout: 60000 }
+    );
+
+    await registrarPosicaoPatrimonio();
+    res.status(201).json({ ...resultado, contaId: conta.id, contaNome: conta.nome });
+  })
+);
+
+router.get(
+  '/importacao/historico',
+  asyncHandler(async (_req, res) => {
+    const lista = await prisma.importacao.findMany({ orderBy: { criadoEm: 'desc' }, take: 50 });
+    res.json(
+      lista.map((i) => ({
+        id: i.id,
+        criadoEm: i.criadoEm.toISOString(),
+        arquivo: i.arquivo,
+        tipo: i.tipo,
+        banco: i.banco,
+        referencia: i.referencia,
+        contaNome: i.contaNome,
+        novos: i.novos,
+        repetidos: i.repetidos,
+        total: i.total === null ? null : num(i.total),
+      }))
+    );
+  })
+);
+
+// ---------- Planilha da B3 ----------
+
+const celula = z.union([z.string().max(500), z.number(), z.boolean(), z.null()]);
+
+const b3AnalisarSchema = z.object({
+  nome: z.string().trim().min(1).max(200),
+  planilhas: z
+    .array(z.object({ nome: z.string().max(100), linhas: z.array(z.array(celula).max(60)).max(60000) }))
+    .min(1)
+    .max(20),
+});
+
+// Investimento manual que corresponde a uma chave da planilha (código de negociação, ou o nome).
+async function investimentosPorChave(chaves: string[]): Promise<Map<string, { id: number; quantidade: number; saldo: number; valorAplicado: number }>> {
+  const mapa = new Map<string, { id: number; quantidade: number; saldo: number; valorAplicado: number }>();
+  if (chaves.length === 0) return mapa;
+  const lista = await prisma.investimento.findMany({
+    where: { origem: 'MANUAL', OR: [{ codigo: { in: chaves } }, { codigo: null, nome: { in: chaves } }] },
+    orderBy: { id: 'asc' },
+  });
+  for (const i of lista) {
+    const chave = i.codigo ?? i.nome;
+    if (!mapa.has(chave)) {
+      mapa.set(chave, { id: i.id, quantidade: num(i.quantidade), saldo: num(i.saldo), valorAplicado: num(i.valorAplicado) });
+    }
+  }
+  return mapa;
+}
+
+router.post(
+  '/importacao/b3/analisar',
+  asyncHandler(async (req, res) => {
+    const dados = validar(b3AnalisarSchema, req.body);
+    const analise = analisarPlanilhaB3(dados.planilhas);
+    const existentes = await investimentosPorChave(analise.posicoes.map((p) => p.chave));
+    const porChave = new Map<string, { proventos: number; movimentos: number }>();
+    for (const m of analise.movimentos) {
+      const atual = porChave.get(m.chave) ?? { proventos: 0, movimentos: 0 };
+      atual.movimentos++;
+      if (m.tipo === 'RENDIMENTO') atual.proventos = arredondar(atual.proventos + m.valor);
+      porChave.set(m.chave, atual);
+    }
+    res.json({
+      tipo: analise.tipo,
+      periodo: analise.periodo,
+      avisos: analise.avisos,
+      posicoes: analise.posicoes.map((p) => ({
+        ...p,
+        investimentoId: existentes.get(p.chave)?.id ?? null,
+        proventos: porChave.get(p.chave)?.proventos ?? 0,
+      })),
+      movimentos: analise.movimentos,
+      encerradas: analise.encerradas,
+      totalProventos: arredondar(analise.movimentos.filter((m) => m.tipo === 'RENDIMENTO').reduce((s, m) => s + m.valor, 0)),
+    });
+  })
+);
+
+const posicaoSchema = z.object({
+  chave: z.string().trim().min(1).max(200),
+  codigo: z.string().trim().max(40).nullable(),
+  nome: z.string().trim().min(1).max(200),
+  tipo: z.enum(['RENDA_FIXA', 'FUNDO', 'ACAO', 'FII', 'ETF', 'PREVIDENCIA', 'CRIPTO', 'OUTRO']),
+  subtipo: z.string().trim().max(60).nullable(),
+  instituicao: z.string().trim().max(200).nullable(),
+  quantidade: z.number().finite().positive(),
+  valorAplicado: z.number().finite().min(0).nullable(),
+  saldo: z.number().finite().min(0).nullable(),
+  vencimento: dataSchema.nullable(),
+});
+
+const movimentoSchema = z.object({
+  chave: z.string().trim().min(1).max(200),
+  data: dataSchema,
+  tipo: z.enum(['APLICACAO', 'RESGATE', 'RENDIMENTO', 'IMPOSTO']),
+  valor: z.number().finite().positive(),
+  quantidade: z.number().finite().min(0).nullable(),
+  descricao: z.string().trim().max(200),
+});
+
+const b3ConfirmarSchema = z.object({
+  arquivo: z.string().trim().min(1).max(200),
+  tipo: z.enum(['MOVIMENTACAO', 'POSICAO']),
+  periodo: z.object({ de: dataSchema, ate: dataSchema }).nullable().optional(),
+  posicoes: z.array(posicaoSchema).max(2000),
+  movimentos: z.array(movimentoSchema).max(60000),
+  encerradas: z.array(z.string().max(200)).max(5000),
+});
+
+router.post(
+  '/importacao/b3/confirmar',
+  asyncHandler(async (req, res) => {
+    const dados = validar(b3ConfirmarSchema, req.body);
+    if (dados.posicoes.length === 0) {
+      throw new HttpError(400, 'Marque pelo menos um ativo para importar');
+    }
+    const existentes = await investimentosPorChave([...dados.posicoes.map((p) => p.chave), ...dados.encerradas]);
+    const escolhidas = new Set(dados.posicoes.map((p) => p.chave));
+
+    const resultado = await prisma.$transaction(
+      async (db) => {
+        const idPorChave = new Map<string, number>();
+        let criados = 0;
+        let atualizados = 0;
+        for (const p of dados.posicoes) {
+          const atual = existentes.get(p.chave);
+          // Saldo: o da planilha de posição; senão mantém o preço que já havia; senão o valor aplicado (a cotação corrige depois).
+          const precoAnterior = atual && atual.quantidade > 0 ? atual.saldo / atual.quantidade : null;
+          const aplicado = p.valorAplicado ?? atual?.valorAplicado ?? p.saldo ?? 0;
+          const saldo = p.saldo ?? (precoAnterior !== null ? arredondar(precoAnterior * p.quantidade) : aplicado);
+          const campos = {
+            tipo: p.tipo,
+            subtipo: p.subtipo,
+            instituicao: p.instituicao,
+            quantidade: p.quantidade,
+            valorAplicado: arredondar(aplicado),
+            saldo: arredondar(saldo),
+            vencimento: p.vencimento ? paraData(p.vencimento) : null,
+            dataPosicao: new Date(),
+            ativo: true,
+          };
+          if (atual) {
+            await db.investimento.update({ where: { id: atual.id }, data: campos });
+            idPorChave.set(p.chave, atual.id);
+            atualizados++;
+          } else {
+            const criado = await db.investimento.create({ data: { ...campos, nome: p.nome.slice(0, 120), codigo: p.codigo } });
+            idPorChave.set(p.chave, criado.id);
+            criados++;
+          }
+        }
+        // Ativos que a planilha mostra zerados: saem da carteira (ficam inativos, com o histórico).
+        let encerrados = 0;
+        for (const chave of dados.encerradas) {
+          const atual = existentes.get(chave);
+          if (atual && !escolhidas.has(chave) && atual.quantidade > 0) {
+            await db.investimento.update({ where: { id: atual.id }, data: { ativo: false, quantidade: 0, saldo: 0 } });
+            encerrados++;
+          }
+        }
+
+        // Movimentos (compras, vendas e proventos) só dos ativos importados.
+        const vistos = new Map<string, number>();
+        const linhas: Prisma.MovimentoInvestimentoCreateManyInput[] = [];
+        for (const m of dados.movimentos) {
+          const investimentoId = idPorChave.get(m.chave);
+          if (investimentoId === undefined) continue;
+          const base = [m.chave, m.data, m.tipo, m.valor.toFixed(2), m.quantidade ?? '', m.descricao.toLowerCase()].join('|');
+          const ordem = vistos.get(base) ?? 0;
+          vistos.set(base, ordem + 1);
+          linhas.push({
+            investimentoId,
+            data: paraData(m.data),
+            tipo: m.tipo,
+            valor: m.valor,
+            quantidade: m.quantidade,
+            descricao: m.descricao || null,
+            chaveImportacao: hash(`b3|${base}|${ordem}`),
+          });
+        }
+        // Só entra o que ainda não foi importado (a chave não é única no banco: a conferência é feita aqui).
+        const jaGravadas = new Set<string>();
+        const todasAsChaves = linhas.map((l) => l.chaveImportacao as string);
+        for (let i = 0; i < todasAsChaves.length; i += 1000) {
+          const lote = await db.movimentoInvestimento.findMany({
+            where: { chaveImportacao: { in: todasAsChaves.slice(i, i + 1000) } },
+            select: { chaveImportacao: true },
+          });
+          for (const m of lote) if (m.chaveImportacao) jaGravadas.add(m.chaveImportacao);
+        }
+        const ineditas = linhas.filter((l) => !jaGravadas.has(l.chaveImportacao as string));
+        for (let i = 0; i < ineditas.length; i += 1000) {
+          await db.movimentoInvestimento.createMany({ data: ineditas.slice(i, i + 1000) });
+        }
+        const movimentosNovos = ineditas.length;
+        await db.importacao.create({
+          data: {
+            arquivo: dados.arquivo,
+            tipo: 'B3',
+            banco: 'B3',
+            referencia: dados.periodo ? `${dados.periodo.de} a ${dados.periodo.ate}` : dataISO(hoje()),
+            novos: criados + movimentosNovos,
+            repetidos: linhas.length - movimentosNovos,
+          },
+        });
+        return { criados, atualizados, encerrados, movimentosNovos, movimentosRepetidos: linhas.length - movimentosNovos };
+      },
+      { timeout: 120000 }
+    );
+
+    await registrarPosicaoPatrimonio();
+    // As cotações rodam em segundo plano: a resposta não espera por elas.
+    tokenDasCotacoes()
+      .then((credencial) => (credencial ? atualizarCotacoes() : null))
+      .catch(() => undefined);
+    res.status(201).json(resultado);
+  })
+);
+
+// ---------- Cotações ----------
+
+async function estadoDasCotacoes() {
+  const [credencial, comCodigo, ultima] = await Promise.all([
+    tokenDasCotacoes(),
+    prisma.investimento.count({ where: { ativo: true, origem: 'MANUAL', codigo: { not: null }, quantidade: { gt: 0 } } }),
+    prisma.investimento.aggregate({ _max: { cotadoEm: true } }),
+  ]);
+  return {
+    configurado: credencial !== null,
+    origemToken: credencial?.origem ?? null,
+    ativosComCodigo: comCodigo,
+    ultimaAtualizacao: ultima._max.cotadoEm ? ultima._max.cotadoEm.toISOString() : null,
+  };
+}
+
+router.get(
+  '/cotacoes/estado',
+  asyncHandler(async (_req, res) => {
+    res.json(await estadoDasCotacoes());
+  })
+);
+
+router.put(
+  '/cotacoes/token',
+  asyncHandler(async (req, res) => {
+    const dados = validar(z.object({ token: z.string().trim().min(8).max(200) }), req.body);
+    // Testa com um ativo que exige token (lança 400 se o token for recusado).
+    await buscarCotacao('ITUB4', dados.token);
+    const gravar = { brapiTokenCifrado: cifrar(dados.token) };
+    await prisma.configuracaoPlataforma.upsert({ where: { id: 1 }, create: { id: 1, ...gravar }, update: gravar });
+    res.json(await estadoDasCotacoes());
+  })
+);
+
+router.delete(
+  '/cotacoes/token',
+  asyncHandler(async (_req, res) => {
+    await prisma.configuracaoPlataforma.updateMany({ where: { id: 1 }, data: { brapiTokenCifrado: null } });
+    res.json(await estadoDasCotacoes());
+  })
+);
+
+router.post(
+  '/cotacoes/atualizar',
+  asyncHandler(async (_req, res) => {
+    const resultado = await atualizarCotacoes();
+    res.json({ ...resultado, estado: await estadoDasCotacoes() });
+  })
+);
+
+export default router;

@@ -89,6 +89,8 @@ const ROTULO_MODULO: Record<string, string> = {
   orcamentos: 'Orçamento',
   metas: 'Metas',
   openfinance: 'Open Finance',
+  importacao: 'Importação',
+  cotacoes: 'Cotações',
   usuarios: 'Usuários',
   atividades: 'Atividades',
   configuracoes: 'Configurações',

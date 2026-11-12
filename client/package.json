@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "pdfjs-dist": "6.5.438",
     "pluggy-connect-sdk": "2.15.0",
     "qrcode": "1.5.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.30.6"
+    "react-router-dom": "6.30.6",
+    "read-excel-file": "9.3.15"
   },
   "devDependencies": {
     "@types/qrcode": "1.5.5",
