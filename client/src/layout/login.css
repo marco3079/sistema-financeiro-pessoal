@@ -1,0 +1,201 @@
+/* Tela de login. Classes com prefixo entrada-. Cores, raios e sombras só por variáveis de estilo.css. */
+
+.entrada {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  box-sizing: border-box;
+}
+
+/* Botão de tema no canto superior direito, fora do fluxo do formulário. */
+
+.entrada-tema {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+}
+
+/* ---------- Painel de marca (só a partir de 900 px) ---------- */
+
+.entrada-marca {
+  display: none;
+}
+
+.entrada-marca-topo,
+.entrada-cartao-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.entrada-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 22%;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Link "Esqueci minha senha", embaixo do botão Entrar (só com recuperação ligada). */
+.entrada-esqueci {
+  align-self: center;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.entrada-esqueci:hover {
+  text-decoration: underline;
+}
+
+.entrada-marca-nome {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.entrada-marca-meio {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.entrada-frase {
+  margin: 0;
+  max-width: 14ch;
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.entrada-marca-apoio {
+  margin: 0;
+  opacity: 0.85;
+}
+
+.entrada-destaques {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.entrada-destaques li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.entrada-destaques svg {
+  flex-shrink: 0;
+}
+
+/* ---------- Formulário ---------- */
+
+.entrada-formulario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 4.5rem 1rem 1rem;
+  box-sizing: border-box;
+}
+
+.entrada-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem;
+  box-sizing: border-box;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.entrada-cartao-marca {
+  font-weight: 800;
+  color: var(--cor-texto);
+}
+
+.entrada-cartao-marca .entrada-logo {
+  width: 56px;
+  height: 56px;
+}
+
+.entrada-titulo {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--cor-texto);
+}
+
+.entrada-apoio {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.entrada-botao {
+  display: flex;
+  margin-top: 0.5rem;
+}
+
+.entrada-botao > .botao {
+  width: 100%;
+}
+
+/* ---------- Telas largas (a partir de 900 px) ---------- */
+
+@media (min-width: 900px) {
+  .entrada {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .entrada-marca {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 2rem;
+    min-width: 0;
+    padding: 3rem;
+    overflow: hidden;
+    box-sizing: border-box;
+    background: var(--gradiente-primario);
+    color: var(--cor-sobre-primaria);
+  }
+
+  .entrada-marca::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 60%;
+    height: 60%;
+    background: url('/ilustracoes/cofre.svg') no-repeat right bottom / contain;
+    opacity: 0.18;
+    mix-blend-mode: luminosity;
+    pointer-events: none;
+  }
+
+  .entrada-marca > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .entrada-cartao-marca {
+    display: none;
+  }
+
+  .entrada-formulario {
+    padding: 4.5rem 3rem 3rem;
+  }
+}

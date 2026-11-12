@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Tema escolhido pelo usuário (chave financas.tema). Roda antes do CSS para evitar o clarão.
+      try {
+        var tema = window.localStorage.getItem('financas.tema');
+        if (tema === 'claro' || tema === 'escuro') document.documentElement.setAttribute('data-tema', tema);
+      } catch (e) {
+        // Sem armazenamento: vale o aparelho.
+      }
+    </script>
+    <script>
+      // Identidade guardada (chave financas.plataforma), aplicada antes do CSS para não piscar o padrão.
+      // O PlataformaProvider refaz tudo depois com a resposta de GET /plataforma.
+      try {
+        var guardada = JSON.parse(window.localStorage.getItem('financas.plataforma') || 'null');
+        if (guardada && typeof guardada === 'object') {
+          if (typeof guardada.nome === 'string' && guardada.nome) document.title = guardada.nome;
+          if (typeof guardada.logo === 'string' && guardada.logo) {
+            document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach(function (l) {
+              l.href = guardada.logo;
+            });
+          }
+          var corOk = /^#[0-9a-fA-F]{6}$/;
+          var primaria = corOk.test(guardada.corPrimaria) ? guardada.corPrimaria : '#2563eb';
+          var secundaria = corOk.test(guardada.corSecundaria) ? guardada.corSecundaria : '#1d4ed8';
+          if (primaria !== '#2563eb' || secundaria !== '#1d4ed8') {
+            var estilo = document.documentElement.style;
+            estilo.setProperty('--cor-primaria', primaria);
+            estilo.setProperty('--cor-primaria-escura', 'color-mix(in srgb, ' + primaria + ' 82%, black)');
+            estilo.setProperty('--cor-primaria-suave', 'color-mix(in srgb, ' + primaria + ' 14%, var(--cor-superficie))');
+            estilo.setProperty('--cor-azul-suave', 'color-mix(in srgb, ' + primaria + ' 14%, var(--cor-superficie))');
+            estilo.setProperty('--gradiente-primario', 'linear-gradient(135deg, ' + primaria + ', ' + secundaria + ')');
+            estilo.setProperty('--sombra-primaria', '0 6px 16px color-mix(in srgb, ' + primaria + ' 30%, transparent)');
+          }
+        }
+      } catch (e) {
+        // Identidade guardada inválida: vale o padrão.
+      }
+    </script>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Ícone da aba: ICO e PNG para qualquer navegador, SVG para os que aceitam (fica nítido em qualquer tamanho). -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/svg+xml" href="/logo-simbolo.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Finanças Pessoais</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

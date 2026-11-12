@@ -1,0 +1,46 @@
+/* Telas de senha por e-mail (esqueci a senha e criar/redefinir senha). Reaproveitam as classes entrada- de login.css.
+   Classes novas com prefixo senha-. Cores só por variáveis de estilo.css. */
+
+.senha-link {
+  color: var(--cor-primaria);
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.senha-link:hover {
+  text-decoration: underline;
+}
+
+.senha-link:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Linha de links embaixo do formulário (voltar para o login, pedir novo link). */
+
+.senha-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+.senha-dica {
+  margin: -0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Telas com o cartão de login: nada pode estourar em 360 px. */
+
+.entrada-cartao .campo {
+  min-width: 0;
+}
+
+.entrada-cartao .aviso {
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,19 @@
+/* Lançamentos: descrição com detalhes embaixo e selo de transferência. Cores só por variáveis. */
+.lanc-descricao {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lanc-detalhe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+}
+
+.lanc-selo {
+  display: inline-block;
+  margin-left: 6px;
+}

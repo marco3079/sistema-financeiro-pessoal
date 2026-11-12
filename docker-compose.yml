@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: financas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-financas}
+      POSTGRES_DB: financas
+    ports:
+      - "127.0.0.1:${DB_PORT:-5434}:5432"
+    volumes:
+      - dados_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U financas -d financas"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://financas:${POSTGRES_PASSWORD:-financas}@db:5432/financas?schema=public"
+      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-de-exemplo}
+      PORT: "3000"
+      ADMIN_NOME: ${ADMIN_NOME:-Titular}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@financas.local}
+      ADMIN_SENHA: ${ADMIN_SENHA:-admin1234}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
+      PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
+      PLUGGY_SANDBOX: ${PLUGGY_SANDBOX:-false}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "127.0.0.1:${API_PORT:-3092}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/saude').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  web:
+    build: ./client
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8092}:80"
+    restart: unless-stopped
+
+volumes:
+  dados_db:

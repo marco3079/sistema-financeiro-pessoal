@@ -1,0 +1,25 @@
+name: "Sugerir uma melhoria"
+description: "Proponha uma função nova ou uma mudança em algo que já existe."
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: "Qual problema isso resolve?"
+      description: "Descreva a situação do dia a dia que hoje fica difícil."
+    validations:
+      required: true
+  - type: textarea
+    id: solucao
+    attributes:
+      label: "Como você imagina a solução?"
+      description: "Descreva o que o sistema deveria fazer."
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: "Alternativas consideradas"
+      description: "Outras formas de resolver, se você pensou em alguma."
+    validations:
+      required: false

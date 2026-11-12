@@ -1,0 +1,656 @@
+/* Tela inicial (painel). Cores, raios e sombras só pelas variáveis do contrato visual. */
+
+.painel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Filhos diretos ficam acima da ilustração do prédio. */
+.painel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Prédio como fundo do painel inteiro: sobe por trás da barra do topo e desce até o quarto indicador. */
+.painel::before {
+  content: '';
+  position: absolute;
+  top: -92px;
+  right: -1.5rem;
+  width: min(52%, 720px);
+  height: 330px;
+  background-image: url('/ilustracoes/predio-claro.png');
+  background-repeat: no-repeat;
+  background-position: right top;
+  background-size: cover;
+  mix-blend-mode: multiply;
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 55%), linear-gradient(to top, transparent 0%, #000 45%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, #000 55%), linear-gradient(to top, transparent 0%, #000 45%);
+  mask-composite: intersect;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Tema escuro: escolhido pelo usuário ou seguindo o aparelho (ver estilo.css). */
+:root[data-tema='escuro'] .painel::before {
+  background-image: url('/ilustracoes/predio-escuro.png');
+  mix-blend-mode: lighten;
+  opacity: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) .painel::before {
+    background-image: url('/ilustracoes/predio-escuro.png');
+    mix-blend-mode: lighten;
+    opacity: 0.9;
+  }
+}
+
+/* ---------- Cabeçalho: saudação, data e hora ---------- */
+
+.painel-cabecalho {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: 0;
+  padding: 4px 0 6px;
+}
+
+.painel-boas-vindas {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.painel-saudacao {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--cor-texto);
+}
+
+.painel-subtitulo {
+  margin: 6px 0 0;
+  color: var(--cor-texto-suave);
+}
+
+.painel-traco {
+  display: block;
+  width: 44px;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+}
+
+.painel-relogio {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.painel-data {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto);
+}
+
+.painel-hora {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--cor-texto);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Cores de apoio (ícone de indicador, marca de aviso) ---------- */
+
+.painel-cor-azul {
+  background: var(--cor-azul-suave);
+  color: var(--cor-primaria);
+}
+
+.painel-cor-roxo {
+  background: var(--cor-roxo-suave);
+  color: var(--cor-roxo);
+}
+
+.painel-cor-verde {
+  background: var(--cor-verde-suave);
+  color: var(--cor-verde);
+}
+
+.painel-cor-laranja {
+  background: var(--cor-laranja-suave);
+  color: var(--cor-laranja);
+}
+
+/* ---------- Cartões de indicador ---------- */
+
+.painel-indicadores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .painel-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .painel-indicadores {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.painel-indicador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.painel-indicador-icone {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.painel-indicador-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.painel-indicador-valor {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--cor-texto);
+}
+
+.painel-indicador-rotulo {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.painel-variacao {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.painel-variacao-alta {
+  color: var(--cor-sucesso);
+}
+
+.painel-variacao-baixa {
+  color: var(--cor-perigo);
+}
+
+/* ---------- Linha inferior: 3 colunas ---------- */
+
+.painel-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Só o destaque e os atalhos (limpeza e recepção). */
+.painel-linha-unica {
+  grid-template-columns: minmax(0, 720px);
+}
+
+/* Sem o gráfico (painel do garçom): duas colunas. */
+.painel-linha-dupla {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .painel-linha,
+  .painel-linha-dupla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.painel-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ---------- Cartão genérico ---------- */
+
+.painel-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.painel-cartao-cabecalho {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.painel-cartao-icone {
+  flex-shrink: 0;
+  color: var(--cor-primaria);
+}
+
+.painel-cartao-titulo {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.painel-ver-todos {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.painel-ver-todos:hover {
+  text-decoration: underline;
+}
+
+.painel-seletor {
+  margin-left: auto;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--cor-texto);
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.painel-seletor:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.painel-vazio {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- Gráfico de desempenho (SVG) ---------- */
+
+/* Contêiner que ocupa a altura que sobrar no cartão; o svg acompanha e fica centralizado (meet). */
+.painel-grafico-corpo {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 220px;
+  min-width: 0;
+}
+
+/* Contêiner medido pelo GraficoLinha (ResizeObserver): ocupa a altura e a largura que sobram no cartão. */
+.painel-grafico-area-medida {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 220px;
+  overflow: hidden;
+}
+
+/* O svg fica absoluto: não empurra o contêiner, então não há laço de redimensionamento. */
+.painel-grafico-area-medida > svg {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.painel-grafico-grade {
+  stroke: var(--cor-borda);
+  stroke-width: 1;
+}
+
+.painel-grafico-eixo {
+  fill: var(--cor-texto-suave);
+  font-size: 13px;
+}
+
+.painel-grafico-linha {
+  fill: none;
+  stroke: var(--cor-primaria);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.painel-grafico-degrade-topo {
+  stop-color: var(--cor-primaria);
+  stop-opacity: 0.28;
+}
+
+.painel-grafico-degrade-base {
+  stop-color: var(--cor-primaria);
+  stop-opacity: 0;
+}
+
+.painel-grafico-ponto {
+  fill: var(--cor-superficie);
+  stroke: var(--cor-primaria);
+  stroke-width: 3;
+}
+
+.painel-grafico-balao {
+  fill: var(--cor-texto);
+}
+
+.painel-grafico-balao-texto {
+  fill: var(--cor-superficie);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ---------- Avisos recentes ---------- */
+
+/* A lista começa no topo do cartão; o cartão só estica. */
+.painel-avisos {
+  justify-content: flex-start;
+}
+
+.painel-avisos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.painel-aviso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.painel-aviso-marca {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.painel-aviso-bolinha {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.painel-aviso-texto {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.painel-aviso-titulo {
+  display: block;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.painel-aviso-corpo {
+  display: block;
+  overflow: hidden;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.painel-aviso-tempo {
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+/* ---------- Destaque (Minha Turma) ---------- */
+
+.painel-destaque {
+  position: relative;
+  min-height: 150px;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--cor-primaria-suave);
+}
+
+/* Pilhas de moedas: mesma técnica, com máscara no fundo. */
+.painel-destaque::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 46%;
+  background-image: url('/ilustracoes/moedas.svg');
+  background-repeat: no-repeat;
+  background-position: right bottom;
+  background-size: contain;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 55%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 55%);
+  pointer-events: none;
+}
+
+.painel-destaque-texto {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 62%;
+  min-width: 0;
+}
+
+.painel-destaque-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+}
+
+.painel-destaque-titulo {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--cor-texto);
+}
+
+.painel-destaque-subtitulo {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.painel-pilula {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+/* ---------- Atalhos rápidos ---------- */
+
+/* O cartão estica até a base da coluna; a grade divide a altura que sobrar entre as fileiras. */
+.painel-atalhos {
+  flex: 1 1 auto;
+}
+
+.painel-atalhos-grade {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(84px, 1fr);
+  gap: 10px;
+}
+
+/* Entre 521 e 1100 px o cartão tem altura natural: fileiras de 84 px no mínimo, sem esticar. */
+@media (min-width: 521px) and (max-width: 1100px) {
+  .painel-atalhos-grade {
+    grid-auto-rows: minmax(84px, auto);
+  }
+}
+
+/* No celular, três atalhos por fileira. */
+@media (max-width: 520px) {
+  .painel-atalhos-grade {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: minmax(84px, auto);
+  }
+}
+
+.painel-atalho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 84px;
+  height: 100%;
+  padding: 8px;
+  color: var(--cor-primaria);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  text-align: center;
+  text-decoration: none;
+}
+
+.painel-atalho:hover {
+  border-color: var(--cor-primaria);
+}
+
+.painel-atalho span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cor-texto);
+}
+
+/* ---------- Telas largas: a linha de baixo ocupa a altura da tela ---------- */
+
+@media (min-width: 1101px) {
+  .painel {
+    min-height: calc(100dvh - 3rem - 44px - 1.5rem - 8px);
+  }
+
+  .painel-linha {
+    flex: 1 1 auto;
+    min-height: 380px;
+  }
+
+  .painel-linha > * {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+/* ---------- Abaixo de 900 px: ilustração menor e mais apagada ---------- */
+
+@media (max-width: 899px) {
+  .painel::before {
+    top: 0;
+    right: -1rem;
+    width: 70%;
+    height: 220px;
+    opacity: 0.3;
+  }
+}
+
+/* ---------- Celular e tablet ---------- */
+
+@media (max-width: 720px) {
+  .painel-cabecalho {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .painel-relogio {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .painel-destaque-texto {
+    max-width: 100%;
+  }
+}

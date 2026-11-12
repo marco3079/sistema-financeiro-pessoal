@@ -1,0 +1,548 @@
+/* ===== Módulo de logs (Atividades e Log do sistema) =====
+   Cores, raios e sombras só por variáveis de ui/estilo.css. */
+
+/* ----- Indicador "Ao vivo" / "Pausado" ----- */
+.logs-vivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.logs-vivo-ativo {
+  color: var(--cor-sucesso);
+}
+
+.logs-ponto {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--cor-texto-suave);
+}
+
+.logs-vivo-ativo .logs-ponto {
+  background: var(--cor-verde);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cor-verde) 60%, transparent);
+  animation: logs-pulsa 1.6s ease-out infinite;
+}
+
+@keyframes logs-pulsa {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cor-verde) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--cor-verde) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--cor-verde) 0%, transparent);
+  }
+}
+
+.logs-com-icone {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.logs-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+}
+
+.logs-subtitulo {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--cor-texto-suave);
+}
+
+/* ----- Indicadores (cartões com ícone colorido) ----- */
+.logs-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.logs-indicador {
+  min-width: 0;
+}
+
+.logs-indicador-texto {
+  min-width: 0;
+}
+
+/* ----- Avatar ----- */
+.logs-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.logs-avatar-pequeno {
+  width: 30px;
+  height: 30px;
+  font-size: 0.72rem;
+}
+
+.logs-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.logs-ponto-online {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cor-verde);
+  border: 2px solid var(--cor-superficie);
+}
+
+/* ----- Online agora ----- */
+.logs-online-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.logs-online-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-left: 4px solid var(--cor-verde);
+  border-radius: var(--raio-pequeno);
+  min-width: 0;
+}
+
+.logs-online-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.logs-online-identidade {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.logs-online-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.logs-online-tela {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.logs-online-ultima {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.logs-online-descricao {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.logs-online-tempo {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cor-sucesso);
+}
+
+/* ----- Gráfico de barras (SVG) ----- */
+.logs-grafico {
+  width: 100%;
+  min-width: 0;
+}
+
+.logs-grafico-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.logs-barra {
+  fill: var(--cor-primaria);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.logs-barra:hover {
+  opacity: 1;
+}
+
+.logs-eixo {
+  stroke: var(--cor-borda);
+  stroke-width: 1;
+}
+
+.logs-eixo-texto {
+  fill: var(--cor-texto-suave);
+  font-size: 11px;
+}
+
+/* ----- Listas com barra horizontal ----- */
+.logs-duas-colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.logs-barras {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.logs-barra-item {
+  min-width: 0;
+}
+
+.logs-barra-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  min-width: 0;
+}
+
+.logs-barra-rotulo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logs-barra-total {
+  flex-shrink: 0;
+  color: var(--cor-texto);
+}
+
+.logs-trilho {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  overflow: hidden;
+}
+
+.logs-preenchimento {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+  transition: width 0.4s ease;
+}
+
+.logs-usuario-barra {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.logs-usuario-barra-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ----- Últimas atividades ----- */
+.logs-cabecalho-cartao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.logs-recentes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-recente {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--cor-borda);
+  min-width: 0;
+}
+
+.logs-recente:last-child {
+  border-bottom: none;
+}
+
+.logs-hora {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.logs-recente-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.logs-recente-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.logs-recente-descricao {
+  overflow-wrap: anywhere;
+}
+
+.logs-recente-modulo {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ----- Log do sistema ----- */
+.logs-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Largura da página fica com o layout; a rolagem horizontal da tabela fica dentro do cartão. */
+.logs-log {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.logs-cartao-tabela {
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Filtros numa fileira que quebra quando falta espaço (sobrescreve a grade de estilo.css). */
+.logs-log .filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.logs-log .filtros > .campo {
+  flex: 1 1 180px;
+  max-width: 240px;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.logs-log .barra-ferramentas {
+  align-items: flex-end;
+}
+
+.logs-botoes {
+  flex: 0 0 auto;
+}
+
+.logs-usuario-linha {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.logs-usuario-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 220px;
+}
+
+.logs-usuario-nome {
+  display: block;
+  max-width: 100%;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logs-usuario-perfil {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+/* Colunas da tabela do log, pela ordem: 1 Hora, 6 Status, 7 Duração (sem classe própria na tabela). */
+.logs-cartao-tabela .tabela th:nth-child(1),
+.logs-cartao-tabela .tabela td:nth-child(1),
+.logs-cartao-tabela .tabela th:nth-child(6),
+.logs-cartao-tabela .tabela td:nth-child(6),
+.logs-cartao-tabela .tabela th:nth-child(7),
+.logs-cartao-tabela .tabela td:nth-child(7) {
+  white-space: nowrap;
+}
+
+.logs-cartao-tabela .tabela th:nth-child(6),
+.logs-cartao-tabela .tabela td:nth-child(6) {
+  min-width: 5.5rem;
+}
+
+.logs-cartao-tabela .tabela th:nth-child(7),
+.logs-cartao-tabela .tabela td:nth-child(7) {
+  min-width: 7rem;
+}
+
+.logs-hora-celula {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Marca de linha nova: fica invisível e serve só de gatilho para :has() no destaque. */
+.logs-marca-nova {
+  display: none;
+}
+
+/* Destaque suave de 2 s nas linhas que entraram no tempo real. */
+@keyframes logs-destaque {
+  from {
+    background-color: var(--cor-primaria-suave);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.tabela tbody tr:has(.logs-marca-nova),
+.tabela-cartao:has(.logs-marca-nova) {
+  animation: logs-destaque 2s ease-out;
+}
+
+.logs-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.logs-contador {
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.logs-detalhes {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.logs-detalhe {
+  min-width: 0;
+}
+
+.logs-detalhe dt {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.logs-detalhe dd {
+  margin: 0.15rem 0 0;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+/* ----- Celular (360 px) ----- */
+@media (max-width: 519px) {
+  .logs-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logs-indicador:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .logs-online-grade {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-recente {
+    grid-template-columns: auto 1fr;
+  }
+
+  .logs-recente .logs-hora {
+    grid-column: 1 / -1;
+  }
+
+  .logs-log .filtros > .campo {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logs-vivo-ativo .logs-ponto {
+    animation: none;
+  }
+
+  .tabela tbody tr:has(.logs-marca-nova),
+  .tabela-cartao:has(.logs-marca-nova) {
+    animation: none;
+  }
+}

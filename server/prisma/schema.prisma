@@ -1,0 +1,369 @@
+// CONTRATO DE DADOS do sistema financeiro pessoal.
+// Convenções:
+// - Valores em dinheiro: Decimal(14,2), em reais.
+// - Transacao.valor é SEMPRE positivo; o sentido vem de Transacao.tipo (RECEITA entra, DESPESA sai).
+// - Conta.saldo de um CARTAO é o valor em aberto da fatura (dívida, positivo).
+// - Patrimônio = soma dos saldos das contas que não são CARTAO + soma de Investimento.saldo - soma dos saldos dos CARTAO.
+// - origem OPEN_FINANCE: registro trazido pela Pluggy (Open Finance); é atualizado a cada sincronização.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+// Perfil único: o titular das finanças (e quem ele convidar) vê e altera tudo.
+enum Perfil {
+  TITULAR
+}
+
+enum Origem {
+  MANUAL
+  OPEN_FINANCE
+}
+
+enum TipoConta {
+  CORRENTE
+  POUPANCA
+  CARTEIRA // dinheiro em espécie
+  CARTAO // cartão de crédito
+  INVESTIMENTO // conta em corretora (saldo parado na conta)
+}
+
+enum TipoTransacao {
+  RECEITA
+  DESPESA
+}
+
+// ABERTA: ainda recebe compras. FECHADA: fechou e aguarda pagamento. PAGA. ATRASADA: venceu sem pagamento.
+enum StatusFatura {
+  ABERTA
+  FECHADA
+  PAGA
+  ATRASADA
+}
+
+enum TipoInvestimento {
+  RENDA_FIXA
+  FUNDO
+  ACAO
+  FII
+  ETF
+  PREVIDENCIA
+  CRIPTO
+  OUTRO
+}
+
+enum TipoMovimentoInvestimento {
+  APLICACAO
+  RESGATE
+  RENDIMENTO
+  IMPOSTO
+}
+
+// ATUALIZADA: dados em dia. ATUALIZANDO: a instituição ainda está respondendo.
+// ERRO_LOGIN: o banco pediu novo consentimento/senha. ERRO: outra falha (ver campo erro).
+enum StatusConexao {
+  ATUALIZADA
+  ATUALIZANDO
+  ERRO_LOGIN
+  ERRO
+}
+
+// ---------- Pessoas ----------
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  perfil    Perfil   @default(TITULAR)
+  ativo     Boolean  @default(true)
+  cpf       String?
+  telefone  String?
+  foto      String? // endereço http(s) ou data URL (imagem reduzida enviada pelo usuário)
+  criadoEm  DateTime @default(now())
+}
+
+// ---------- Open Finance (Pluggy) ----------
+
+// Uma conexão = um "item" da Pluggy = o consentimento do usuário em uma instituição.
+model ConexaoBancaria {
+  id                  Int           @id @default(autoincrement())
+  pluggyItemId        String        @unique
+  instituicao         String // nome do banco/corretora
+  instituicaoLogo     String? // endereço da imagem
+  instituicaoCor      String? // hex com #, ex.: "#820AD1"
+  status              StatusConexao @default(ATUALIZANDO)
+  erro                String? // mensagem da última falha
+  ultimaSincronizacao DateTime?
+  criadoEm            DateTime      @default(now())
+
+  contas        Conta[]
+  investimentos Investimento[]
+}
+
+// ---------- Contas, cartões e lançamentos ----------
+
+model Conta {
+  id               Int       @id @default(autoincrement())
+  nome             String
+  tipo             TipoConta
+  instituicao      String?
+  numero           String? // conta/agência ou final do cartão
+  saldo            Decimal   @default(0) @db.Decimal(14, 2)
+  cor              String    @default("#2563eb")
+  ativo            Boolean   @default(true)
+  // Só para CARTAO:
+  bandeira         String?
+  limite           Decimal?  @db.Decimal(14, 2)
+  limiteDisponivel Decimal?  @db.Decimal(14, 2)
+  diaFechamento    Int?
+  diaVencimento    Int?
+
+  origem          Origem           @default(MANUAL)
+  conexaoId       Int?
+  conexao         ConexaoBancaria? @relation(fields: [conexaoId], references: [id], onDelete: SetNull)
+  pluggyAccountId String?          @unique
+  criadoEm        DateTime         @default(now())
+
+  transacoes Transacao[]
+  faturas    Fatura[]
+
+  @@index([tipo])
+}
+
+model Categoria {
+  id   Int           @id @default(autoincrement())
+  nome String
+  tipo TipoTransacao
+  cor  String        @default("#64748b")
+
+  transacoes Transacao[]
+  orcamento  Orcamento?
+
+  @@unique([nome, tipo])
+}
+
+model Transacao {
+  id            Int           @id @default(autoincrement())
+  contaId       Int
+  conta         Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  data          DateTime      @db.Date
+  descricao     String
+  valor         Decimal       @db.Decimal(14, 2) // sempre positivo
+  tipo          TipoTransacao
+  // true = movimento entre contas próprias ou pagamento de fatura: não entra em receitas/despesas dos relatórios.
+  transferencia Boolean       @default(false)
+  pendente      Boolean       @default(false)
+  categoriaId   Int?
+  categoria     Categoria?    @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  faturaId      Int?
+  fatura        Fatura?       @relation(fields: [faturaId], references: [id], onDelete: SetNull)
+  parcela       Int? // número da parcela (1, 2, ...)
+  totalParcelas Int?
+  observacao    String?
+
+  origem              Origem   @default(MANUAL)
+  pluggyTransactionId String?  @unique
+  criadoEm            DateTime @default(now())
+
+  @@index([contaId, data])
+  @@index([data])
+  @@index([categoriaId, data])
+  @@index([faturaId])
+}
+
+// Fatura de um cartão de crédito (Conta do tipo CARTAO). Uma por vencimento.
+model Fatura {
+  id         Int          @id @default(autoincrement())
+  contaId    Int
+  conta      Conta        @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  vencimento DateTime     @db.Date
+  fechamento DateTime?    @db.Date
+  total      Decimal      @default(0) @db.Decimal(14, 2)
+  minimo     Decimal?     @db.Decimal(14, 2)
+  status     StatusFatura @default(ABERTA)
+  pagaEm     DateTime?    @db.Date
+
+  origem       Origem   @default(MANUAL)
+  pluggyBillId String?  @unique
+  criadoEm     DateTime @default(now())
+
+  transacoes Transacao[]
+
+  @@unique([contaId, vencimento])
+}
+
+// ---------- Investimentos ----------
+
+model Investimento {
+  id            Int              @id @default(autoincrement())
+  nome          String
+  codigo        String? // ticker ou código do ativo
+  tipo          TipoInvestimento
+  subtipo       String? // ex.: CDB, LCI, Tesouro Selic
+  instituicao   String?
+  emissor       String?
+  valorAplicado Decimal          @default(0) @db.Decimal(14, 2)
+  saldo         Decimal          @default(0) @db.Decimal(14, 2) // posição bruta atual
+  saldoLiquido  Decimal?         @db.Decimal(14, 2)
+  quantidade    Decimal?         @db.Decimal(20, 8)
+  taxa          String? // texto livre, ex.: "110% do CDI", "IPCA + 6,2%"
+  vencimento    DateTime?        @db.Date
+  dataPosicao   DateTime         @default(now())
+  ativo         Boolean          @default(true)
+
+  origem             Origem           @default(MANUAL)
+  conexaoId          Int?
+  conexao            ConexaoBancaria? @relation(fields: [conexaoId], references: [id], onDelete: SetNull)
+  pluggyInvestmentId String?          @unique
+  criadoEm           DateTime         @default(now())
+
+  movimentos MovimentoInvestimento[]
+
+  @@index([tipo])
+}
+
+model MovimentoInvestimento {
+  id             Int                       @id @default(autoincrement())
+  investimentoId Int
+  investimento   Investimento              @relation(fields: [investimentoId], references: [id], onDelete: Cascade)
+  data           DateTime                  @db.Date
+  tipo           TipoMovimentoInvestimento
+  valor          Decimal                   @db.Decimal(14, 2) // sempre positivo
+  quantidade     Decimal?                  @db.Decimal(20, 8)
+  descricao      String?
+  pluggyId       String?                   @unique
+  criadoEm       DateTime                  @default(now())
+
+  @@index([investimentoId, data])
+}
+
+// Fotografia diária do patrimônio (uma por dia), para o gráfico de evolução.
+model PosicaoPatrimonio {
+  id            Int      @id @default(autoincrement())
+  data          DateTime @unique @db.Date
+  contas        Decimal  @db.Decimal(14, 2) // soma das contas que não são cartão
+  investimentos Decimal  @db.Decimal(14, 2)
+  cartoes       Decimal  @db.Decimal(14, 2) // dívida somada dos cartões (positivo)
+}
+
+// ---------- Planejamento ----------
+
+// Limite mensal de gasto de uma categoria de DESPESA.
+model Orcamento {
+  id          Int       @id @default(autoincrement())
+  categoriaId Int       @unique
+  categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  limite      Decimal   @db.Decimal(14, 2)
+}
+
+model Meta {
+  id         Int       @id @default(autoincrement())
+  nome       String
+  valorAlvo  Decimal   @db.Decimal(14, 2)
+  valorAtual Decimal   @default(0) @db.Decimal(14, 2)
+  prazo      DateTime? @db.Date
+  cor        String    @default("#2563eb")
+  concluida  Boolean   @default(false)
+  criadoEm   DateTime  @default(now())
+}
+
+// ---------- Sistema ----------
+
+// Um registro por atividade na plataforma. Visível só para o TITULAR.
+// Não guarda corpo de requisição nem senha. Registros com mais de 90 dias são apagados.
+model LogAtividade {
+  id          Int      @id @default(autoincrement())
+  criadoEm    DateTime @default(now())
+  usuarioId   Int? // sem relação: o log sobrevive à exclusão do usuário
+  usuarioNome String?
+  perfil      String? // perfil no momento: TITULAR
+  tipo        String // LOGIN, FALHA_LOGIN, SAIDA, TELA, CONSULTA, CRIACAO, ALTERACAO, EXCLUSAO
+  modulo      String // ex.: contas, transacoes, investimentos, sessao
+  descricao   String // frase curta em português
+  metodo      String? // GET, POST, PUT, DELETE
+  caminho     String? // caminho da API ou da tela, sem query string
+  status      Int? // código HTTP da resposta
+  duracaoMs   Int?
+  ip          String?
+  navegador   String?
+
+  @@index([criadoEm])
+  @@index([usuarioId, criadoEm])
+  @@index([tipo, criadoEm])
+}
+
+// ===== Configurações da plataforma (linha única, id = 1) =====
+
+model ConfiguracaoPlataforma {
+  id            Int     @id @default(1)
+  nome          String  @default("Finanças Pessoais")
+  slogan        String  @default("Contas, faturas e investimentos em um só lugar.")
+  logo          String? // data URL (jpeg, png ou webp) ou endereço http(s); null = logo padrão
+  corPrimaria   String  @default("#2563eb")
+  corSecundaria String  @default("#1d4ed8")
+  enderecoSite  String? // endereço público do site, usado nos links dos e-mails
+
+  smtpServidor       String?
+  smtpPorta          Int     @default(587)
+  smtpSeguro         Boolean @default(false) // true = TLS direto (porta 465)
+  smtpUsuario        String?
+  smtpSenhaCifrada   String? // AES-256-GCM; nunca sai pela API
+  emailRemetente     String?
+  emailNomeRemetente String?
+  emailAtivo         Boolean @default(false)
+
+  emailRecuperacao Boolean @default(true)
+  emailBoasVindas  Boolean @default(true)
+
+  // Open Finance (Pluggy). Se vazios, valem PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET do .env.
+  pluggyClientId            String?
+  pluggyClientSecretCifrado String? // AES-256-GCM; nunca sai pela API
+  pluggySandbox             Boolean @default(false) // mostra os bancos de teste da Pluggy
+
+  atualizadoEm DateTime @updatedAt
+}
+
+enum TipoTokenSenha {
+  RECUPERACAO
+  BOAS_VINDAS
+}
+
+// Token de uso único para criar ou redefinir a senha por e-mail (só o hash fica no banco).
+model TokenSenha {
+  id        Int            @id @default(autoincrement())
+  usuarioId Int
+  tokenHash String         @unique
+  tipo      TipoTokenSenha
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  criadoEm  DateTime       @default(now())
+
+  @@index([usuarioId])
+}
+
+enum StatusEmail {
+  ENVIADO
+  FALHOU
+}
+
+// Histórico dos e-mails enviados (sem o corpo), para o titular conferir.
+model EmailEnviado {
+  id       Int         @id @default(autoincrement())
+  para     String
+  assunto  String
+  tipo     String // TESTE, RECUPERACAO, BOAS_VINDAS
+  status   StatusEmail
+  erro     String?
+  criadoEm DateTime    @default(now())
+
+  @@index([criadoEm])
+}

@@ -1,0 +1,816 @@
+/* Casca do app: barra lateral, topo, busca, sino, menu do usuário e, no celular, barra superior, barra inferior e gaveta.
+   Cores, raios e sombras só por variáveis do contrato visual (estilo.css). Exceções: rgba do fundo da gaveta. */
+
+.casca {
+  min-height: 100vh;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.casca button:focus-visible,
+.casca a:focus-visible,
+.casca input:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+/* ---------- Barra lateral (desktop) ---------- */
+
+.casca-lateral {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--largura-lateral);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  background: var(--cor-superficie);
+  border-right: 1px solid var(--cor-borda);
+  z-index: 20;
+}
+
+.casca-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem 1.25rem;
+}
+
+.casca-marca-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 22%;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Botão do chat (ao lado do sino): link redondo com contador */
+.casca-chat-botao {
+  text-decoration: none;
+  color: var(--cor-texto);
+}
+
+.casca-marca-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.casca-marca-nome {
+  display: block;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--cor-texto);
+}
+
+.casca-marca-portal {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-menu {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cor-borda) transparent;
+}
+
+.casca-menu::-webkit-scrollbar,
+.casca-gaveta::-webkit-scrollbar {
+  width: 6px;
+}
+
+.casca-menu::-webkit-scrollbar-thumb,
+.casca-gaveta::-webkit-scrollbar-thumb {
+  background: var(--cor-borda);
+  border-radius: 999px;
+}
+
+.casca-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 0.75rem;
+}
+
+.casca-grupo-titulo {
+  margin: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cor-texto-suave);
+}
+
+.casca-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 42px;
+  padding: 0 0.75rem;
+  border-radius: var(--raio-pequeno);
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.casca-item-icone {
+  flex-shrink: 0;
+}
+
+.casca-item-rotulo {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casca-item:hover {
+  background: var(--cor-superficie-2);
+}
+
+.casca-item.casca-ativo {
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  box-shadow: var(--sombra-primaria);
+}
+
+/* Cartão do rodapé */
+
+.casca-cartao {
+  position: relative;
+  margin-top: auto;
+  min-height: 92px;
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: var(--raio);
+  background: var(--cor-primaria-suave);
+}
+
+.casca-cartao-frase {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: 58%;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: var(--cor-texto);
+}
+
+.casca-cartao-ilustracao {
+  position: absolute;
+  left: auto;
+  right: 6px;
+  bottom: 6px;
+  width: 96px;
+  height: 76px;
+  background-image: url('/ilustracoes/cofre.svg');
+  background-size: contain;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* ---------- Área de conteúdo ---------- */
+
+.casca-principal {
+  min-width: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 1.5rem;
+}
+
+.casca-desktop .casca-principal {
+  margin-left: var(--largura-lateral);
+}
+
+.casca-area {
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+}
+
+/* ---------- Topo (desktop) ---------- */
+
+.casca-topo {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.casca-topo-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Botão redondo (sino e menu do celular) */
+
+.casca-botao-redondo {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+}
+
+.casca-contador {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--cor-perigo);
+  color: var(--cor-sobre-primaria);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.casca-sino-area {
+  position: relative;
+}
+
+/* Painel suspenso (sino) */
+
+.casca-painel-avisos {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 340px;
+  max-width: calc(100vw - 2rem);
+  box-sizing: border-box;
+  padding: 0.75rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.casca-painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.casca-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.casca-painel-vazio {
+  margin: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-avisos-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.casca-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.5rem;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.casca-aviso:hover {
+  background: var(--cor-superficie-2);
+}
+
+.casca-aviso-ponto {
+  width: 10px;
+  height: 10px;
+  margin-top: 0.35rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--cor-primaria);
+}
+
+.casca-aviso-ponto-lido {
+  background: transparent;
+  border: 1px solid var(--cor-borda);
+}
+
+.casca-aviso-texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.casca-aviso-titulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.casca-aviso-meta {
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-aviso-novo {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+  background: var(--cor-primaria-suave);
+}
+
+/* Campo de busca */
+
+.casca-busca {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.casca-busca-campo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+}
+
+.casca-busca-campo:focus-within {
+  border-color: var(--cor-primaria);
+}
+
+.casca-busca-icone {
+  flex-shrink: 0;
+  margin-right: 0.6rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-busca-entrada {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.casca-busca-entrada::placeholder {
+  color: var(--cor-texto-suave);
+}
+
+.casca-busca-painel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.casca-busca-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.casca-busca-tipo {
+  margin: 0.5rem 0.5rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cor-texto-suave);
+}
+
+.casca-busca-opcao {
+  display: flex;
+  flex-direction: column;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+}
+
+.casca-busca-opcao-ativa {
+  background: var(--cor-superficie-2);
+}
+
+.casca-busca-titulo {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.casca-busca-subtitulo {
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-busca-vazio {
+  margin: 0.5rem 0.75rem;
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Menu do usuário (desktop) */
+
+.casca-usuario {
+  position: relative;
+}
+
+.casca-usuario-botao {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.casca-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--cor-texto);
+  color: var(--cor-superficie);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.casca-usuario-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+}
+
+.casca-usuario-nome {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.casca-usuario-papel {
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+.casca-seta {
+  color: var(--cor-texto-suave);
+}
+
+.casca-menu-usuario {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  box-sizing: border-box;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.casca-menu-usuario-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.casca-menu-usuario-item:hover {
+  background: var(--cor-superficie-2);
+}
+
+.casca-menu-usuario-sair {
+  color: var(--cor-perigo);
+}
+
+/* Avatar do menu com ponto de novidade e contador do item "Suporte" (terceira leva) */
+.casca-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.casca-ponto-novidade {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--cor-perigo);
+  box-shadow: 0 0 0 2px var(--cor-superficie);
+}
+
+.casca-menu-usuario-rotulo {
+  flex: 1;
+}
+
+.casca-contador {
+  min-width: 22px;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--cor-perigo);
+  color: var(--cor-sobre-primaria);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+
+/* Botão "Suporte" no rodapé da gaveta do celular (abre o popup de chamados) */
+.casca-suporte-celular {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.casca-suporte-celular:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+/* ---------- Celular (abaixo de 900 px) ---------- */
+
+.casca-topo-celular {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.casca-topo-celular-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 3.5rem;
+  padding: 0 1rem;
+  box-sizing: border-box;
+}
+
+.casca-topo-celular-logo {
+  flex-shrink: 0;
+  border-radius: 22%;
+  object-fit: contain;
+}
+
+.casca-topo-celular-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.casca-topo-celular-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.casca-topo-celular-acoes .casca-botao-redondo {
+  width: 40px;
+  height: 40px;
+}
+
+.casca-topo-celular-busca {
+  padding: 0.5rem 1rem 0.75rem;
+  box-sizing: border-box;
+}
+
+.casca-topo-celular-busca .casca-busca {
+  max-width: none;
+}
+
+.casca-celular .casca-principal {
+  padding: 7.5rem 1rem calc(var(--altura-barra-inferior) + env(safe-area-inset-bottom));
+}
+
+/* Barra inferior */
+
+.casca-inferior {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  height: calc(var(--altura-barra-inferior) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  align-items: stretch;
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.casca-inferior-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: 0.68rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.casca-inferior-item.casca-ativo {
+  color: var(--cor-primaria);
+}
+
+.casca-inferior-rotulo {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Gaveta */
+
+.casca-gaveta-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.casca-gaveta {
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cor-borda) transparent;
+  box-sizing: border-box;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  background: var(--cor-superficie);
+  border-radius: var(--raio) var(--raio) 0 0;
+  box-shadow: var(--sombra);
+  animation: casca-sobe 0.22s ease-out;
+}
+
+@keyframes casca-sobe {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.casca-gaveta-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.casca-menu-gaveta {
+  flex: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.casca-gaveta-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.casca-gaveta-rodape .casca-usuario-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casca-sair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie-2);
+  color: var(--cor-perigo);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+

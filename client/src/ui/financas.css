@@ -1,0 +1,255 @@
+/* Componentes compartilhados das telas financeiras (ui/financas.tsx). Só variáveis de estilo.css. */
+
+.fin-resumo-texto {
+  min-width: 0;
+}
+
+/* ---------- Seletor de mês ---------- */
+.fin-mes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  box-shadow: var(--sombra);
+}
+
+.fin-mes-botao {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.fin-mes-botao:hover {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+
+.fin-mes-rotulo {
+  min-width: 10.5rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+/* ---------- Dinheiro ---------- */
+.fin-valor {
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-texto);
+}
+
+.fin-valor-entrada {
+  color: var(--cor-sucesso);
+}
+
+.fin-valor-saida {
+  color: var(--cor-perigo);
+}
+
+/* ---------- Barra de progresso ---------- */
+.fin-barra {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  overflow: hidden;
+}
+
+.fin-barra-cheio {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+  transition: width 0.3s ease;
+}
+
+.fin-barra-estourou .fin-barra-cheio {
+  background: var(--cor-perigo);
+}
+
+/* ---------- Cor ---------- */
+.fin-ponto {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.fin-nome-cor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.fin-paleta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fin-cor {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--cor-superficie);
+  box-shadow: 0 0 0 1px var(--cor-borda);
+  cursor: pointer;
+}
+
+.fin-cor-ativa {
+  box-shadow: 0 0 0 3px var(--cor-primaria);
+}
+
+/* ---------- Rosca ---------- */
+.fin-rosca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.fin-rosca-desenho {
+  width: 170px;
+  height: 170px;
+  flex: none;
+}
+
+.fin-rosca-fundo {
+  fill: none;
+  stroke: var(--cor-superficie-2);
+  stroke-width: 16;
+}
+
+.fin-rosca-centro {
+  font-size: 8px;
+  font-weight: 800;
+  fill: var(--cor-texto);
+}
+
+.fin-legenda {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.fin-legenda li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.fin-legenda-rotulo {
+  flex: 1;
+  min-width: 0;
+  color: var(--cor-texto);
+}
+
+.fin-legenda-valor {
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Estado vazio ---------- */
+.fin-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  background: var(--cor-superficie);
+  border: 1px dashed var(--cor-borda);
+  border-radius: var(--raio);
+  color: var(--cor-texto);
+}
+
+.fin-vazio p {
+  max-width: 34rem;
+  color: var(--cor-texto-suave);
+}
+
+.fin-vazio-icone {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+
+.fin-selo-origem {
+  margin-left: 0.4rem;
+  white-space: nowrap;
+}
+
+/* ---------- Auxiliares de layout usados por várias telas ---------- */
+
+/* Duas colunas no desktop (ex.: gráfico ao lado da lista), uma no celular. */
+.fin-duas-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 899px) {
+  .fin-duas-colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Grade de cartões (contas, cartões de crédito, metas). */
+.fin-cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+/* Dois campos lado a lado dentro de um formulário. */
+.fin-linha {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 519px) {
+  .fin-linha {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Texto de apoio pequeno. */
+.fin-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+}
+
+/* Cabeçalho de cartão com título à esquerda e ação à direita. */
+.fin-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}

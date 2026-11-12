@@ -1,0 +1,425 @@
+/* Tela de configurações da plataforma (admin). Prefixo config-. Cores só por variáveis de ui/estilo.css. */
+
+.config-duas-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .config-duas-colunas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.config-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.config-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.config-campo-com-ajuda {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.config-ajuda-campo {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.config-ajuda {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+  min-width: 0;
+}
+
+.config-ajuda ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.config-erro-suave {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--cor-perigo);
+  overflow-wrap: anywhere;
+}
+
+.config-caixas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.config-grupo {
+  border: 0;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-grupo legend {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.config-email {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.config-linha-teste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.config-linha-teste .campo {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* Logo */
+
+.config-logo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.config-logo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.config-logo-atual {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.config-logo-atual img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: var(--raio-pequeno);
+}
+
+.config-logo-acoes {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.config-arquivo-botao {
+  position: relative;
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.config-arquivo-entrada {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.config-arquivo-desabilitado {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Prévias da identidade */
+
+.config-previas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.config-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.config-previa-rotulo {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.config-previa-lateral {
+  width: 100%;
+  max-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  min-width: 0;
+}
+
+.config-previa-lateral-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--raio-pequeno);
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  min-width: 0;
+}
+
+.config-previa-logo-pequena {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--cor-superficie);
+}
+
+.config-remocao-senha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.config-previa-nome-lateral {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-previa-item {
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--raio-pequeno);
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.config-previa-item-ativo {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria-escura);
+  font-weight: 600;
+}
+
+.config-previa-login {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  text-align: center;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+  min-width: 0;
+}
+
+.config-previa-logo-grande {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.config-previa-nome-login {
+  overflow-wrap: anywhere;
+}
+
+.config-previa-slogan {
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.config-previa-botao {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.5rem 1.2rem;
+  border-radius: var(--raio-pequeno);
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  font-weight: 600;
+  box-shadow: var(--sombra-primaria);
+}
+
+/* Cores */
+
+.config-cores {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.config-predefinidas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.config-predefinida {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.config-predefinida-ativa {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 2px var(--cor-primaria-suave);
+}
+
+.config-predefinida-amostra {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.config-predefinida-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.config-cores-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 1rem;
+  min-width: 0;
+}
+
+.config-cor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.config-cor-controles {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.config-cor-seletor {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 42px;
+  padding: 2px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+  cursor: pointer;
+}
+
+.config-cor-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.config-previa-cores {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.config-faixa-gradiente {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+}
+
+.config-previa-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.config-selo-primaria {
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria-escura);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.config-link-primaria {
+  color: var(--cor-primaria);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

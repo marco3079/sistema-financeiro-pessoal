@@ -1,0 +1,29 @@
+/* Orçamento e metas. Cores só por variáveis de estilo.css. */
+
+.planejamento-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.planejamento-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planejamento-item-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.planejamento-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

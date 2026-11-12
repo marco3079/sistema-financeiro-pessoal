@@ -1,0 +1,891 @@
+/* ===== Variáveis (contrato visual de docs/plano/redesenho.md) ===== */
+:root {
+  --cor-fundo: #f3f6fc;
+  --cor-superficie: #ffffff;
+  --cor-superficie-2: #f6f8fd;
+  --cor-texto: #0f172a;
+  --cor-texto-suave: #64748b;
+  --cor-borda: #e6ebf5;
+  --cor-primaria: #2563eb;
+  --cor-primaria-escura: #1d4ed8;
+  --cor-primaria-suave: #e8f0fe;
+  --gradiente-primario: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  --cor-sobre-primaria: #ffffff;
+  --cor-roxo: #7c3aed;
+  --cor-roxo-suave: #efe9fe;
+  --cor-verde: #10b981;
+  --cor-verde-suave: #e3f8f0;
+  --cor-laranja: #f59e0b;
+  --cor-laranja-suave: #fef3dc;
+  --cor-azul-suave: #e8f0fe;
+  --cor-perigo: #dc2626;
+  --cor-sucesso: #059669;
+  --cor-aviso: #d97706;
+  --cor-info: #2563eb;
+  --raio: 16px;
+  --raio-pequeno: 10px;
+  --sombra: 0 4px 20px rgba(15, 23, 42, 0.06);
+  --sombra-primaria: 0 6px 16px rgba(37, 99, 235, 0.28);
+  --largura-lateral: 240px;
+  --altura-barra-inferior: 64px;
+  --altura-toque: 44px;
+  --fonte: Inter, 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  color-scheme: light;
+}
+
+/*
+ * Tema escuro, em dois casos (contrato do tema, docs/plano/v-tema-e-perfil.md):
+ * 1) o usuário escolheu "Escuro" (data-tema='escuro' no <html>);
+ * 2) o usuário está em "Sistema" (sem data-tema) e o aparelho está no escuro.
+ * As duas listas de variáveis têm de ficar iguais.
+ */
+:root[data-tema='escuro'] {
+  color-scheme: dark;
+  --cor-fundo: #070d1a;
+  --cor-superficie: #0e1627;
+  --cor-superficie-2: #131d33;
+  --cor-texto: #f1f5f9;
+  --cor-texto-suave: #94a3b8;
+  --cor-borda: #1c2740;
+  --cor-primaria: #3b82f6;
+  --cor-primaria-escura: #2563eb;
+  --cor-primaria-suave: #12244a;
+  --gradiente-primario: linear-gradient(135deg, #3b82f6, #1e40af);
+  --cor-sobre-primaria: #ffffff;
+  --cor-roxo: #a78bfa;
+  --cor-roxo-suave: #231a47;
+  --cor-verde: #34d399;
+  --cor-verde-suave: #0c2b25;
+  --cor-laranja: #fbbf24;
+  --cor-laranja-suave: #33240a;
+  --cor-azul-suave: #12244a;
+  --cor-perigo: #f87171;
+  --cor-sucesso: #34d399;
+  --cor-aviso: #fbbf24;
+  --cor-info: #60a5fa;
+  --raio: 16px;
+  --raio-pequeno: 10px;
+  --sombra: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --sombra-primaria: 0 6px 16px rgba(37, 99, 235, 0.35);
+  --largura-lateral: 240px;
+  --altura-barra-inferior: 64px;
+  --altura-toque: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    color-scheme: dark;
+    --cor-fundo: #070d1a;
+    --cor-superficie: #0e1627;
+    --cor-superficie-2: #131d33;
+    --cor-texto: #f1f5f9;
+    --cor-texto-suave: #94a3b8;
+    --cor-borda: #1c2740;
+    --cor-primaria: #3b82f6;
+    --cor-primaria-escura: #2563eb;
+    --cor-primaria-suave: #12244a;
+    --gradiente-primario: linear-gradient(135deg, #3b82f6, #1e40af);
+    --cor-sobre-primaria: #ffffff;
+    --cor-roxo: #a78bfa;
+    --cor-roxo-suave: #231a47;
+    --cor-verde: #34d399;
+    --cor-verde-suave: #0c2b25;
+    --cor-laranja: #fbbf24;
+    --cor-laranja-suave: #33240a;
+    --cor-azul-suave: #12244a;
+    --cor-perigo: #f87171;
+    --cor-sucesso: #34d399;
+    --cor-aviso: #fbbf24;
+    --cor-info: #60a5fa;
+    --raio: 16px;
+    --raio-pequeno: 10px;
+    --sombra: 0 4px 20px rgba(0, 0, 0, 0.35);
+    --sombra-primaria: 0 6px 16px rgba(37, 99, 235, 0.35);
+    --largura-lateral: 240px;
+    --altura-barra-inferior: 64px;
+    --altura-toque: 44px;
+  }
+}
+
+/* ===== Base ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+}
+
+body {
+  font-family: var(--fonte);
+  font-size: 16px;
+  line-height: 1.45;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+img,
+svg {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+
+/* ===== Botões ===== */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--altura-toque);
+  padding: 0.5rem 1rem;
+  border-radius: var(--raio-pequeno);
+  border: 1px solid transparent;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.botao:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.botao:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.botao-primario {
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  box-shadow: var(--sombra-primaria);
+}
+
+.botao-primario:hover:not(:disabled) {
+  background: var(--cor-primaria-escura);
+}
+
+.botao-secundario {
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  border-color: var(--cor-borda);
+}
+
+.botao-perigo {
+  background: var(--cor-perigo);
+  color: var(--cor-sobre-primaria);
+}
+
+.botao-texto {
+  background: transparent;
+  color: var(--cor-primaria);
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+/* ===== Selos e avisos ===== */
+.selo {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+
+.selo-verde {
+  background: var(--cor-verde-suave);
+  color: var(--cor-sucesso);
+}
+
+.selo-amarelo {
+  background: var(--cor-laranja-suave);
+  color: var(--cor-aviso);
+}
+
+.selo-vermelho {
+  background: color-mix(in srgb, var(--cor-perigo) 14%, transparent);
+  color: var(--cor-perigo);
+}
+
+.selo-azul {
+  background: var(--cor-azul-suave);
+  color: var(--cor-primaria);
+}
+
+.selo-cinza {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+
+.aviso {
+  padding: 0.75rem 1rem;
+  border-radius: var(--raio-pequeno);
+  border: 0;
+  border-left: 4px solid;
+  margin-bottom: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.aviso-erro {
+  border-left-color: var(--cor-perigo);
+  color: var(--cor-perigo);
+  background: color-mix(in srgb, var(--cor-perigo) 10%, transparent);
+}
+
+.aviso-sucesso {
+  border-left-color: var(--cor-sucesso);
+  color: var(--cor-sucesso);
+  background: color-mix(in srgb, var(--cor-sucesso) 10%, transparent);
+}
+
+.aviso-info {
+  border-left-color: var(--cor-info);
+  color: var(--cor-info);
+  background: color-mix(in srgb, var(--cor-info) 10%, transparent);
+}
+
+.carregando {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Página e cartões ===== */
+.pagina {
+  min-width: 0;
+}
+
+.pagina-cabecalho {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.pagina-cabecalho h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.pagina-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.1rem 1.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cartao-titulo {
+  margin-bottom: 0.75rem;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.cartao-indicador-valor {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--cor-texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cartao-indicador-rotulo {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Tabela (cartões no celular) ===== */
+.tabela-desktop {
+  display: none;
+}
+
+.tabela-cartoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tabela-cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.1rem 1.25rem;
+  min-width: 0;
+}
+
+.tabela-par {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+
+.tabela-par-titulo {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+.tabela-par-titulo::after {
+  content: ':';
+}
+
+.tabela-par-valor {
+  overflow-wrap: anywhere;
+}
+
+.tabela-vazia {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+
+.clicavel {
+  cursor: pointer;
+}
+
+.tabela-cartao.clicavel:hover,
+.tabela tbody tr.clicavel:hover {
+  border-color: var(--cor-primaria);
+}
+
+/* ===== Campos ===== */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+  min-width: 0;
+}
+
+.campo-rotulo {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.campo-controle {
+  width: 100%;
+  min-height: var(--altura-toque);
+  padding: 0.5rem 0.75rem;
+  font-size: 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+.campo-controle:focus {
+  border-color: var(--cor-primaria);
+  box-shadow: 0 0 0 3px var(--cor-primaria-suave);
+}
+
+textarea.campo-controle {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.caixa {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: var(--altura-toque);
+  margin-bottom: 0.9rem;
+  cursor: pointer;
+}
+
+.caixa input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+}
+
+/* ===== Modal ===== */
+.modal-fundo {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 100;
+  display: flex;
+}
+
+.modal {
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.modal-cabecalho h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modal-fechar {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-corpo {
+  padding: 1rem;
+  flex: 1;
+}
+
+/* ===== Abas ===== */
+.abas {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  max-width: 100%;
+}
+
+.aba {
+  min-height: var(--altura-toque);
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+.aba:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.aba-ativa {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  font-weight: 700;
+}
+
+/* ===== Celular pequeno: nada de rolagem horizontal ===== */
+@media (max-width: 359px) {
+  .cartao,
+  .tabela-cartao {
+    padding: 0.75rem;
+  }
+}
+
+/* ===== Abaixo de 720 px: modal em tela cheia, grades em uma coluna ===== */
+
+/* ===== A partir de 720 px ===== */
+@media (min-width: 720px) {
+  .pagina-cabecalho {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .pagina-acoes {
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .tabela-desktop {
+    display: block;
+    overflow-x: auto;
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+  }
+
+  .tabela-cartoes {
+    display: none;
+  }
+
+  .tabela {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--cor-superficie);
+  }
+
+  .tabela th,
+  .tabela td {
+    text-align: left;
+    padding: 0.8rem 0.75rem;
+    border-bottom: 1px solid var(--cor-borda);
+    vertical-align: middle;
+  }
+
+  /* Sem quebra de linha só na tabela larga; nos cartões do celular o texto quebra. */
+  .tabela-desktop .sem-quebra {
+    white-space: nowrap;
+  }
+
+  .tabela-desktop tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .tabela th:first-child,
+  .tabela td:first-child {
+    padding-left: 1.25rem;
+  }
+
+  .tabela th:last-child,
+  .tabela td:last-child {
+    padding-right: 1.25rem;
+  }
+
+  .tabela th {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cor-texto-suave);
+    background: var(--cor-superficie-2);
+  }
+
+  .tabela tbody tr:hover {
+    background: var(--cor-superficie-2);
+  }
+
+  .modal-fundo {
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 560px;
+    height: auto;
+    max-height: 90vh;
+    border-radius: var(--raio);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  }
+
+  .grade {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+/* ===== Espaçamento entre os blocos das páginas internas ===== */
+/* Margens verticais de bloco colapsam: .abas (margin-bottom) e .aviso não se somam ao espaço de 1rem */
+.pagina > * + * {
+  margin-top: 1rem;
+}
+
+/* Popups de posição fixa filhos diretos de .pagina não recebem o espaçamento acima */
+.pagina > .modal-fundo {
+  margin-top: 0;
+}
+
+.pagina > [role="dialog"],
+.pagina > [class$="-fundo"] {
+  margin-top: 0;
+}
+
+/* ===== Resumo (indicadores em cartões com ícone) ===== */
+.resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* No celular, dois cartões por linha em vez de um embaixo do outro. */
+@media (max-width: 560px) {
+  .resumo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  .resumo .resumo-item {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    gap: 8px;
+    min-width: 0;
+  }
+  .resumo .resumo-icone {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    flex: none;
+  }
+  .resumo .resumo-valor {
+    font-size: 1rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .resumo .resumo-rotulo {
+    font-size: 0.78rem;
+  }
+}
+
+.resumo-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  min-width: 0;
+}
+
+.resumo-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.resumo-icone-azul {
+  background: var(--cor-azul-suave);
+  color: var(--cor-primaria);
+}
+
+.resumo-icone-roxo {
+  background: var(--cor-roxo-suave);
+  color: var(--cor-roxo);
+}
+
+.resumo-icone-verde {
+  background: var(--cor-verde-suave);
+  color: var(--cor-verde);
+}
+
+.resumo-icone-laranja {
+  background: var(--cor-laranja-suave);
+  color: var(--cor-laranja);
+}
+
+.resumo-icone-vermelho {
+  background: color-mix(in srgb, var(--cor-perigo) 14%, transparent);
+  color: var(--cor-perigo);
+}
+
+.resumo-valor {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--cor-texto);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resumo-rotulo {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Barra de ferramentas (filtros + botão de ação) ===== */
+.barra-ferramentas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.barra-ferramentas > .filtros {
+  flex: 1 1 320px;
+}
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 240px));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.filtros > .campo {
+  margin-bottom: 0;
+}
+
+/* Abaixo de 520 px: filtros em uma coluna e botão da barra em largura total */
+@media (max-width: 519px) {
+  .filtros {
+    grid-template-columns: 1fr;
+  }
+
+  .barra-ferramentas > .botao {
+    width: 100%;
+  }
+}
+
+/* ===== Tabela: alinhamento e coluna de ações (terceira leva) ===== */
+/* Seletor .tabela .x supera a regra .tabela th/td de 720 px (text-align: left). */
+.tabela .tabela-alinhar-esquerda {
+  text-align: left;
+}
+
+.tabela .tabela-alinhar-centro {
+  text-align: center;
+}
+
+.tabela .tabela-alinhar-direita {
+  text-align: right;
+}
+
+.tabela .tabela-coluna-acoes {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Cartão do celular: a célula de ações fica no fim, alinhada à direita, sem rótulo. */
+.tabela-par-acoes {
+  align-items: flex-end;
+}
+
+/* Texto que só os leitores de tela leem (cabeçalho da coluna de ações sem título visível). */
+.tabela-oculto-visual {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ===== Avatar (foto ou iniciais, redondo) ===== */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== Controle segmentado (alterna visões) ===== */
+.segmentado {
+  display: inline-flex;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.25rem;
+  overflow-x: auto;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+}
+
+.segmentado-item {
+  min-height: 40px;
+  padding: 0.35rem 0.8rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmentado-item:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.segmentado-item[aria-pressed="true"] {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}

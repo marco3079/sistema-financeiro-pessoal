@@ -1,0 +1,720 @@
+/* ===== Meu perfil (cores, raios e sombras só por variáveis de ui/estilo.css) ===== */
+
+/* Cores de apoio: fundo suave e cor de destaque de cada família */
+.perfil-cor-azul {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+
+.perfil-cor-roxo {
+  background: var(--cor-roxo-suave);
+  color: var(--cor-roxo);
+}
+
+.perfil-cor-verde {
+  background: var(--cor-verde-suave);
+  color: var(--cor-verde);
+}
+
+.perfil-cor-laranja {
+  background: var(--cor-laranja-suave);
+  color: var(--cor-laranja);
+}
+
+/* ===== Cabeçalho ===== */
+
+.perfil-cabecalho {
+  position: relative;
+  padding: 0 0 18px;
+  overflow: visible;
+}
+
+/* Faixa colorida só como fundo decorativo no topo (altura fixa) */
+.perfil-capa {
+  height: 96px;
+  border-radius: var(--raio) var(--raio) 0 0;
+  background: var(--gradiente-primario);
+}
+
+/* Todo o texto fica abaixo da faixa, sobre o fundo do cartão */
+.perfil-cabecalho-corpo {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 0 20px;
+}
+
+/* Avatar sobrepõe a borda inferior da faixa (metade de 96 px) */
+.perfil-foto-grande {
+  flex-shrink: 0;
+  margin-top: -48px;
+  border: 4px solid var(--cor-superficie);
+  border-radius: 50%;
+  box-shadow: var(--sombra);
+}
+
+.perfil-identidade {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 200px;
+  padding-top: 12px;
+  color: var(--cor-texto);
+}
+
+.perfil-nome-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.perfil-nome {
+  margin: 0;
+  min-width: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.perfil-acao-foto {
+  flex-shrink: 0;
+}
+
+.perfil-papel {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.perfil-linha-id,
+.perfil-desde {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+/* ===== Abas e cartões ===== */
+
+.perfil-secao-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.perfil-secao-cabecalho .cartao-titulo {
+  margin: 0;
+}
+
+.perfil-nota {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+}
+
+.perfil-vazio {
+  margin: 8px 0 0;
+  color: var(--cor-texto-suave);
+}
+
+.perfil-pontos {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+}
+
+/* ===== Nível e pontos ===== */
+
+.perfil-nivel-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.perfil-nivel-titulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.perfil-nivel-pontos {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cor-primaria);
+}
+
+.perfil-barra-nivel {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  overflow: hidden;
+}
+
+.perfil-barra-nivel > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cor-primaria);
+  transition: width 0.4s ease;
+}
+
+.perfil-nivel-faltam {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Resumo (cartões de indicador) ===== */
+
+/* Blocos da Visão geral: intervalo único de 1rem entre nível, indicadores, medalhas e atividade */
+.perfil-visao {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.perfil-indicadores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .perfil-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.perfil-indicador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+}
+
+.perfil-indicador-icone {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--raio-pequeno);
+}
+
+.perfil-indicador-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.perfil-indicador-valor {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.perfil-indicador-rotulo {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Medalhas ===== */
+
+.perfil-medalhas .cartao-titulo {
+  margin: 0;
+}
+
+.perfil-contador {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.perfil-pilulas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+
+.perfil-pilula {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.perfil-pilula-ativa {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+
+.perfil-grade-medalhas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perfil-medalha {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 16px 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra);
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.perfil-medalha:hover,
+.perfil-medalha:focus-visible {
+  border-color: var(--cor-primaria);
+}
+
+.perfil-medalha-bloqueada {
+  background: var(--cor-superficie-2);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.perfil-medalha-titulo {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.perfil-medalha-descricao {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.perfil-medalha-origem {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+/* Emblema redondo de 64 px (96 px no detalhe) */
+.perfil-emblema {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  box-shadow: var(--sombra-primaria);
+}
+
+.perfil-emblema-grande {
+  width: 96px;
+  height: 96px;
+}
+
+.perfil-emblema-bloqueado {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+  box-shadow: none;
+  border: 2px dashed var(--cor-borda);
+  opacity: 0.55;
+}
+
+.perfil-emblema-cadeado {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-suave);
+  border: 1px solid var(--cor-borda);
+  box-shadow: var(--sombra);
+}
+
+.perfil-progresso {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.perfil-progresso-barra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  overflow: hidden;
+}
+
+.perfil-progresso-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+}
+
+.perfil-progresso-texto {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Detalhe da medalha (modal) */
+.perfil-detalhe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.perfil-detalhe-titulo {
+  margin: 4px 0 0;
+  font-size: 1.15rem;
+}
+
+.perfil-detalhe-descricao,
+.perfil-detalhe-linha {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+/* ===== Atividade recente ===== */
+
+.perfil-atividade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perfil-atividade-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.perfil-atividade-item:last-child {
+  border-bottom: 0;
+}
+
+.perfil-atividade-icone {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--raio-pequeno);
+}
+
+.perfil-atividade-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.perfil-atividade-descricao {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.perfil-atividade-meta {
+  font-size: 0.78rem;
+  color: var(--cor-texto-suave);
+}
+
+/* ===== Popup de foto ===== */
+
+.perfil-foto-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.perfil-foto-previa {
+  align-self: center;
+  box-shadow: var(--sombra);
+}
+
+.perfil-foto-acoes {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.perfil-arquivo-botao {
+  position: relative;
+  align-self: flex-start;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.perfil-arquivo-desabilitado {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.perfil-arquivo-entrada {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ===== Dados e segurança ===== */
+
+.perfil-dados {
+  max-width: 1100px;
+}
+
+/* Uma coluna no celular; duas colunas iguais a partir de 900 px */
+.perfil-dados-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  max-width: 1100px;
+}
+
+.perfil-dados-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .perfil-dados-grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Título de cartão com ícone à esquerda */
+.perfil-titulo-com-icone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perfil-titulo-com-icone > svg {
+  flex-shrink: 0;
+  color: var(--cor-primaria);
+}
+
+/* Lista "rótulo à esquerda, valor à direita", com divisória fina entre as linhas */
+.perfil-lista {
+  margin: 0;
+  padding: 0;
+}
+
+.perfil-lista-linha {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.perfil-lista-linha:last-child {
+  border-bottom: 0;
+}
+
+.perfil-lista-linha dt {
+  flex-shrink: 0;
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+}
+
+.perfil-lista-linha dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  font-weight: 600;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+/* Botões de formulário alinhados à esquerda (o padrão do sistema é à direita) */
+.perfil-dados .perfil-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Seletor de tema: três cartões lado a lado */
+.perfil-temas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.perfil-tema {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 8px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.perfil-tema:hover,
+.perfil-tema:focus-visible {
+  border-color: var(--cor-primaria);
+}
+
+.perfil-tema-ativo {
+  border-color: var(--cor-primaria);
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+}
+
+.perfil-tema-icone {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+}
+
+.perfil-tema-rotulo {
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.perfil-tema-legenda {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+}
+
+.perfil-tema-ativo .perfil-tema-legenda {
+  color: var(--cor-primaria);
+}
+
+/* Celular estreito: cabe nos três cartões com menos respiro */
+@media (max-width: 400px) {
+  .perfil-temas {
+    gap: 6px;
+  }
+
+  .perfil-tema {
+    padding: 12px 4px;
+  }
+
+  .perfil-tema-rotulo {
+    font-size: 0.82rem;
+  }
+
+  .perfil-tema-legenda {
+    font-size: 0.7rem;
+  }
+}
+
+/* ===== Organização em telas pequenas ===== */
+
+/* Cabeçalho em telas estreitas: avatar em cima, texto abaixo, botão "Trocar foto" em largura total */
+@media (max-width: 560px) {
+  .perfil-cabecalho-corpo {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .perfil-foto-grande {
+    align-self: flex-start;
+  }
+
+  .perfil-identidade {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .perfil-nome-linha {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .perfil-acao-foto,
+  .perfil-acao-foto > .botao {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .perfil-grade-medalhas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
