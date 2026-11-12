@@ -38,8 +38,8 @@ Opções úteis: `-Demo` no Windows ou `--demo` no Linux/macOS carrega dados de 
 ## O que dizer à pessoa no fim
 
 - O endereço do site (`http://localhost:<WEB_PORT>`).
-- O e-mail do titular (`admin@financas.local`, ou o valor de `ADMIN_EMAIL` do `.env`).
-- A senha do titular: `admin1234` (padrão, ou o valor de `ADMIN_SENHA` do `.env` se a pessoa tiver definido outra).
+- O e-mail do titular (`demo@financas.local`, ou o valor de `ADMIN_EMAIL` do `.env`).
+- A senha do titular: `demo1234` (padrão, ou o valor de `ADMIN_SENHA` do `.env` se a pessoa tiver definido outra).
 - Que ela deve trocar a senha em "Meu perfil" logo no primeiro acesso.
 
 ## Regras para o assistente

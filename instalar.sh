@@ -149,7 +149,7 @@ if [ -f "$ARQ_ENV" ]; then
 fi
 ENV_CRIADO_AGORA=0
 SENHA_ADMIN=""
-ADMIN_EMAIL="admin@financas.local"
+ADMIN_EMAIL="demo@financas.local"
 ADMIN_SENHA_EXISTENTE=""
 
 # [2/6] Docker instalado
@@ -246,7 +246,7 @@ else
   fi
   SENHA_BANCO=$(gerar_segredo 24)
   SEGREDO_JWT=$(gerar_segredo 48)
-  SENHA_ADMIN="admin1234"
+  SENHA_ADMIN="demo1234"
   SEED_DEMO=false
   if [ "$DEMO" -eq 1 ]; then
     SEED_DEMO=true
@@ -257,7 +257,7 @@ else
 # Gerado pelo instalar.sh. Nao envie este arquivo para o Git.
 POSTGRES_PASSWORD=$SENHA_BANCO
 JWT_SECRET=$SEGREDO_JWT
-ADMIN_NOME=Titular
+ADMIN_NOME=Demo
 ADMIN_EMAIL=$ADMIN_EMAIL
 ADMIN_SENHA=$SENHA_ADMIN
 SEED_DEMO=$SEED_DEMO
@@ -304,8 +304,8 @@ if [ "$PRONTO" -ne 1 ]; then
 fi
 
 # Quadro final
-if [ "$ENV_CRIADO_AGORA" -eq 1 ] || [ -z "$ADMIN_SENHA_EXISTENTE" ] || [ "$ADMIN_SENHA_EXISTENTE" = "admin1234" ]; then
-  LINHA_SENHA='Senha:          admin1234 (padrao; troque em "Meu perfil")'
+if [ "$ENV_CRIADO_AGORA" -eq 1 ] || [ -z "$ADMIN_SENHA_EXISTENTE" ] || [ "$ADMIN_SENHA_EXISTENTE" = "demo1234" ]; then
+  LINHA_SENHA='Senha:          demo1234 (padrao; troque em "Meu perfil")'
 else
   LINHA_SENHA="Senha:          a senha esta no arquivo .env, variavel ADMIN_SENHA"
 fi

@@ -155,7 +155,7 @@ $arquivoEnv = Join-Path $PSScriptRoot '.env'
 $envExiste = Test-Path -LiteralPath $arquivoEnv
 $envCriadoAgora = $false
 $senhaAdmin = ''
-$adminEmail = 'admin@financas.local'
+$adminEmail = 'demo@financas.local'
 $adminSenhaExistente = ''
 
 # [2/6] Docker instalado
@@ -234,14 +234,14 @@ if ($envExiste) {
     }
     $senhaBanco = Gerar-Segredo -Tamanho 24
     $segredoJwt = Gerar-Segredo -Tamanho 48
-    $senhaAdmin = 'admin1234'
+    $senhaAdmin = 'demo1234'
     $seedDemo = 'false'
     if ($Demo) { $seedDemo = 'true' }
     $linhas = @(
         '# Gerado pelo instalar.ps1. Nao envie este arquivo para o Git.',
         ('POSTGRES_PASSWORD=' + $senhaBanco),
         ('JWT_SECRET=' + $segredoJwt),
-        'ADMIN_NOME=Titular',
+        'ADMIN_NOME=Demo',
         ('ADMIN_EMAIL=' + $adminEmail),
         ('ADMIN_SENHA=' + $senhaAdmin),
         ('SEED_DEMO=' + $seedDemo),
@@ -286,8 +286,8 @@ if (-not $prontoApi) {
 }
 
 # Quadro final
-if ($envCriadoAgora -or $adminSenhaExistente -eq '' -or $adminSenhaExistente -eq 'admin1234') {
-    $linhaSenha = 'Senha:          admin1234 (padrao; troque em "Meu perfil")'
+if ($envCriadoAgora -or $adminSenhaExistente -eq '' -or $adminSenhaExistente -eq 'demo1234') {
+    $linhaSenha = 'Senha:          demo1234 (padrao; troque em "Meu perfil")'
 } else {
     $linhaSenha = 'Senha:          a senha esta no arquivo .env, variavel ADMIN_SENHA'
 }

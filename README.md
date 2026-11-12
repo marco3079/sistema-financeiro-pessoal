@@ -108,8 +108,8 @@ O passo a passo completo, com perguntas frequentes, está em [INSTALAR.md](INSTA
 
 ## Primeiro acesso
 
-- E-mail: `admin@financas.local`
-- Senha: `admin1234`
+- E-mail: `demo@financas.local`
+- Senha: `demo1234`
 
 Troque a senha em **Meu perfil** logo no primeiro acesso. Depois, conecte seu banco em **Conexões** ou cadastre suas contas à mão em **Contas**.
 
@@ -151,7 +151,7 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 |---|---|---|
 | `POSTGRES_PASSWORD` | Senha do banco | aleatória |
 | `JWT_SECRET` | Segredo dos logins e da cifra dos segredos guardados no banco | aleatório |
-| `ADMIN_NOME`, `ADMIN_EMAIL`, `ADMIN_SENHA` | Conta do titular criada na primeira subida | `Titular`, `admin@financas.local`, `admin1234` |
+| `ADMIN_NOME`, `ADMIN_EMAIL`, `ADMIN_SENHA` | Conta do titular criada na primeira subida | `Titular`, `demo@financas.local`, `demo1234` |
 | `SEED_DEMO` | `true` carrega os dados de demonstração | `false` |
 | `WEB_PORT` | Porta do site | `8092` |
 | `API_PORT` | Porta da API (só neste computador) | `3092` |

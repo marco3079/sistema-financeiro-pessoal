@@ -23,9 +23,9 @@ services:
       DATABASE_URL: "postgresql://financas:${POSTGRES_PASSWORD:-financas}@db:5432/financas?schema=public"
       JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-de-exemplo}
       PORT: "3000"
-      ADMIN_NOME: ${ADMIN_NOME:-Titular}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@financas.local}
-      ADMIN_SENHA: ${ADMIN_SENHA:-admin1234}
+      ADMIN_NOME: ${ADMIN_NOME:-Demo}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-demo@financas.local}
+      ADMIN_SENHA: ${ADMIN_SENHA:-demo1234}
       SEED_DEMO: ${SEED_DEMO:-false}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
       PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}

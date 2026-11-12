@@ -14,7 +14,7 @@ Se você usa um assistente com acesso ao terminal (Claude Code, Cursor, Copilot 
 
 > Instale o sistema financeiro pessoal do repositório https://github.com/marco3079/sistema-financeiro-pessoal neste computador seguindo o arquivo AGENTS.md do repositório. Ao terminar, me diga o endereço para abrir no navegador e o e-mail e a senha do titular.
 
-O assistente baixa o projeto, roda o instalador e avisa o endereço do site. A senha inicial do titular é `admin1234` (e-mail `admin@financas.local`); o assistente informa as duas e avisa para trocar a senha no primeiro acesso.
+O assistente baixa o projeto, roda o instalador e avisa o endereço do site. A senha inicial do titular é `demo1234` (e-mail `demo@financas.local`); o assistente informa as duas e avisa para trocar a senha no primeiro acesso.
 
 ## Jeito 2: com um comando
 
@@ -39,8 +39,8 @@ bash instalar.sh
 O instalador confere o Docker, oferece instalar o que faltar, cria o arquivo `.env` com segredos aleatórios, baixa tudo e sobe o sistema. No fim ele mostra:
 
 - o endereço do site (por exemplo, `http://localhost:8092`);
-- o e-mail do titular (`admin@financas.local`);
-- a senha do titular (`admin1234`, a senha padrão; troque em "Meu perfil" no primeiro acesso).
+- o e-mail do titular (`demo@financas.local`);
+- a senha do titular (`demo1234`, a senha padrão; troque em "Meu perfil" no primeiro acesso).
 
 Se o instalador parar com uma mensagem, leia a mensagem: ela diz o que fazer. Os códigos de saída estão em `AGENTS.md`.
 
@@ -107,7 +107,7 @@ Os dados de demonstração são fictícios. Para usar de verdade, faça uma inst
 
 **Porta ocupada.** Na primeira instalação, se a porta 8092 (site) ou 3092 (API) já estiver em uso, o instalador escolhe a próxima livre e avisa qual usou. Confira o endereço no fim da instalação. Se já existe um arquivo `.env`, o instalador usa as portas dele e só avisa que estão ocupadas.
 
-**Esqueci a senha do titular.** Se você não trocou a senha, ela é `admin1234`, com o e-mail `admin@financas.local` (ou o que estiver em `ADMIN_EMAIL` no arquivo `.env`). Se você definiu outra senha em `ADMIN_SENHA` no `.env`, ela está lá. Se já trocou e esqueceu, a saída é apagar o banco (`docker compose down -v`, o que apaga todos os dados) e instalar de novo, ou pedir a outro administrador que redefina o acesso.
+**Esqueci a senha do titular.** Se você não trocou a senha, ela é `demo1234`, com o e-mail `demo@financas.local` (ou o que estiver em `ADMIN_EMAIL` no arquivo `.env`). Se você definiu outra senha em `ADMIN_SENHA` no `.env`, ela está lá. Se já trocou e esqueceu, a saída é apagar o banco (`docker compose down -v`, o que apaga todos os dados) e instalar de novo, ou pedir a outro administrador que redefina o acesso.
 
 **O instalador parou com a mensagem "Ja existe um banco de dados desta instalacao" (código 6).** O banco de uma instalação anterior ainda existe, mas o arquivo `.env` com a senha dele não está na pasta. Duas saídas: (a) se você tem o `.env` antigo, copie-o de volta para a pasta do projeto e rode o instalador de novo; (b) se você não precisa mais dos dados antigos, apague o banco com `docker compose down -v` (isso apaga tudo) e rode o instalador de novo. O instalador não apaga nada sozinho.
 
