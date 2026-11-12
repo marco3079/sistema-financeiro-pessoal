@@ -22,7 +22,10 @@ const CATEGORIAS_PADRAO: { nome: string; tipo: TipoTransacao; cor: string }[] = 
   { nome: 'Outras receitas', tipo: 'RECEITA', cor: '#64748b' },
 ];
 
-// Idempotente: categorias que já existem são mantidas.
-export async function criarCategoriasPadrao(prisma: PrismaClient): Promise<void> {
-  await prisma.categoria.createMany({ data: CATEGORIAS_PADRAO, skipDuplicates: true });
+// Cria as categorias padrão de um perfil financeiro. Idempotente: as que já existem (mesmo nome e tipo) são mantidas.
+export async function criarCategoriasPadrao(prisma: PrismaClient, perfilId = 1): Promise<void> {
+  const existentes = await prisma.categoria.findMany({ where: { perfilId }, select: { nome: true, tipo: true } });
+  const ja = new Set(existentes.map((c) => c.tipo + '|' + c.nome));
+  const novas = CATEGORIAS_PADRAO.filter((c) => !ja.has(c.tipo + '|' + c.nome)).map((c) => ({ ...c, perfilId }));
+  if (novas.length > 0) await prisma.categoria.createMany({ data: novas });
 }

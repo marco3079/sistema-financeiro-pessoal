@@ -25,3 +25,16 @@
   opacity: 0;
   overflow: hidden;
 }
+
+/* Prévia de um arquivo: cabeçalho, avisos, campos, resumo e tabela com o mesmo respiro entre si. */
+.importar-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.importar-previa > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}

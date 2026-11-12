@@ -1,0 +1,159 @@
+/* Tela Análise: cores só pelas variáveis do tema. */
+
+.analise-positivo {
+  color: var(--cor-sucesso);
+  font-weight: 600;
+}
+
+.analise-negativo {
+  color: var(--cor-perigo);
+  font-weight: 600;
+}
+
+.analise-suave {
+  color: var(--cor-texto-suave);
+  margin: 0 0 0.75rem;
+}
+
+/* Sugestões */
+
+.analise-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.analise-sugestao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--cor-borda);
+  border-left-width: 4px;
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.analise-sugestao-alerta {
+  border-left-color: var(--cor-aviso);
+}
+
+.analise-sugestao-dica {
+  border-left-color: var(--cor-primaria);
+}
+
+.analise-sugestao-bom {
+  border-left-color: var(--cor-verde);
+}
+
+.analise-sugestao p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.analise-sugestao a {
+  align-self: flex-start;
+  font-weight: 600;
+  color: var(--cor-primaria);
+}
+
+/* Gráfico de barras (div, sem biblioteca) */
+
+.analise-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  height: 200px;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.analise-grupo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  height: 100%;
+  min-width: 44px;
+  flex: 0 0 auto;
+}
+
+.analise-colunas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+
+.analise-barra {
+  display: block;
+  width: 14px;
+  border-radius: 4px 4px 0 0;
+  flex: 0 0 auto;
+}
+
+.analise-barra-receita {
+  background: var(--cor-verde);
+}
+
+.analise-barra-despesa {
+  background: var(--cor-perigo);
+}
+
+.analise-rotulo-mes {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.analise-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.analise-legenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.analise-cor {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* Texto só para leitor de tela */
+.analise-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.analise-investimentos-acoes {
+  margin-top: 0.75rem;
+}
+
+.analise-investimentos-acoes a {
+  font-weight: 600;
+  color: var(--cor-primaria);
+}

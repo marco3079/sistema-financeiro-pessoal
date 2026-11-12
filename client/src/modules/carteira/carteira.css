@@ -1,0 +1,77 @@
+/* Tela Carteira: o que é comum às quatro abas. Cada aba tem o próprio arquivo de estilos. */
+
+.cart-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.cart-atualizando {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.cart-positivo {
+  color: var(--cor-sucesso, var(--cor-verde));
+}
+
+.cart-negativo {
+  color: var(--cor-perigo);
+}
+
+/* Bloco "pior / melhor": faixa colorida à esquerda, rótulo, valor grande e percentual. */
+.cart-destaque {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-left: 4px solid var(--cor-borda);
+  border-radius: var(--raio);
+  min-width: 0;
+}
+
+.cart-destaque-bom {
+  border-left-color: var(--cor-sucesso, var(--cor-verde));
+}
+
+.cart-destaque-ruim {
+  border-left-color: var(--cor-aviso, var(--cor-perigo));
+}
+
+.cart-destaque-rotulo {
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+.cart-destaque-valor {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.cart-dupla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.cart-tripla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.cart-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-atualizando {
+    transition: none;
+  }
+}

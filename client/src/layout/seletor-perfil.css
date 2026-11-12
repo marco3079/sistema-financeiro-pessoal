@@ -1,0 +1,105 @@
+/* Seletor de perfil financeiro no topo. Cores só por variáveis do tema. */
+
+.seletor-perfil {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.seletor-perfil-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 0.35rem 0.75rem;
+  box-sizing: border-box;
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seletor-perfil-botao:focus-visible,
+.seletor-perfil-item:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.seletor-perfil-nome {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seletor-perfil-seta {
+  display: inline-flex;
+  color: var(--cor-texto-suave);
+}
+
+.seletor-perfil-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  min-width: 240px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.seletor-perfil-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.seletor-perfil-item:hover {
+  background: var(--cor-superficie-2);
+}
+
+.seletor-perfil-item-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seletor-perfil-item-valor {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.seletor-perfil-visto {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--cor-primaria);
+}
+
+.seletor-perfil-separador {
+  height: 1px;
+  margin: 0.35rem 0.25rem;
+  background: var(--cor-borda);
+}

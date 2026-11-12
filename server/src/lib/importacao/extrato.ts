@@ -542,6 +542,12 @@ export function analisarArquivo(entrada: {
   const doNome = dataNoNome(entrada.nome);
   let parcial: Omit<Analise, 'banco' | 'vencimento'>;
   let banco = detectarBanco(entrada.nome, entrada.formato === 'pdf' ? entrada.texto : '');
+  // Arquivo renomeado ("Fatura2026-11-01 (1).csv"): o cabeçalho do CSV denuncia o banco.
+  if (!banco && entrada.formato === 'csv') {
+    const cabecalho = entrada.texto.replace(/^\uFEFF/, '').slice(0, 300).split(/\r?\n/)[0].toLowerCase().replace(/\s+/g, '');
+    if (cabecalho.startsWith('data;estabelecimento;portador;valor;parcela')) banco = 'XP';
+    else if (cabecalho.startsWith('date,title,amount')) banco = 'Nubank';
+  }
   let vencimento: string | null = null;
 
   if (entrada.formato === 'ofx') {

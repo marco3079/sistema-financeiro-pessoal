@@ -1,0 +1,59 @@
+.botao-celular {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.botao-celular img {
+  max-width: 100%;
+  height: auto;
+}
+
+.botao-celular-texto {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  text-align: center;
+}
+
+.botao-celular-qr {
+  align-self: center;
+  background: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.botao-celular-endereco {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.1rem;
+  color: var(--cor-texto);
+  text-align: center;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.botao-celular-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.botao-celular-detalhes summary {
+  cursor: pointer;
+  color: var(--cor-primaria);
+}
+
+.botao-celular-detalhes .botao-celular {
+  margin-top: 1rem;
+}
+
+.botao-celular-rodape {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  text-align: center;
+}

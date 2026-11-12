@@ -183,7 +183,7 @@ export function PreviaB3(props: {
   ];
 
   return (
-    <div>
+    <div className="importar-previa">
       <div className="fin-cabecalho">
         <div>
           <strong>{nome}</strong>

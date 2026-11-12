@@ -7,10 +7,12 @@ import { useTema } from '../lib/tema';
 import { NOME_DO_PERFIL, RAIZ_DO_PERFIL } from '../lib/tipos';
 import type { Perfil } from '../lib/tipos';
 import { Icone } from '../ui/icones';
+import { BotaoCelular } from './BotaoCelular';
 import { Busca } from './Busca';
 import { agrupar } from './grupos';
 import { MenuUsuario } from './MenuUsuario';
 import { Notificacoes } from './Notificacoes';
+import { SeletorPerfil } from './SeletorPerfil';
 import './casca.css';
 
 const CONSULTA_CELULAR = '(max-width: 899px)';
@@ -130,6 +132,7 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
             <img src={logoSrc} alt="" className="casca-topo-celular-logo" width={28} height={28} />
             <span className="casca-topo-celular-nome">{portal}</span>
             <div className="casca-topo-celular-acoes">
+              <SeletorPerfil />
               <Notificacoes raiz={raizPortal} />
               <BotaoTema />
               <button
@@ -154,6 +157,8 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
             <header className="casca-topo">
               <Busca telas={menu} />
               <div className="casca-topo-acoes">
+                <SeletorPerfil />
+                <BotaoCelular />
                 <Notificacoes raiz={raizPortal} />
                 <BotaoTema />
                 <MenuUsuario />

@@ -1,0 +1,89 @@
+/* Gráficos em SVG (ui/graficos.tsx). */
+
+.grafico {
+  width: 100%;
+  min-width: 0;
+}
+
+.grafico svg {
+  display: block;
+  max-width: 100%;
+}
+
+.grafico-grade {
+  stroke: var(--cor-borda);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.grafico-zero {
+  stroke: var(--cor-texto-suave);
+  stroke-width: 1;
+}
+
+.grafico-eixo {
+  fill: var(--cor-texto-suave);
+  font-size: 11px;
+}
+
+.grafico-linha {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.grafico-area {
+  opacity: 0.18;
+  stroke: none;
+}
+
+.grafico-cursor {
+  stroke: var(--cor-texto-suave);
+  stroke-width: 1;
+}
+
+.grafico-faixa {
+  fill: transparent;
+}
+
+.grafico-faixa-ativa {
+  fill: var(--cor-borda);
+  opacity: 0.45;
+}
+
+.grafico-leitura,
+.grafico-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+.grafico-leitura strong {
+  color: var(--cor-texto);
+}
+
+.grafico-leitura span,
+.grafico-legenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.grafico-legenda-cor {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.grafico-vazio {
+  color: var(--cor-texto-suave);
+  margin: 0;
+}

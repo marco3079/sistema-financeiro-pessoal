@@ -27,10 +27,18 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-demo@financas.local}
       ADMIN_SENHA: ${ADMIN_SENHA:-demo1234}
       BRAPI_TOKEN: ${BRAPI_TOKEN:-}
+      # Endereço para abrir no celular (botão do QR code). No Windows o nome do computador vem sozinho.
+      ENDERECO_REDE: ${ENDERECO_REDE:-}
+      NOME_DA_MAQUINA: ${COMPUTERNAME:-${HOSTNAME:-}}
+      WEB_PORT: ${WEB_PORT:-8092}
+      # Drive: pasta sincronizada que guarda os dados (escolhida pelo conectar-drive.ps1). Vazio = desligado.
+      PASTA_DRIVE: ${PASTA_DRIVE:-}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
       PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
       PLUGGY_SANDBOX: ${PLUGGY_SANDBOX:-false}
       TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - ${PASTA_DRIVE:-./drive}:/drive
     ports:
       - "127.0.0.1:${API_PORT:-3092}:3000"
     healthcheck:

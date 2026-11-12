@@ -110,6 +110,11 @@ router.post(
   '/categorias',
   asyncHandler(async (req, res) => {
     const dados = validar(criarCategoriaSchema, req.body);
+    const repetida = await prisma.categoria.findFirst({
+      where: { tipo: dados.tipo, nome: { equals: dados.nome, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (repetida) throw new HttpError(409, 'Já existe uma categoria com esse nome');
     const criada = await prisma.categoria.create({
       data: { nome: dados.nome, tipo: dados.tipo, cor: dados.cor },
     });

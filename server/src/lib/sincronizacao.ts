@@ -7,7 +7,7 @@
 // - Nada do que foi digitado à mão (origem MANUAL) é tocado.
 
 import type { Prisma, StatusConexao, TipoConta, TipoInvestimento, TipoMovimentoInvestimento } from '@prisma/client';
-import { prisma } from './prisma';
+import { comPerfil, prisma } from './prisma';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
 import {
   listarContasDoItem,
@@ -563,7 +563,13 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
 export function sincronizarConexao(conexaoId: number, opcoes: { pedirAtualizacao?: boolean } = {}): Promise<void> {
   const atual = emAndamento.get(conexaoId);
   if (atual) return atual;
-  const execucao = executar(conexaoId, opcoes.pedirAtualizacao ?? false).finally(() => emAndamento.delete(conexaoId));
+  // Roda dentro do perfil financeiro dono da conexão, para o que for criado (contas, lançamentos) cair nele.
+  const execucao = prisma.conexaoBancaria
+    .findFirst({ where: { id: conexaoId }, select: { perfilId: true } })
+    .then((conexao) =>
+      conexao ? comPerfil(conexao.perfilId, () => executar(conexaoId, opcoes.pedirAtualizacao ?? false)) : undefined
+    )
+    .finally(() => emAndamento.delete(conexaoId));
   emAndamento.set(conexaoId, execucao);
   return execucao;
 }

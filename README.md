@@ -23,6 +23,10 @@
 - [Instalação rápida](#instalação-rápida)
 - [Primeiro acesso](#primeiro-acesso)
 - [Importar arquivos](#importar-arquivos)
+- [Drive: os mesmos dados em mais de um computador](#drive-os-mesmos-dados-em-mais-de-um-computador)
+- [Conectar IA (MCP)](#conectar-ia-mcp)
+- [Abrir no celular](#abrir-no-celular)
+- [Rendimento e índices](#rendimento-e-índices)
 - [Open Finance (opcional)](#open-finance-opcional)
 - [Configuração](#configuração)
 - [Arquitetura](#arquitetura)
@@ -48,6 +52,40 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 - **Planilha da B3** (movimentação ou posição, em XLSX): monta a carteira com quantidade e custo médio, importa compras, vendas e proventos, e traz desmarcados os ativos que parecem ter saído da carteira.
 - **Cotações automáticas** de ações, fundos imobiliários e ETFs pela brapi.dev, a cada 8 horas.
 - O arquivo é lido no navegador; o servidor recebe só o conteúdo e não guarda o arquivo.
+
+**Perfis financeiros**
+
+- Um login, vários perfis ("Pessoal", "Empresa", "Casal"): cada um com as próprias contas, cartões, faturas, investimentos, categorias, orçamento e metas.
+- A troca é feita pelo seletor no topo; os perfis são criados, renomeados e apagados em **Perfis financeiros**.
+
+**Análise e rendimento**
+
+- **Análise**: receitas e gastos mês a mês, por categoria e por estabelecimento, gastos que se repetem e sugestões calculadas a partir dos seus dados, separadas em gastos, receitas e investimentos.
+- **Rendimento**: quanto a carteira rendeu (valorização mais proventos) e quanto os mesmos aportes, nas mesmas datas, teriam rendido na Selic, no IPCA, no Ibovespa e no IFIX.
+- Renda fixa sem cotação tem o saldo corrigido pela taxa do título ("110% do CDI", "IPCA + 6%", "12% a.a.").
+- Projeção da carteira para 12 meses, supondo que cada classe repita o que o seu índice rendeu nos últimos 12.
+- **Próximas faturas**: as parcelas que ainda não foram cobradas, distribuídas mês a mês.
+
+**Carteira**
+
+- **Resumo**: patrimônio, desempenho do mês contra CDI e Ibovespa, distribuição por mercado e por instituição, histórico do patrimônio e ganho de capital mês a mês.
+- **Análises**: rentabilidade por dia, por mês e por ano contra CDI, Ibovespa, IPCA e IFIX, com o pior e o melhor de cada um; filtro por renda variável, fundos e renda fixa.
+- **Relatório**: rentabilidade por período, estatísticas, divisão por mercado e por instituição, tabela ano × meses e todos os ativos com rentabilidade acumulada e % do CDI. Imprime ou salva em PDF.
+- **Proventos**: histórico, mapa de calor mensal por ativo, distribuição e rendimento sobre o custo; agenda com o que foi recebido e uma estimativa dos próximos 12 meses.
+- Cotações e preços históricos vêm do Yahoo Finance, sem cadastro (o token da brapi.dev continua opcional).
+
+**Drive**
+
+- Os dados acompanham uma pasta sincronizada (Google Drive, OneDrive, Dropbox) para usar o sistema em mais de um computador.
+
+**Conectar IA (MCP)**
+
+- Servidor MCP embutido: assistentes como Claude, ChatGPT, Cursor e VS Code consultam seus dados para responder perguntas ("quanto gastei com mercado este ano?").
+- Cada chave de acesso é "só consulta" ou "consulta e lança", vale para um perfil financeiro e pode ser apagada a qualquer momento.
+
+**Abrir no celular**
+
+- O botão com o ícone de celular, no topo, mostra um QR code com o endereço deste computador na rede.
 
 **Open Finance (opcional)**
 
@@ -149,6 +187,87 @@ A planilha de **Posição** também é aceita (carteira do dia, com o valor atua
 
 Crie um token gratuito em [brapi.dev](https://brapi.dev) e cole no cartão **Cotações automáticas** da tela Importar (ou em `BRAPI_TOKEN` no `.env`). O saldo de cada ação, fundo imobiliário e ETF passa a ser quantidade × preço, atualizado a cada 8 horas. Renda fixa e Tesouro não têm cotação: o saldo fica o que você informar.
 
+## Drive: os mesmos dados em mais de um computador
+
+O sistema guarda em uma pasta do seu Drive uma cópia completa dos dados e a mantém atualizada. No outro computador, você instala o sistema e escolhe a mesma pasta: os dados aparecem sozinhos.
+
+1. Instale o programa do Drive (Google Drive para computador, OneDrive, Dropbox) e confira que a pasta aparece no Explorador de Arquivos.
+2. Na pasta do sistema, clique com o botão direito em `conectar-drive.ps1` e escolha **Executar com o PowerShell**. Escolha uma pasta dentro do Drive. No Linux ou no Mac, escreva o caminho em `PASTA_DRIVE` no `.env` e rode `docker compose up -d`.
+3. Abra a tela **Drive** para acompanhar. Repita no outro computador com a mesma pasta.
+
+Como funciona: cada computador continua com o próprio banco de dados. A cada 20 segundos o sistema confere a pasta: o que você alterou é gravado nela; o que o outro computador gravou é carregado. Um banco de dados "vivo" dentro de pasta sincronizada corromperia com dois computadores gravando, por isso a pasta guarda uma fotografia completa (`financas-pessoais/dados.json.gz`) e não o banco em si.
+
+Limites que você precisa conhecer:
+
+- O programa do Drive leva alguns segundos para subir e baixar o arquivo. Depois de alterar algo, espere a tela Drive mostrar **Tudo sincronizado** antes de usar o outro computador.
+- Se os dois computadores alterarem dados no mesmo intervalo, vale a alteração mais recente inteira (as mudanças não são misturadas). A outra versão fica guardada na pasta como `conflito-...`, sem ser apagada.
+- No Google Drive, use o modo **Espelhar arquivos** (ou uma pasta que exista de verdade no disco): o Docker pode não conseguir abrir a unidade virtual do modo de streaming.
+- O arquivo da pasta tem todos os seus dados financeiros e não é cifrado: a proteção é a da sua conta do Drive.
+- Para os tokens gravados (cotações, Open Finance) funcionarem nos dois computadores, use o mesmo `JWT_SECRET` no `.env` dos dois.
+
+## Conectar IA (MCP)
+
+O sistema fala o [Model Context Protocol](https://modelcontextprotocol.io) em `/api/mcp` (transporte Streamable HTTP, sem sessão). Em **Conectar IA** você cria uma chave e copia a configuração pronta para cada aplicativo.
+
+Ferramentas oferecidas:
+
+| Ferramenta | O que faz |
+|---|---|
+| `visao_geral` | patrimônio, saldo das contas e dívida dos cartões |
+| `listar_lancamentos` | receitas e despesas com filtros de período, texto, conta, categoria e tipo |
+| `listar_categorias` | categorias com os ids |
+| `analise_de_gastos` | gastos por mês, categoria e estabelecimento, recorrentes e sugestões |
+| `cartoes_e_faturas` | cartões, faturas e a previsão das próximas com as parcelas a vencer |
+| `investimentos` | posição de cada investimento |
+| `carteira` | rentabilidade por período contra CDI, Ibovespa, IPCA e IFIX |
+| `proventos` | proventos recebidos e a agenda estimada |
+| `comparar_com_indices` | os mesmos aportes aplicados em cada índice |
+| `orcamento_e_metas` | limites do mês e andamento das metas |
+| `criar_lancamento` | registra uma receita ou despesa (só chave "consulta e lança") |
+| `categorizar_lancamento` | muda a categoria de um lançamento (só chave "consulta e lança") |
+
+Nenhuma ferramenta apaga dados.
+
+Exemplos (troque `SUA_CHAVE` pela chave criada na tela):
+
+```bash
+claude mcp add --transport http financas http://localhost:8092/api/mcp --header "Authorization: Bearer SUA_CHAVE"
+```
+
+Cursor (`.cursor/mcp.json`):
+
+```json
+{ "mcpServers": { "financas": { "url": "http://localhost:8092/api/mcp", "headers": { "Authorization": "Bearer SUA_CHAVE" } } } }
+```
+
+A tela traz também os exemplos do Claude Desktop (pela ponte `mcp-remote`) e do VS Code. O caminho dos menus muda entre as versões de cada aplicativo; o que importa é o endereço e o cabeçalho `Authorization`.
+
+O que você precisa saber:
+
+- **O que a IA consulta sai do seu computador.** A resposta de cada ferramenta é enviada ao provedor do assistente (Anthropic, OpenAI...).
+- **Aplicativos de navegador (ChatGPT, Claude na web) não alcançam o localhost.** Para usá-los, o sistema precisa estar publicado na internet com HTTPS; nesse caso a chave pode ir no fim do endereço (`https://seu-endereco/api/mcp/SUA_CHAVE`), e esse endereço passa a valer como senha.
+- A chave aparece uma vez, ao ser criada; o banco guarda só o hash. Há limite de 120 chamadas por minuto por chave.
+- Testado no nível do protocolo (inicialização, lista e chamada de todas as ferramentas). Ainda não foi conferido dentro de cada aplicativo de IA.
+
+## Abrir no celular
+
+Com o celular na mesma rede Wi-Fi do computador, clique no ícone de celular no topo e aponte a câmera para o QR code.
+
+O endereço usado é, nesta ordem: o que você digitar no próprio popup; `ENDERECO_REDE` do `.env` (o IP do computador ou um nome como `financas-pessoais.local`); ou o nome do computador seguido de `.local`, que o Windows anuncia na rede e os celulares atuais encontram sozinhos. Um nome próprio como `financas-pessoais.local` só funciona se a sua rede resolver esse nome (no roteador ou com um serviço mDNS); sem isso, use o IP.
+
+Se o celular não abrir, libere a porta `8092` no firewall do computador. O acesso é por HTTP, só para a rede de casa: não exponha essa porta à internet.
+
+## Rendimento e índices
+
+A tela **Rendimento** busca os índices em fontes públicas, sem cadastro: Selic e IPCA na API de séries do Banco Central; Ibovespa e IFIX nas estatísticas históricas da B3. A primeira consulta baixa o histórico desde o ano do seu movimento mais antigo e depois atualiza a cada 12 horas.
+
+- **Comparação**: cada aplicação, resgate e provento é repetido no índice na mesma data. O resultado diz quanto você teria hoje se o dinheiro tivesse seguido o índice.
+- **Ao ano**: taxa interna de retorno, que leva em conta quando cada valor entrou e saiu.
+- **Renda fixa**: escreva a taxa no cadastro do título. O saldo é uma estimativa bruta pela taxa (sem imposto de renda nem marcação a mercado) e substitui o saldo digitado.
+- **Projeção**: é uma conta, não uma previsão. Rendimento passado não garante rendimento futuro.
+
+A tela **Carteira** usa outra conta, a rentabilidade ponderada pelo tempo: em cada dia, a variação do valor dos ativos mais os proventos, sem o efeito de aplicar ou resgatar. Por isso os percentuais das duas telas não são iguais. O histórico usa a quantidade de cada dia, reconstruída pelos movimentos, e o fechamento do Yahoo Finance; desdobramentos antigos são ajustados por aproximação.
+
 ## Open Finance (opcional)
 
 Para puxar dados reais, a Pluggy exige uma conta com acesso de produção (contas de teste só conectam o banco fictício). Se você tiver esse acesso, a tela **Conexões** continua disponível.
@@ -186,6 +305,8 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 | `WEB_PORT` | Porta do site | `8092` |
 | `API_PORT` | Porta da API (só neste computador) | `3092` |
 | `DB_PORT` | Porta do banco (só neste computador) | `5434` |
+| `PASTA_DRIVE` | Pasta sincronizada que guarda os dados (escolhida pelo `conectar-drive.ps1`) | vazio (desligado) |
+| `ENDERECO_REDE` | Endereço do computador na rede para o QR code (IP ou nome `.local`) | nome do computador |
 | `BRAPI_TOKEN` | Token das cotações (opcional; também dá para informar na tela) | vazio |
 | `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET` | Credenciais do Open Finance (opcional; também dá para informar na tela) | vazias |
 | `PLUGGY_SANDBOX` | `true` mostra os bancos de teste da Pluggy | `false` |
@@ -204,6 +325,12 @@ server/
   src/lib/financas.ts             regras de saldo, fatura e patrimônio
   src/lib/importacao/             leitura de fatura, extrato e planilha da B3
   src/lib/cotacoes.ts             cotações (brapi.dev)
+  src/lib/carteira.ts             rentabilidade diária da carteira, preços históricos e proventos
+  src/lib/drive.ts                sincronização dos dados por pasta do Drive
+  src/lib/mcp.ts                  servidor MCP: chaves, ferramentas e protocolo
+  src/lib/indices.ts              Selic, IPCA, Ibovespa e IFIX
+  src/lib/rendimento.ts           comparação com os índices, renda fixa pela taxa e projeção
+  src/lib/prisma.ts, perfil.ts    perfis financeiros (filtro por perfil em um lugar só)
   src/lib/pluggy.ts               cliente HTTP da Pluggy
   src/lib/sincronizacao.ts        importação do Open Finance
   src/modules/<modulo>/routes.ts  rotas de cada módulo

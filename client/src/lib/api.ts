@@ -6,6 +6,9 @@ function cabecalhos(temCorpo: boolean): HeadersInit {
   if (temCorpo) cabecalho['Content-Type'] = 'application/json';
   const token = localStorage.getItem(CHAVE_TOKEN);
   if (token) cabecalho['Authorization'] = `Bearer ${token}`;
+  // Perfil financeiro escolhido no seletor do topo: o servidor separa os dados por ele.
+  const perfil = localStorage.getItem('financas.perfil');
+  if (perfil) cabecalho['X-Perfil'] = perfil;
   return cabecalho;
 }
 

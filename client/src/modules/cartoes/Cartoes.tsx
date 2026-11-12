@@ -7,8 +7,10 @@ import type { ContaDTO, FaturaDTO } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
 import { Aviso, Botao, Campo, Cartao, Carregando, MenuAcoes, Modal, Pagina, Selecao, Selo, Tabela } from '../../ui';
 import type { AcaoMenu } from '../../ui';
-import { BarraProgresso, CampoCor, ResumoItem, SeloOrigem, Vazio } from '../../ui/financas';
+import { CampoCor, ResumoItem, Vazio } from '../../ui/financas';
+import { CartaoVisual } from './CartaoVisual';
 import { DetalheFatura } from './DetalheFatura';
+import { Previsao } from './Previsao';
 import './cartoes.css';
 
 interface CartaoResumoDTO {
@@ -160,6 +162,7 @@ export function Cartoes() {
   const [formulario, setFormulario] = useState<{ conta: ContaDTO | null } | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const faturas = useDados<FaturaDTO[]>(cartaoId ? '/faturas?contaId=' + cartaoId : null);
+  const [versaoPrevisao, setVersaoPrevisao] = useState(0);
 
   // Ao carregar a lista, mantém o cartão escolhido ou seleciona o primeiro.
   useEffect(() => {
@@ -183,6 +186,7 @@ export function Cartoes() {
   function recarregarTudo() {
     cartoesDados.recarregar();
     faturas.recarregar();
+    setVersaoPrevisao((v) => v + 1);
   }
 
   async function excluirCartao(conta: ContaDTO) {
@@ -227,36 +231,17 @@ export function Cartoes() {
             <ResumoItem icone="visto" cor="verde" valor={formatarReais(limiteDisponivel)} rotulo="Limite disponível" />
           </div>
 
-          <div className="fin-cartoes">
-            {cartoes.map(({ conta, faturaAtual, percentualUsado }) => {
-              const ativo = conta.id === cartaoId;
-              return (
-                <button
-                  key={conta.id}
-                  type="button"
-                  className={ativo ? 'cartoes-cartao cartoes-cartao-ativo' : 'cartoes-cartao'}
-                  style={{
-                    background: `linear-gradient(135deg, ${conta.cor}, color-mix(in srgb, ${conta.cor} 55%, #000))`,
-                  }}
-                  aria-pressed={ativo}
-                  onClick={() => setCartaoId(conta.id)}
-                >
-                  <span className="cartoes-cartao-linha">
-                    <strong>{conta.nome}</strong>
-                    <span>{conta.bandeira ?? ''}</span>
-                  </span>
-                  <span className="cartoes-cartao-numero">•••• {conta.numero ?? '••••'}</span>
-                  <span className="cartoes-cartao-linha">
-                    <span>Fatura atual</span>
-                    <strong>{formatarReais(conta.saldo)}</strong>
-                  </span>
-                  {faturaAtual && <span>Vence em {formatarDia(faturaAtual.vencimento)}</span>}
-                  <BarraProgresso percentual={percentualUsado ?? 0} />
-                  {conta.limite !== null && <span>Limite: {formatarReais(conta.limite)}</span>}
-                  <SeloOrigem origem={conta.origem} />
-                </button>
-              );
-            })}
+          <div className="cv-grade">
+            {cartoes.map(({ conta, faturaAtual, percentualUsado }) => (
+              <CartaoVisual
+                key={conta.id}
+                conta={conta}
+                vencimento={faturaAtual?.vencimento ?? null}
+                percentualUsado={percentualUsado}
+                ativo={conta.id === cartaoId}
+                aoClicar={() => setCartaoId(conta.id)}
+              />
+            ))}
           </div>
 
           {selecionado && (
@@ -287,6 +272,8 @@ export function Cartoes() {
               )}
             </Cartao>
           )}
+
+          <Previsao versao={versaoPrevisao} />
         </>
       )}
 

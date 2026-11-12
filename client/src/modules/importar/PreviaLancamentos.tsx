@@ -172,7 +172,7 @@ export function PreviaLancamentos({
   const jaImportadosMarcados = marcadas.filter((l) => l.jaImportado).length;
 
   return (
-    <div>
+    <div className="importar-previa">
       <div className="fin-cabecalho">
         <div>
           <strong>{arquivo.nome}</strong>

@@ -12,7 +12,7 @@ export const GRUPOS: GrupoMenu[] = [
   { titulo: 'Dia a dia', icones: ['contas', 'transacoes', 'cartao'] },
   { titulo: 'Patrimônio', icones: ['investimentos'] },
   { titulo: 'Planejamento', icones: ['orcamento', 'metas', 'categorias'] },
-  { titulo: 'Trazer dados', icones: ['importar', 'conexoes'] },
+  { titulo: 'Trazer dados', icones: ['importar', 'conexoes', 'sincronizar'] },
   { titulo: 'Sistema', icones: ['usuarios', 'atividade', 'log', 'engrenagem'] },
   { titulo: 'Conta', icones: ['perfil'] },
 ];

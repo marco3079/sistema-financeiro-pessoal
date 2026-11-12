@@ -6,6 +6,7 @@ import {
   arredondar,
   atualizarStatusDasFaturas,
   contaDTO,
+  dataISO,
   dataSchema,
   faturaDTO,
   hoje,
@@ -159,5 +160,174 @@ router.post(
     res.json(faturaDTO(atualizada));
   })
 );
+
+// ---------- Previsão das próximas faturas ----------
+
+function semMarcaDeParcela(descricao: string): string {
+  return descricao
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/(-\s*)?(parcela|parc\.?)?\s*\d{1,2}\s*(\/|de)\s*\d{1,2}/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Mesma data, `meses` depois; dia 31 em mês de 30 vira o último dia do mês.
+function mesesDepois(data: Date, meses: number): Date {
+  const ano = data.getUTCFullYear();
+  const mes = data.getUTCMonth() + meses;
+  const ultimoDia = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(ano, mes, Math.min(data.getUTCDate(), ultimoDia)));
+}
+
+interface ItemPrevisto {
+  descricao: string;
+  parcela: number;
+  totalParcelas: number;
+  valor: number;
+}
+
+interface MesPrevisto {
+  mes: string; // 'AAAA-MM' do vencimento
+  vencimento: string;
+  lancado: number; // fatura que já existe e ainda não foi paga
+  previsto: number; // parcelas que ainda vão entrar
+  total: number;
+  itens: ItemPrevisto[];
+}
+
+const LIMITE_MESES = 36;
+
+// Parcelas que ainda não foram cobradas, distribuídas nas faturas dos próximos meses.
+// Para cada compra parcelada, parte da última parcela registrada ("3 de 10" na fatura de novembro) e põe
+// as seguintes nos meses seguintes. Parcela que cairia em fatura que já existe não é prevista de novo.
+router.get(
+  '/cartoes/previsao',
+  asyncHandler(async (_req, res) => {
+    await atualizarStatusDasFaturas();
+    const inicioDeHoje = hoje();
+    const cartoes = await prisma.conta.findMany({ where: { tipo: 'CARTAO', ativo: true }, orderBy: { nome: 'asc' } });
+
+    const resposta = await Promise.all(
+      cartoes.map(async (cartao) => {
+        const [faturas, parceladas] = await Promise.all([
+          prisma.fatura.findMany({ where: { contaId: cartao.id }, orderBy: { vencimento: 'asc' } }),
+          prisma.transacao.findMany({
+            where: { contaId: cartao.id, tipo: 'DESPESA', parcela: { not: null }, totalParcelas: { not: null }, faturaId: { not: null } },
+            select: { descricao: true, valor: true, parcela: true, totalParcelas: true, fatura: { select: { vencimento: true } } },
+          }),
+        ]);
+        const meses = new Map<string, MesPrevisto>();
+        const mesDe = (vencimento: Date): MesPrevisto => {
+          const chave = dataISO(vencimento).slice(0, 7);
+          let mes = meses.get(chave);
+          if (!mes) {
+            mes = { mes: chave, vencimento: dataISO(vencimento), lancado: 0, previsto: 0, total: 0, itens: [] };
+            meses.set(chave, mes);
+          }
+          return mes;
+        };
+
+        // Faturas que já existem e ainda não foram pagas.
+        for (const f of faturas) {
+          if (f.status === 'PAGA') continue;
+          const mes = mesDe(f.vencimento);
+          mes.vencimento = dataISO(f.vencimento);
+          mes.lancado += num(f.total);
+        }
+
+        const ultimaFatura = faturas.length > 0 ? faturas[faturas.length - 1].vencimento : null;
+        if (ultimaFatura) {
+          // Uma série por compra: mesma descrição (sem o "2/5"), mesmo número de parcelas e mesmo valor.
+          const series = new Map<string, { nome: string; descricao: string; total: number; valor: number; ultima: number; base: Date; quantas: number }>();
+          for (const t of parceladas) {
+            if (t.parcela === null || t.totalParcelas === null || !t.fatura) continue;
+            const chave = [semMarcaDeParcela(t.descricao), t.totalParcelas, num(t.valor).toFixed(2)].join('|');
+            const serie = series.get(chave);
+            if (!serie || t.parcela > serie.ultima) {
+              series.set(chave, {
+                nome: semMarcaDeParcela(t.descricao),
+                descricao: t.descricao,
+                total: t.totalParcelas,
+                valor: num(t.valor),
+                ultima: t.parcela,
+                base: t.fatura.vencimento,
+                quantas: 1,
+              });
+            } else if (t.parcela === serie.ultima) {
+              // Duas compras iguais correndo juntas (mesma loja, mesmo valor, mesma parcela).
+              serie.quantas++;
+              if (t.fatura.vencimento.getTime() > serie.base.getTime()) serie.base = t.fatura.vencimento;
+            }
+          }
+          // A primeira parcela costuma levar os centavos que sobram (33,34 / 33,33 / 33,33): é a mesma compra.
+          // Fica só a série mais adiantada; com a mesma parcela nas duas, são compras diferentes e ficam as duas.
+          const todas = [...series.values()];
+          const validas = todas.filter(
+            (s) => !todas.some((o) => o !== s && o.nome === s.nome && o.total === s.total && Math.abs(o.valor - s.valor) <= 0.1 && o.ultima > s.ultima)
+          );
+          for (const serie of validas) {
+            for (let k = 1; k <= serie.total - serie.ultima && k <= LIMITE_MESES; k++) {
+              const vencimento = mesesDepois(serie.base, k);
+              // Cairia em uma fatura que já foi importada: ou já está lá, ou a compra foi estornada.
+              if (dataISO(vencimento).slice(0, 7) <= dataISO(ultimaFatura).slice(0, 7)) continue;
+              const mes = mesDe(mesesDepois(ultimaFatura, mesesEntre(ultimaFatura, vencimento)));
+              for (let n = 0; n < serie.quantas; n++) {
+                mes.itens.push({ descricao: serie.descricao, parcela: serie.ultima + k, totalParcelas: serie.total, valor: serie.valor });
+                mes.previsto += serie.valor;
+              }
+            }
+          }
+        }
+
+        const lista = [...meses.values()]
+          // Fatura em aberto aparece sempre (mesmo atrasada). Mês só com previsão e vencimento já passado fica de
+          // fora: essa fatura já fechou no banco e ainda não foi importada.
+          .filter((m) => m.lancado > 0 || m.vencimento >= dataISO(inicioDeHoje))
+          .sort((a, b) => (a.mes < b.mes ? -1 : 1))
+          .map((m) => ({
+            ...m,
+            lancado: arredondar(m.lancado),
+            previsto: arredondar(m.previsto),
+            total: arredondar(m.lancado + m.previsto),
+            itens: m.itens.sort((a, b) => b.valor - a.valor),
+          }));
+        return {
+          contaId: cartao.id,
+          nome: cartao.nome,
+          cor: cartao.cor,
+          meses: lista,
+          parcelasRestantes: lista.reduce((soma, m) => soma + m.itens.length, 0),
+          previsto: arredondar(lista.reduce((soma, m) => soma + m.previsto, 0)),
+          total: arredondar(lista.reduce((soma, m) => soma + m.total, 0)),
+        };
+      })
+    );
+
+    // Soma de todos os cartões, mês a mês.
+    const geral = new Map<string, { mes: string; lancado: number; previsto: number; total: number }>();
+    for (const cartao of resposta) {
+      for (const m of cartao.meses) {
+        const g = geral.get(m.mes) ?? { mes: m.mes, lancado: 0, previsto: 0, total: 0 };
+        g.lancado = arredondar(g.lancado + m.lancado);
+        g.previsto = arredondar(g.previsto + m.previsto);
+        g.total = arredondar(g.total + m.total);
+        geral.set(m.mes, g);
+      }
+    }
+    res.json({
+      cartoes: resposta,
+      meses: [...geral.values()].sort((a, b) => (a.mes < b.mes ? -1 : 1)),
+      parcelasRestantes: resposta.reduce((soma, c) => soma + c.parcelasRestantes, 0),
+      previsto: arredondar(resposta.reduce((soma, c) => soma + c.previsto, 0)),
+      total: arredondar(resposta.reduce((soma, c) => soma + c.total, 0)),
+    });
+  })
+);
+
+function mesesEntre(de: Date, ate: Date): number {
+  return (ate.getUTCFullYear() - de.getUTCFullYear()) * 12 + (ate.getUTCMonth() - de.getUTCMonth());
+}
 
 export default router;

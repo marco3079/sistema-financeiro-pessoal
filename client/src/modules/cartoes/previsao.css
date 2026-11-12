@@ -1,0 +1,144 @@
+.previsao {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.previsao-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.previsao-linha {
+  display: grid;
+  grid-template-columns: minmax(70px, 110px) 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.previsao-rotulo {
+  color: var(--cor-texto);
+  font-size: 0.9rem;
+}
+
+.previsao-trilho {
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--cor-borda);
+}
+
+.previsao-barra {
+  display: flex;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.previsao-barra-lancado {
+  flex: 0 0 auto;
+  background: var(--cor-primaria);
+}
+
+.previsao-barra-previsto {
+  flex: 1 1 auto;
+  background: color-mix(in srgb, var(--cor-primaria) 45%, transparent);
+}
+
+.previsao-valor {
+  color: var(--cor-texto);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.previsao-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.previsao-legenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.previsao-quadrado {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.previsao-quadrado-lancado {
+  background: var(--cor-primaria);
+}
+
+.previsao-quadrado-previsto {
+  background: color-mix(in srgb, var(--cor-primaria) 45%, transparent);
+}
+
+.previsao-seletor {
+  max-width: 320px;
+}
+
+.previsao-itens {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.previsao-itens-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--cor-texto);
+}
+
+.previsao-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.previsao-item + .previsao-item {
+  border-top: 1px solid var(--cor-borda);
+}
+
+.previsao-item-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.previsao-item-descricao {
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.previsao-item-valor {
+  color: var(--cor-texto);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .previsao-linha {
+    grid-template-columns: minmax(70px, 110px) 1fr;
+  }
+
+  .previsao-valor {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}

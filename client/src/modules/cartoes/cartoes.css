@@ -1,45 +1,5 @@
 /* Cartão de crédito visual e topo do detalhe da fatura (módulo cartões). */
 
-.cartoes-cartao {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-  min-height: 190px;
-  height: auto;
-  padding: 1rem 1.1rem;
-  border: 0;
-  border-radius: var(--raio);
-  box-shadow: var(--sombra);
-  /* Texto branco permitido só dentro do cartão colorido. */
-  color: #fff;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.cartoes-cartao:focus-visible {
-  outline: 2px solid var(--cor-primaria);
-  outline-offset: 2px;
-}
-
-.cartoes-cartao-ativo {
-  box-shadow: 0 0 0 3px var(--cor-primaria), var(--sombra);
-}
-
-.cartoes-cartao-linha {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.cartoes-cartao-numero {
-  font-size: 1.1rem;
-  letter-spacing: 0.12em;
-}
-
 .cartoes-fatura-topo {
   display: flex;
   flex-wrap: wrap;
@@ -55,9 +15,6 @@
 }
 
 @media (max-width: 360px) {
-  .cartoes-cartao-numero {
-    font-size: 0.95rem;
-  }
   .cartoes-fatura-total {
     font-size: 1.25rem;
   }

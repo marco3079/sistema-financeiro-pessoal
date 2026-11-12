@@ -352,7 +352,10 @@ export async function registrarPosicaoPatrimonio(): Promise<void> {
     const t = await totaisPatrimonio();
     const data = hoje();
     const valores = { contas: t.contas, investimentos: t.investimentos, cartoes: t.cartoes };
-    await prisma.posicaoPatrimonio.upsert({ where: { data }, create: { data, ...valores }, update: valores });
+    // Uma fotografia por dia e por perfil (o filtro por perfil vem de lib/prisma.ts).
+    const existente = await prisma.posicaoPatrimonio.findFirst({ where: { data }, select: { id: true } });
+    if (existente) await prisma.posicaoPatrimonio.update({ where: { id: existente.id }, data: valores });
+    else await prisma.posicaoPatrimonio.create({ data: { data, ...valores } });
   } catch (erro) {
     console.error('Falha ao registrar a posição do patrimônio:', erro instanceof Error ? erro.message : erro);
   }

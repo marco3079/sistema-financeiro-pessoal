@@ -811,6 +811,19 @@ textarea.campo-controle {
 
 .tabela .tabela-alinhar-direita {
   text-align: right;
+  /* Valores e percentuais nunca quebram no meio; se a tabela não couber, ela rola de lado. */
+  white-space: nowrap;
+}
+
+.tabela-desktop {
+  overflow-x: auto;
+}
+
+/* Dentro da tabela as palavras não quebram letra por letra (o cartão em volta permite quebra em qualquer ponto). */
+.tabela th,
+.tabela td {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .tabela .tabela-coluna-acoes {

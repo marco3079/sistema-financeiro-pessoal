@@ -73,6 +73,43 @@ async function chavesExistentes(chaves: string[]): Promise<Set<string>> {
   return achadas;
 }
 
+// Diz, para cada item do arquivo, se ele já está registrado na conta. Duas conferências:
+//   1. pela chave do arquivo (o mesmo arquivo, ou outro que repita a linha);
+//   2. por data, valor, tipo e descrição iguais em um lançamento que não veio deste arquivo
+//      (digitado à mão, vindo do Open Finance ou de outro arquivo com as linhas em outra ordem).
+// Cada lançamento gravado "gasta" um item só: duas compras iguais no mesmo dia continuam sendo duas.
+async function itensJaRegistrados(contaId: number, itens: ItemLido[]): Promise<{ chaves: string[]; repetido: boolean[] }> {
+  const chaves = chavesDosItens(contaId, itens);
+  const existentes = await chavesExistentes(chaves);
+  const repetido = chaves.map((c) => existentes.has(c));
+  if (itens.length === 0 || repetido.every(Boolean)) return { chaves, repetido };
+  const datas = itens.map((i) => i.data).sort();
+  const gravados = await prisma.transacao.findMany({
+    where: { contaId, data: { gte: paraData(datas[0]), lte: paraData(datas[datas.length - 1]) } },
+    select: { data: true, valor: true, tipo: true, descricao: true, chaveImportacao: true },
+  });
+  const assinatura = (data: string, valor: number, tipo: string, descricao: string) =>
+    [data, valor.toFixed(2), tipo, semAcento(descricao).replace(/\s+/g, ' ').trim()].join('|');
+  const disponiveis = new Map<string, number>();
+  const doArquivo = new Set(chaves);
+  for (const t of gravados) {
+    // Os que têm a chave deste arquivo já foram contados na primeira conferência.
+    if (t.chaveImportacao && doArquivo.has(t.chaveImportacao)) continue;
+    const a = assinatura(dataISO(t.data), num(t.valor), t.tipo, t.descricao);
+    disponiveis.set(a, (disponiveis.get(a) ?? 0) + 1);
+  }
+  itens.forEach((item, i) => {
+    if (repetido[i]) return;
+    const a = assinatura(item.data, item.valor, item.tipo, item.descricao);
+    const restam = disponiveis.get(a) ?? 0;
+    if (restam > 0) {
+      repetido[i] = true;
+      disponiveis.set(a, restam - 1);
+    }
+  });
+  return { chaves, repetido };
+}
+
 function semAcento(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
@@ -101,13 +138,23 @@ router.post(
       where: { ativo: true, origem: 'MANUAL', tipo: analise.documento === 'FATURA' ? 'CARTAO' : { not: 'CARTAO' } },
       orderBy: { nome: 'asc' },
     });
-    const escolhida =
+    let escolhida =
       (dados.contaId ? candidatas.find((c) => c.id === dados.contaId) : undefined) ?? contaDoBanco(candidatas, analise.banco);
     let jaImportados: boolean[] = analise.itens.map(() => false);
     if (escolhida) {
-      const chaves = chavesDosItens(escolhida.id, analise.itens);
-      const existentes = await chavesExistentes(chaves);
-      jaImportados = chaves.map((c) => existentes.has(c));
+      jaImportados = (await itensJaRegistrados(escolhida.id, analise.itens)).repetido;
+    } else {
+      // Sem banco identificado: procura a conta em que estes lançamentos já estão e sugere essa.
+      let maisRepetidos = 0;
+      for (const candidata of candidatas) {
+        const { repetido } = await itensJaRegistrados(candidata.id, analise.itens);
+        const quantos = repetido.filter(Boolean).length;
+        if (quantos > maisRepetidos) {
+          maisRepetidos = quantos;
+          escolhida = candidata;
+          jaImportados = repetido;
+        }
+      }
     }
     res.json({
       documento: analise.documento,
@@ -211,8 +258,7 @@ router.post(
       });
     }
 
-    const chaves = chavesDosItens(conta.id, dados.itens);
-    const existentes = await chavesExistentes(chaves);
+    const { chaves, repetido } = await itensJaRegistrados(conta.id, dados.itens);
     const classificar = await montarClassificador();
     const historico = await categoriasPorHistorico(dados.itens.map((i) => i.descricao));
     const agora = hoje();
@@ -244,7 +290,7 @@ router.post(
         const novos: Prisma.TransacaoCreateManyInput[] = [];
         let efeito = 0;
         dados.itens.forEach((item, i) => {
-          if (existentes.has(chaves[i])) return;
+          if (repetido[i]) return;
           novos.push({
             contaId: conta.id,
             data: paraData(item.data),
@@ -501,7 +547,29 @@ router.post(
           });
           for (const m of lote) if (m.chaveImportacao) jaGravadas.add(m.chaveImportacao);
         }
-        const ineditas = linhas.filter((l) => !jaGravadas.has(l.chaveImportacao as string));
+        // Movimento registrado à mão (sem chave) com o mesmo ativo, dia, tipo e valor também conta como já registrado.
+        const idsDosAtivos = [...new Set(linhas.map((l) => l.investimentoId))];
+        const manuais = new Map<string, number>();
+        if (idsDosAtivos.length > 0) {
+          const semChave = await db.movimentoInvestimento.findMany({
+            where: { investimentoId: { in: idsDosAtivos }, chaveImportacao: null },
+            select: { investimentoId: true, data: true, tipo: true, valor: true },
+          });
+          for (const m of semChave) {
+            const a = [m.investimentoId, dataISO(m.data), m.tipo, num(m.valor).toFixed(2)].join('|');
+            manuais.set(a, (manuais.get(a) ?? 0) + 1);
+          }
+        }
+        const ineditas = linhas.filter((l) => {
+          if (jaGravadas.has(l.chaveImportacao as string)) return false;
+          const a = [l.investimentoId, dataISO(l.data as Date), l.tipo, Number(l.valor).toFixed(2)].join('|');
+          const restam = manuais.get(a) ?? 0;
+          if (restam > 0) {
+            manuais.set(a, restam - 1);
+            return false;
+          }
+          return true;
+        });
         for (let i = 0; i < ineditas.length; i += 1000) {
           await db.movimentoInvestimento.createMany({ data: ineditas.slice(i, i + 1000) });
         }
@@ -524,7 +592,7 @@ router.post(
     await registrarPosicaoPatrimonio();
     // As cotações rodam em segundo plano: a resposta não espera por elas.
     tokenDasCotacoes()
-      .then((credencial) => (credencial ? atualizarCotacoes() : null))
+      .then(() => atualizarCotacoes())
       .catch(() => undefined);
     res.status(201).json(resultado);
   })

@@ -1,0 +1,151 @@
+/* Abas Resumo e Análises da tela Carteira. Só variáveis do tema; sem hexadecimal. */
+
+/* ---------- Resumo: desempenho no mês ---------- */
+
+.resumo-desempenho {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 0.75rem;
+}
+
+.resumo-desempenho-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.resumo-desempenho-item strong {
+  font-size: 1.35rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.resumo-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.resumo-barra-linha {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Trilho com duas metades: a esquerda para valores negativos, a direita para positivos. */
+.resumo-trilho {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  height: 0.75rem;
+  min-width: 0;
+  background: var(--cor-borda);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.resumo-trilho::after {
+  content: '';
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: start;
+  width: 1px;
+  height: 100%;
+  background: var(--cor-texto-suave);
+}
+
+.resumo-barra {
+  grid-row: 1;
+  height: 100%;
+  border-radius: 999px;
+  min-width: 0;
+}
+
+.resumo-barra-esquerda {
+  grid-column: 1;
+  justify-self: end;
+}
+
+.resumo-barra-direita {
+  grid-column: 2;
+  justify-self: start;
+}
+
+/* ---------- Resumo: distribuição (mapa de blocos) ---------- */
+
+.resumo-blocos {
+  display: flex;
+  flex-wrap: wrap;
+  height: 220px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.resumo-bloco {
+  display: flex;
+  flex: 1 1 60px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.25rem;
+  min-width: 60px;
+  padding: 0.5rem;
+  border-radius: var(--raio);
+  color: var(--cor-texto);
+  font-size: 0.8rem;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.resumo-bloco-cheio {
+  color: var(--cor-sobre-primaria);
+}
+
+/* ---------- Análises ---------- */
+
+.analises-como {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.analises-como summary {
+  cursor: pointer;
+  color: var(--cor-texto);
+  font-weight: 600;
+}
+
+.analises-como p {
+  margin: 0.5rem 0 0;
+}
+
+.analises-metricas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.analises-metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.analises-metrica strong {
+  font-size: 1.1rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 400px) {
+  .analises-metricas {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resumo-barra {
+    transition: none;
+  }
+}

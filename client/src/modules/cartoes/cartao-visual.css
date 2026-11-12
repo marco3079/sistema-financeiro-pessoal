@@ -1,0 +1,230 @@
+/* Cartão de crédito com aparência de cartão real (módulo cartões). */
+
+.cv-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 380px));
+  gap: 1.25rem;
+}
+
+.cv-cartao {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 1.586 / 1;
+  padding: 1.1rem 1.25rem;
+  border: 0;
+  border-radius: 16px;
+  background: var(--cv-fundo);
+  color: var(--cv-texto);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cv-cartao::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.12) 50%, transparent 60%);
+}
+
+.cv-cartao:hover {
+  transform: translateY(-2px);
+}
+
+.cv-cartao-ativo {
+  box-shadow: 0 0 0 3px var(--cor-primaria), 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.cv-cartao:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-cartao {
+    transition: none;
+  }
+  .cv-cartao:hover {
+    transform: none;
+  }
+}
+
+.cv-cartao > * {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.cv-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.cv-banco {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.cv-topo-direita {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cv-selo {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.cv-aproximacao {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.cv-chip {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #e6c56b, #b8913a);
+}
+
+.cv-chip::before,
+.cv-chip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cv-chip::before {
+  top: 10px;
+}
+
+.cv-chip::after {
+  bottom: 10px;
+}
+
+.cv-numero-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cv-numero {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cv-apelido {
+  font-size: 0.75rem;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-base {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cv-base-esquerda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+}
+
+.cv-fatura {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cv-rotulo {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.cv-valor {
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.cv-bandeira {
+  font-style: italic;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.cv-limite {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cv-limite-trilho {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cv-texto) 25%, transparent);
+  overflow: hidden;
+}
+
+.cv-limite-barra {
+  display: block;
+  height: 100%;
+  background: var(--cv-detalhe);
+}
+
+.cv-limite-texto {
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+@media (max-width: 380px) {
+  .cv-cartao {
+    padding: 0.9rem 1rem;
+  }
+  .cv-numero {
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+  }
+}

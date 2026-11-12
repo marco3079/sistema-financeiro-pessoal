@@ -1,0 +1,89 @@
+.rend-positivo {
+  color: var(--cor-sucesso, #16a34a);
+}
+
+.rend-negativo {
+  color: var(--cor-perigo, #dc2626);
+}
+
+.rend-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.rend-linha {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.rend-rotulo {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rend-valor {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rend-trilho {
+  height: 14px;
+  border-radius: 999px;
+  background: var(--cor-borda);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.rend-barra {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.rend-barra-carteira {
+  background: var(--cor-primaria);
+}
+
+.rend-barra-indice {
+  background: color-mix(in srgb, var(--cor-primaria) 40%, transparent);
+}
+
+.rend-subtitulo {
+  margin: 1rem 0 0.4rem;
+  font-size: 1rem;
+}
+
+.rend-lista {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.rend-sub {
+  display: block;
+  color: var(--cor-texto-suave);
+  font-size: 0.85em;
+}
+
+@media (max-width: 519px) {
+  .rend-linha {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .rend-linha > .rend-rotulo {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rend-linha > .rend-trilho {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .rend-linha > .rend-valor {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+}

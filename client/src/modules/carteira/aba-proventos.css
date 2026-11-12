@@ -1,0 +1,262 @@
+/* Aba Proventos da tela Carteira: Resumo (mapa de calor, rosca, tabela) e Agenda (calendário do mês). */
+
+.proventos-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.proventos-topo > .campo {
+  min-width: 10rem;
+}
+
+/* Mapa de calor: rolagem horizontal só dentro do cartão, nunca na página. */
+.proventos-rolagem {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.proventos-mapa {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.proventos-mapa th,
+.proventos-mapa td {
+  padding: 0.4rem 0.5rem;
+  white-space: nowrap;
+  text-align: right;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.proventos-mapa thead th {
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.proventos-mapa th:first-child,
+.proventos-mapa td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--cor-superficie);
+  z-index: 1;
+}
+
+.proventos-mapa tfoot th,
+.proventos-mapa tfoot td {
+  font-weight: 600;
+  border-bottom: none;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.proventos-mapa-rotulo {
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+/* Agenda: calendário à esquerda, lista do dia/mês à direita. */
+.proventos-agenda {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.proventos-agenda > * {
+  min-width: 0;
+}
+
+@media (max-width: 800px) {
+  .proventos-agenda {
+    grid-template-columns: 1fr;
+  }
+}
+
+.proventos-mes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.proventos-nav {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.proventos-nav:hover {
+  background: var(--cor-primaria-suave);
+}
+
+.proventos-nav:focus-visible,
+.proventos-dia:focus-visible,
+.proventos-mapa button:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.proventos-semana,
+.proventos-grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.proventos-semana {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.proventos-dia {
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.proventos-dia:hover {
+  background: var(--cor-primaria-suave);
+}
+
+.proventos-dia-recebido {
+  background: color-mix(in srgb, var(--cor-verde) 30%, transparent);
+}
+
+.proventos-dia-previsto {
+  border: 1px dashed var(--cor-aviso);
+}
+
+.proventos-dia-hoje {
+  outline: 2px solid var(--cor-primaria);
+}
+
+.proventos-dia[aria-pressed="true"] {
+  background: var(--cor-primaria);
+  color: var(--cor-sobre-primaria);
+}
+
+.proventos-total-mes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.9rem;
+}
+
+.proventos-total-mes strong {
+  font-size: 1.1rem;
+}
+
+.proventos-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+.proventos-marca {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 0.3rem;
+  border-radius: 3px;
+  vertical-align: -2px;
+}
+
+.proventos-marca-recebido {
+  background: color-mix(in srgb, var(--cor-verde) 30%, transparent);
+  border: 1px solid var(--cor-borda);
+}
+
+.proventos-marca-previsto {
+  border: 1px dashed var(--cor-aviso);
+}
+
+.proventos-itens {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.proventos-item {
+  display: grid;
+  grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.proventos-item-dia {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.proventos-item-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.proventos-item-valor {
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.proventos-ativo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.proventos-lista-simples {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.proventos-lista-simples li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  min-width: 0;
+}
+
+.proventos-lista-simples .cart-suave {
+  margin-left: auto;
+}

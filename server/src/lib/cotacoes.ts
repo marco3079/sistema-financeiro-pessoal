@@ -1,9 +1,13 @@
 // Cotações de ações, fundos imobiliários, ETFs e BDRs pela brapi.dev (https://brapi.dev/docs).
 // O plano gratuito aceita um ativo por requisição e pede um token (gratuito) para a maioria dos códigos.
 // O token vem das configurações gravadas no banco (cifrado) ou de BRAPI_TOKEN no .env.
+// Sem token (ou quando a brapi não conhece o código), vale o último fechamento do Yahoo Finance, que não pede cadastro.
 // Com a cotação, o saldo do investimento passa a ser quantidade x preço.
 
-import { prisma } from './prisma';
+import { perfilAtual, prisma } from './prisma';
+import { emCadaPerfil } from './perfil';
+import { garantirPrecos, ultimoPreco } from './carteira';
+import { somarDias, hojeISO } from './indices';
 import { decifrar } from './cripto';
 import { HttpError } from './erros';
 import { arredondar, num, registrarPosicaoPatrimonio } from './financas';
@@ -57,7 +61,8 @@ export interface ResultadoCotacoes {
   erro: string | null; // motivo de ter parado antes do fim, se parou
 }
 
-let emAndamento: Promise<ResultadoCotacoes> | null = null;
+// Uma execução por perfil financeiro (a chave 0 é "sem perfil").
+const emAndamento = new Map<number, Promise<ResultadoCotacoes>>();
 
 async function executar(): Promise<ResultadoCotacoes> {
   const credencial = await tokenDasCotacoes();
@@ -73,7 +78,12 @@ async function executar(): Promise<ResultadoCotacoes> {
     if (!CODIGO_NEGOCIADO.test(codigo)) continue;
     try {
       if (!precos.has(codigo)) {
-        precos.set(codigo, await buscarCotacao(codigo, credencial?.token ?? null));
+        let preco = credencial ? await buscarCotacao(codigo, credencial.token) : null;
+        if (preco === null) {
+          await garantirPrecos([codigo], somarDias(hojeISO(), -30));
+          preco = await ultimoPreco(codigo);
+        }
+        precos.set(codigo, preco);
         await new Promise((resolve) => setTimeout(resolve, PAUSA_ENTRE_CHAMADAS_MS));
       }
     } catch (erro) {
@@ -99,25 +109,28 @@ async function executar(): Promise<ResultadoCotacoes> {
 // Atualiza o saldo de todos os investimentos manuais que têm código de bolsa e quantidade.
 // Chamadas simultâneas compartilham a mesma execução.
 export function atualizarCotacoes(): Promise<ResultadoCotacoes> {
-  if (!emAndamento) {
-    emAndamento = executar().finally(() => {
-      emAndamento = null;
+  const chave = perfilAtual() ?? 0;
+  let execucao = emAndamento.get(chave);
+  if (!execucao) {
+    execucao = executar().finally(() => {
+      emAndamento.delete(chave);
     });
+    emAndamento.set(chave, execucao);
   }
-  return emAndamento;
+  return execucao;
 }
 
 const INTERVALO_MS = 8 * 60 * 60 * 1000;
 const ATRASO_INICIAL_MS = 2 * 60 * 1000;
 let automaticaIniciada = false;
 
-// Atualiza dois minutos depois de o servidor subir e, depois, a cada 8 horas. Sem token, não faz nada.
+// Atualiza dois minutos depois de o servidor subir e, depois, a cada 8 horas.
 export function iniciarCotacoesAutomaticas(): void {
   if (automaticaIniciada) return;
   automaticaIniciada = true;
   const rodar = () => {
     tokenDasCotacoes()
-      .then((credencial) => (credencial ? atualizarCotacoes() : null))
+      .then(() => emCadaPerfil(() => atualizarCotacoes()))
       .catch((erro: unknown) => {
         console.error('Falha na atualização automática das cotações:', erro instanceof Error ? erro.message : erro);
       });

@@ -1,0 +1,73 @@
+.ia-blocos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ia-codigo {
+  display: block;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--cor-fundo, var(--cor-superficie));
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.ia-bloco-codigo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.ia-bloco-codigo .ia-codigo {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ia-texto-suave {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--cor-texto-suave);
+}
+
+.ia-lista {
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ia-lista-titulo {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+}
+
+.ia-item strong {
+  display: block;
+}
+
+.ia-item span {
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.ia-cabecalho-cartao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ia-tabela-chave {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}

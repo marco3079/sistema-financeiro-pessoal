@@ -11,6 +11,14 @@ const prisma = new PrismaClient();
 const SENHA_PADRAO = 'demo1234';
 
 async function main(): Promise<void> {
+  // O perfil financeiro "Pessoal" (id 1) recebe tudo o que já existia antes de haver perfis.
+  if ((await prisma.perfilFinanceiro.count()) === 0) {
+    await prisma.perfilFinanceiro.create({ data: { id: 1, nome: 'Pessoal' } });
+    await prisma.$executeRawUnsafe(
+      `SELECT setval(pg_get_serial_sequence('"PerfilFinanceiro"', 'id'), GREATEST((SELECT MAX(id) FROM "PerfilFinanceiro"), 1))`
+    );
+  }
+
   if ((await prisma.usuario.count()) > 0) {
     console.log('Banco já possui dados, seed ignorado.');
     return;
@@ -37,7 +45,7 @@ async function main(): Promise<void> {
     },
   });
 
-  await criarCategoriasPadrao(prisma);
+  await criarCategoriasPadrao(prisma, 1);
 
   console.log('==== TITULAR CRIADO ====');
   console.log(`E-mail: ${email}`);

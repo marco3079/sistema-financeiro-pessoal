@@ -26,6 +26,13 @@ Na subida, a API aplica o modelo de dados (`prisma db push`), e, se o banco esti
 | `investimentos` | investimentos e movimentos |
 | `planejamento` | orçamento e metas |
 | `importacao` | leitura e gravação de fatura, extrato e planilha da B3; cotações |
+| `perfis` | perfis financeiros |
+| `carteira` | resumo, análises, relatório e proventos da carteira |
+| `drive` | sincronização dos dados por pasta do Drive |
+| `mcp` | ponto de acesso MCP e cadastro das chaves |
+| `analise` | dashboard de gastos e ganhos com sugestões |
+| `rendimento` | comparação com os índices, renda fixa pela taxa e projeção |
+| `rede` | endereço para abrir no celular |
 | `openfinance` | credenciais da Pluggy, token do widget, conexões e sincronização |
 | `painel` | resumo do painel, avisos do sino e busca |
 | `plataforma` | identidade visual e e-mail |
@@ -70,6 +77,32 @@ Convenções:
 - Pagar uma fatura a marca como paga, reduz a dívida do cartão e, se uma conta for indicada, lança nela a saída como transferência.
 - As faturas mudam de situação sozinhas: aberta, fechada depois do fechamento, atrasada depois do vencimento.
 
+## Perfis financeiros
+
+Um login pode ter vários perfis (`PerfilFinanceiro`). Os modelos de dados financeiros (`Conta`, `Categoria`, `Transacao`, `Fatura`, `Investimento`, `MovimentoInvestimento`, `PosicaoPatrimonio`, `Orcamento`, `Meta`, `Importacao`, `ConexaoBancaria`) têm a coluna `perfilId` (padrão 1, sem chave estrangeira, para um banco antigo ganhar a coluna sem migração manual).
+
+O filtro fica em um lugar só, `server/src/lib/prisma.ts`: o middleware `escolherPerfil` (`lib/perfil.ts`) lê o cabeçalho `X-Perfil` e guarda o perfil da requisição em um `AsyncLocalStorage`; uma extensão do Prisma acrescenta `perfilId` ao `where` de toda leitura, alteração e exclusão e ao `data` de toda criação nesses modelos. As rotas não repetem o filtro.
+
+- Consulta em SQL puro (`$queryRaw`) não passa pela extensão: se for criada uma, ela precisa filtrar por `perfilAtual()`.
+- Tarefas de fundo (cotações, índices) rodam uma vez por perfil com `emCadaPerfil`; a sincronização do Open Finance roda dentro do perfil dono da conexão.
+- O nome da categoria pode repetir entre perfis: a conferência de duplicado é feita na rota, não por índice único.
+
+## Rendimento e índices
+
+`lib/indices.ts` grava em `IndicePonto` o nível acumulado de cada índice por dia (Selic e IPCA do Banco Central, Ibovespa e IFIX da B3), de modo que o retorno entre duas datas é a razão entre dois níveis. `lib/rendimento.ts` monta os fluxos de caixa de cada investimento a partir dos movimentos (aplicação entra, resgate e provento saem) e calcula: o valor que esses fluxos teriam hoje seguindo cada índice; a taxa interna de retorno da carteira e de cada índice; o saldo da renda fixa pela taxa escrita no cadastro; e a projeção de 12 meses.
+
+## Carteira
+
+`lib/carteira.ts` monta, sobre os dias úteis (os mesmos da série da Selic), o valor da carteira em cada dia: quantidade reconstruída pelos movimentos × fechamento do ativo (`PrecoAtivo`, buscado do Yahoo Finance por código, uma vez a cada 6 horas). O retorno do dia é `(valor de hoje − aplicações + resgates + proventos) / valor de ontem − 1`; variações acima de 40% em um dia são tratadas como falha de dado. Meses, anos, extremos e estatísticas saem do encadeamento desses retornos. Ativo sem preço histórico cresce de forma uniforme do valor aplicado até o saldo. A agenda de proventos é uma estimativa: quem pagou em nove ou mais dos últimos doze meses repete a média dos três últimos pagamentos; os demais repetem o calendário do último ano.
+
+## Drive
+
+`lib/drive.ts` sincroniza o banco inteiro com uma pasta montada em `/drive` (`PASTA_DRIVE`). A pasta guarda `dados.json.gz` (todas as tabelas de dados, menos log, tokens de senha, e-mails, índices e preços) e `estado.json` (versão, data, computador e sha256). `EstadoDrive` é local: última versão vista e se há alteração a enviar (marcada em `app.ts` depois de cada requisição que altera dados). A cada 20 segundos: versão igual e alteração local → grava; versão nova na pasta sem alteração local → carrega (troca o conteúdo das tabelas em uma transação e acerta as sequências); os dois mudaram → vale a mais recente e a outra é copiada como `conflito-...`. Na primeira conexão de um computador que já tem dados, nada é trocado até a pessoa escolher o lado. O arquivo só é carregado quando o sha256 confere, para não ler um arquivo ainda chegando.
+
+## MCP
+
+`lib/mcp.ts` implementa o lado servidor do Model Context Protocol sobre HTTP, sem biblioteca: cada POST em `/api/mcp` traz uma mensagem JSON-RPC e recebe a resposta em JSON. A credencial é uma chave (`ChaveMcp`: só o sha256 fica gravado) ligada a um perfil financeiro e a uma permissão. Cada ferramenta valida os argumentos com zod e chama a própria API REST do sistema em `127.0.0.1`, com um token interno de dois minutos e o cabeçalho `X-Perfil` da chave: a IA passa pelas mesmas regras de validação, de saldo e de perfil que a tela. As ferramentas de escrita só aparecem em `tools/list` e só são aceitas em `tools/call` para chaves `ESCRITA`. As chaves não viajam pelo Drive: cada computador tem as suas.
+
 ## Importação de arquivos
 
 O navegador abre o arquivo (`client/src/modules/importar/lerArquivo.ts`): CSV e OFX viram texto; o PDF vira texto com uma linha por linha da página (pdf.js); o XLSX vira uma matriz por aba. Só esse conteúdo vai para a API, em dois passos:
@@ -83,6 +116,7 @@ Fatura e extrato (`server/src/lib/importacao/extrato.ts`):
 - CSV: o cabeçalho é a primeira linha com coluna de data e de valor; há leitura de parcela ("Parcela 2/5", "5 de 6").
 - Em fatura, valor positivo é compra e negativo é pagamento ou estorno; o pagamento da fatura anterior entra como transferência.
 - Compra parcelada que vem com a data original avança mês a mês até cair no ciclo da fatura.
+- Além da chave, um item é tratado como já registrado quando a conta tem um lançamento com a mesma data, valor, tipo e descrição que não veio deste arquivo (digitado à mão, de outro arquivo ou do Open Finance).
 - Cada lançamento recebe uma chave (`Transacao.chaveImportacao`, um hash de conta, data, descrição, valor e ordem): o que já existe é ignorado.
 - Todos os lançamentos do arquivo vão para a fatura daquele vencimento; a dívida do cartão passa a ser a soma das faturas não pagas.
 - O registro gravado é `MANUAL`: pode ser editado e recategorizado.

@@ -112,6 +112,49 @@ O cartão é uma conta de tipo `CARTAO`: criar, alterar e excluir é pelas rotas
 
 O corpo das rotas de importação pode ter até 12 MB. O token das cotações nunca é devolvido pela API.
 
+## Perfis financeiros
+
+Todas as rotas autenticadas respondem dentro de um perfil financeiro. O cliente escolhe o perfil pelo cabeçalho `X-Perfil: <id>`; sem o cabeçalho (ou com um id que não existe), vale o perfil mais antigo.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/perfis` | lista os perfis com `atual`, quantidade de contas e de investimentos e o patrimônio |
+| POST | `/perfis` | `{ nome, cor? }`; cria o perfil com as categorias padrão |
+| PUT | `/perfis/:id` | `{ nome?, cor? }` |
+| DELETE | `/perfis/:id` | apaga o perfil e todos os dados dele; recusa apagar o último |
+
+## Análise, rendimento e rede
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/analise?meses=3\|6\|12\|24` | receitas e gastos por mês, por categoria e por estabelecimento, gastos recorrentes, resumo dos investimentos e `sugestoes` (`area`: `GASTOS`, `RECEITAS` ou `INVESTIMENTOS`) |
+| GET | `/rendimento` | carteira, classes e ativos comparados com Selic, IPCA, Ibovespa e IFIX; renda fixa estimada pela taxa; projeção de 12 meses |
+| POST | `/rendimento/atualizar` | busca os índices de novo e devolve o relatório recalculado |
+| GET | `/cartoes/previsao` | parcelas ainda não cobradas, por cartão e por mês, somadas às faturas em aberto |
+| GET | `/rede` | `{ porta, enderecos: [{ rotulo, url }] }` para o QR code de acesso pelo celular |
+
+## Carteira e Drive
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/carteira?meses=6\|12\|24\|60\|0&classe=RENDA_VARIAVEL\|RENDA_FIXA\|FUNDOS\|OUTROS` | resumo, períodos, série diária, meses, anos, extremos, estatísticas, classes, instituições e ativos (`meses=0` = desde o início) |
+| GET | `/carteira/proventos?meses=...` | histórico, mapa de calor, proventos por ativo e agenda (recebidos e previstos) |
+| GET | `/drive/estado` | pasta, situação, última sincronização, pendência e conflito |
+| POST | `/drive/sincronizar` | roda um ciclo de sincronização agora |
+| POST | `/drive/escolher` | `{ origem: "PASTA" \| "COMPUTADOR" }`: qual lado vale na primeira conexão de um computador que já tinha dados |
+
+## MCP (assistentes de IA)
+
+| Método | Rota | O que faz |
+|---|---|---|
+| POST | `/mcp` | mensagem JSON-RPC do Model Context Protocol; credencial em `Authorization: Bearer fin_...` (não usa o login) |
+| POST | `/mcp/fin_...` | o mesmo, com a chave no caminho, para aplicativos que só aceitam um endereço |
+| GET | `/mcp/chaves` | chaves do perfil em uso (sem o texto da chave) e as ferramentas oferecidas |
+| POST | `/mcp/chaves` | `{ nome, permissao: "LEITURA" \| "ESCRITA" }`; a resposta traz `chave` uma única vez |
+| DELETE | `/mcp/chaves/:id` | apaga a chave |
+
+Métodos atendidos em `/mcp`: `initialize`, `ping`, `tools/list` e `tools/call`; notificações recebem 202. `GET` e `DELETE` devolvem 405 (não há fluxo de eventos nem sessão).
+
 ## Open Finance
 
 | Método | Rota | O que faz |

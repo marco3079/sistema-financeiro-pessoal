@@ -96,6 +96,7 @@ model Usuario {
 // Uma conexão = um "item" da Pluggy = o consentimento do usuário em uma instituição.
 model ConexaoBancaria {
   id                  Int           @id @default(autoincrement())
+  perfilId            Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   pluggyItemId        String        @unique
   instituicao         String // nome do banco/corretora
   instituicaoLogo     String? // endereço da imagem
@@ -107,12 +108,15 @@ model ConexaoBancaria {
 
   contas        Conta[]
   investimentos Investimento[]
+
+  @@index([perfilId])
 }
 
 // ---------- Contas, cartões e lançamentos ----------
 
 model Conta {
   id               Int       @id @default(autoincrement())
+  perfilId         Int       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   nome             String
   tipo             TipoConta
   instituicao      String?
@@ -137,22 +141,26 @@ model Conta {
   faturas    Fatura[]
 
   @@index([tipo])
+  @@index([perfilId])
 }
 
 model Categoria {
-  id   Int           @id @default(autoincrement())
-  nome String
-  tipo TipoTransacao
-  cor  String        @default("#64748b")
+  id       Int           @id @default(autoincrement())
+  perfilId Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  nome     String
+  tipo     TipoTransacao
+  cor      String        @default("#64748b")
 
   transacoes Transacao[]
   orcamento  Orcamento?
 
-  @@unique([nome, tipo])
+  @@index([perfilId, nome, tipo])
+  @@index([perfilId])
 }
 
 model Transacao {
   id            Int           @id @default(autoincrement())
+  perfilId      Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   contaId       Int
   conta         Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
   data          DateTime      @db.Date
@@ -181,11 +189,13 @@ model Transacao {
   @@index([categoriaId, data])
   @@index([faturaId])
   @@index([chaveImportacao])
+  @@index([perfilId])
 }
 
 // Fatura de um cartão de crédito (Conta do tipo CARTAO). Uma por vencimento.
 model Fatura {
   id         Int          @id @default(autoincrement())
+  perfilId   Int          @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   contaId    Int
   conta      Conta        @relation(fields: [contaId], references: [id], onDelete: Cascade)
   vencimento DateTime     @db.Date
@@ -202,12 +212,14 @@ model Fatura {
   transacoes Transacao[]
 
   @@unique([contaId, vencimento])
+  @@index([perfilId])
 }
 
 // ---------- Investimentos ----------
 
 model Investimento {
   id            Int              @id @default(autoincrement())
+  perfilId      Int              @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   nome          String
   codigo        String? // ticker ou código do ativo
   tipo          TipoInvestimento
@@ -228,15 +240,18 @@ model Investimento {
   conexao            ConexaoBancaria? @relation(fields: [conexaoId], references: [id], onDelete: SetNull)
   pluggyInvestmentId String?          @unique
   cotadoEm           DateTime? // última vez em que o saldo foi atualizado pela cotação
+  estimadoEm         DateTime? // última vez em que o saldo foi estimado pela taxa (renda fixa)
   criadoEm           DateTime         @default(now())
 
   movimentos MovimentoInvestimento[]
 
   @@index([tipo])
+  @@index([perfilId])
 }
 
 model MovimentoInvestimento {
   id              Int                       @id @default(autoincrement())
+  perfilId        Int                       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   investimentoId  Int
   investimento    Investimento              @relation(fields: [investimentoId], references: [id], onDelete: Cascade)
   data            DateTime                  @db.Date
@@ -250,15 +265,20 @@ model MovimentoInvestimento {
 
   @@index([investimentoId, data])
   @@index([chaveImportacao])
+  @@index([perfilId])
 }
 
 // Fotografia diária do patrimônio (uma por dia), para o gráfico de evolução.
 model PosicaoPatrimonio {
   id            Int      @id @default(autoincrement())
-  data          DateTime @unique @db.Date
+  perfilId      Int      @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  data          DateTime @db.Date
   contas        Decimal  @db.Decimal(14, 2) // soma das contas que não são cartão
   investimentos Decimal  @db.Decimal(14, 2)
   cartoes       Decimal  @db.Decimal(14, 2) // dívida somada dos cartões (positivo)
+
+  @@index([perfilId])
+  @@index([perfilId, data])
 }
 
 // ---------- Importação de arquivos ----------
@@ -266,6 +286,7 @@ model PosicaoPatrimonio {
 // Histórico do que foi importado de arquivo (fatura, extrato ou planilha da B3).
 model Importacao {
   id         Int      @id @default(autoincrement())
+  perfilId   Int      @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   criadoEm   DateTime @default(now())
   arquivo    String // nome do arquivo enviado
   tipo       String // FATURA, EXTRATO ou B3
@@ -278,6 +299,7 @@ model Importacao {
   total      Decimal? @db.Decimal(14, 2)
 
   @@index([criadoEm])
+  @@index([perfilId])
 }
 
 // ---------- Planejamento ----------
@@ -285,13 +307,17 @@ model Importacao {
 // Limite mensal de gasto de uma categoria de DESPESA.
 model Orcamento {
   id          Int       @id @default(autoincrement())
+  perfilId    Int       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   categoriaId Int       @unique
   categoria   Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   limite      Decimal   @db.Decimal(14, 2)
+
+  @@index([perfilId])
 }
 
 model Meta {
   id         Int       @id @default(autoincrement())
+  perfilId   Int       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
   nome       String
   valorAlvo  Decimal   @db.Decimal(14, 2)
   valorAtual Decimal   @default(0) @db.Decimal(14, 2)
@@ -299,6 +325,8 @@ model Meta {
   cor        String    @default("#2563eb")
   concluida  Boolean   @default(false)
   criadoEm   DateTime  @default(now())
+
+  @@index([perfilId])
 }
 
 // ---------- Sistema ----------
@@ -324,6 +352,66 @@ model LogAtividade {
   @@index([criadoEm])
   @@index([usuarioId, criadoEm])
   @@index([tipo, criadoEm])
+}
+
+// ===== Perfis financeiros =====
+
+// Cada perfil ("Pessoal", "Empresa", "Casal") tem as próprias contas, cartões, faturas, investimentos,
+// categorias, orçamentos e metas. O mesmo login troca de perfil na tela. Os registros apontam para o perfil
+// pela coluna perfilId (sem chave estrangeira, para o banco que já existe ganhar a coluna sem migração manual);
+// o filtro por perfil é aplicado em lib/prisma.ts.
+model PerfilFinanceiro {
+  id       Int      @id @default(autoincrement())
+  nome     String
+  cor      String   @default("#2563eb")
+  criadoEm DateTime @default(now())
+}
+
+// ===== Índices de referência (Selic, IPCA, Ibovespa, IFIX) =====
+
+// Cada ponto é o nível acumulado do índice no dia: o retorno entre duas datas é a razão entre os níveis.
+model IndicePonto {
+  indice String
+  data   DateTime @db.Date
+  valor  Float
+
+  @@id([indice, data])
+}
+
+// Fechamento diário de cada ativo negociado em bolsa (histórico para a rentabilidade da carteira).
+model PrecoAtivo {
+  codigo String
+  data   DateTime @db.Date
+  valor  Float
+
+  @@id([codigo, data])
+}
+
+// Estado do Drive NESTE computador (linha única). Não viaja para a pasta.
+model EstadoDrive {
+  id             Int       @id @default(1)
+  versao         String? // última versão da pasta que este computador carregou ou gravou
+  sujo           Boolean   @default(false) // há alteração local ainda não enviada
+  alteradoEm     DateTime?
+  sincronizadoEm DateTime?
+  pendencia      String? // "ESCOLHER": a pessoa precisa dizer qual lado vale
+  erro           String?
+  ultimoConflito String? // "quando|nome da cópia guardada"
+}
+
+// Chave de acesso de um assistente de IA (MCP). O banco guarda só o hash; o texto aparece uma vez, ao criar.
+model ChaveMcp {
+  id          Int       @id @default(autoincrement())
+  nome        String
+  hash        String    @unique // sha256 da chave
+  prefixo     String // começo da chave, só para a pessoa reconhecer
+  permissao   String    @default("LEITURA") // LEITURA ou ESCRITA
+  perfilId    Int       @default(1) // perfil financeiro que a chave enxerga
+  criadoEm    DateTime  @default(now())
+  ultimoUsoEm DateTime?
+  usos        Int       @default(0)
+
+  @@index([perfilId])
 }
 
 // ===== Configurações da plataforma (linha única, id = 1) =====

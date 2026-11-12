@@ -5,6 +5,8 @@ import path from 'path';
 import { Prisma } from '@prisma/client';
 import { HttpError } from './lib/erros';
 import { autenticar } from './lib/auth';
+import { escolherPerfil } from './lib/perfil';
+import { marcarAlterado } from './lib/drive';
 import { descreverRequisicao, iniciarLimpezaDeLogs, registrarLog } from './lib/log';
 
 interface ModuloRotas {
@@ -55,7 +57,8 @@ function tratarErro(e: unknown, req: Request, res: Response, _next: NextFunction
     res.status(413).json({ erro: 'Corpo da requisição grande demais' });
     return;
   }
-  console.error(`Erro em ${req.method} ${req.originalUrl}:`, e);
+  // A chave de acesso do MCP pode vir no caminho: nunca vai para o log.
+  console.error(`Erro em ${req.method} ${req.originalUrl.replace(/\/mcp\/fin_[A-Za-z0-9_-]+/i, '/mcp/fin_***')}:`, e);
   res.status(500).json({ erro: 'Erro interno' });
 }
 
@@ -66,6 +69,23 @@ function registrarAtividade(req: Request, res: Response, next: NextFunction): vo
   const caminho = req.originalUrl.split('?')[0];
   const metodo = req.method;
   res.on('finish', () => {
+    // Toda alteração feita pela tela avisa o Drive de que há algo a enviar para a pasta.
+    if (
+      metodo !== 'GET' &&
+      metodo !== 'HEAD' &&
+      metodo !== 'OPTIONS' &&
+      res.statusCode < 400 &&
+      caminho.startsWith('/api/') &&
+      !caminho.startsWith('/api/drive/') &&
+      // As chamadas de IA chegam em /api/mcp e gravam pelas rotas normais, que já avisam o Drive.
+      !caminho.startsWith('/api/mcp') &&
+      // Trocar ou redefinir a senha altera dados e precisa viajar; entrar, sair e pedir o e-mail de recuperação, não.
+      caminho !== '/api/auth/login' &&
+      caminho !== '/api/auth/sair' &&
+      caminho !== '/api/auth/esqueci-senha'
+    ) {
+      marcarAlterado();
+    }
     try {
       if (!caminho.startsWith('/api/') || !req.usuario || metodo === 'OPTIONS') {
         return;
@@ -123,7 +143,7 @@ export function criarApp() {
   }
   for (const { mod } of modulos) {
     if (mod.default) {
-      app.use('/api', autenticar, mod.default);
+      app.use('/api', autenticar, escolherPerfil, mod.default);
     }
   }
 

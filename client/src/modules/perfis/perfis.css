@@ -1,0 +1,48 @@
+/* Tela de perfis financeiros. Cores só por variáveis do tema. */
+
+.perfis-texto-suave {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--cor-texto-suave);
+}
+
+.perfis-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.perfis-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+.perfis-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  color: var(--cor-texto);
+}
+
+.perfis-dados {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.perfis-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
