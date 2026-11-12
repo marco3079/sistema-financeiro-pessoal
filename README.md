@@ -23,7 +23,6 @@
 - [Instalação rápida](#instalação-rápida)
 - [Primeiro acesso](#primeiro-acesso)
 - [Open Finance](#open-finance)
-- [Dados de demonstração](#dados-de-demonstração)
 - [Configuração](#configuração)
 - [Arquitetura](#arquitetura)
 - [Desenvolvimento](#desenvolvimento)
@@ -88,7 +87,7 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 | ![Investimentos](docs/imagens/investimentos.png) | ![Orçamento](docs/imagens/orcamento.png) |
 | ![Conexões Open Finance](docs/imagens/conexoes.png) | ![Painel no tema escuro](docs/imagens/painel-escuro.png) |
 
-Os dados dos prints são fictícios (dados de demonstração).
+Os dados dos prints são fictícios. O sistema é instalado vazio, só com a conta demo e as categorias padrão.
 
 ## Instalação rápida
 
@@ -134,14 +133,7 @@ Limites conhecidos:
 
 - A Pluggy não informa se uma fatura foi paga. O sistema considera paga a fatura que tem pagamento registrado ou cujo vencimento já passou.
 - A fatura em aberto é montada a partir do saldo do cartão e das compras ainda sem fatura fechada.
-- A sincronização foi escrita a partir da documentação da Pluggy e validada com dados de demonstração, não com todos os bancos. Depois da primeira sincronização, confira saldos e faturas com o aplicativo do banco.
-
-## Dados de demonstração
-
-Para conhecer o sistema com contas, um cartão com faturas, seis meses de lançamentos, investimentos, orçamento e metas fictícios, instale com a opção de demonstração numa instalação **nova**:
-
-- Windows: `powershell -ExecutionPolicy Bypass -File .\instalar.ps1 -Demo`
-- Linux e macOS: `bash instalar.sh --demo`
+- A sincronização foi escrita a partir da documentação da Pluggy e ainda não foi validada com todos os bancos. Depois da primeira sincronização, confira saldos e faturas com o aplicativo do banco.
 
 ## Configuração
 
@@ -151,8 +143,7 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 |---|---|---|
 | `POSTGRES_PASSWORD` | Senha do banco | aleatória |
 | `JWT_SECRET` | Segredo dos logins e da cifra dos segredos guardados no banco | aleatório |
-| `ADMIN_NOME`, `ADMIN_EMAIL`, `ADMIN_SENHA` | Conta do titular criada na primeira subida | `Titular`, `demo@financas.local`, `demo1234` |
-| `SEED_DEMO` | `true` carrega os dados de demonstração | `false` |
+| `ADMIN_NOME`, `ADMIN_EMAIL`, `ADMIN_SENHA` | Conta do titular criada na primeira subida | `Demo`, `demo@financas.local`, `demo1234` |
 | `WEB_PORT` | Porta do site | `8092` |
 | `API_PORT` | Porta da API (só neste computador) | `3092` |
 | `DB_PORT` | Porta do banco (só neste computador) | `5434` |

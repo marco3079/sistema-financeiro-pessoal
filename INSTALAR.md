@@ -92,15 +92,6 @@ Atenção: este comando **apaga o banco de dados** (contas, lançamentos, invest
 docker compose down -v
 ```
 
-## Quero ver com dados de exemplo
-
-Para começar com contas, um cartão com faturas, seis meses de lançamentos, investimentos, orçamento e metas de exemplo, use a opção de demonstração numa instalação **nova**:
-
-- Windows: `powershell -ExecutionPolicy Bypass -File .\instalar.ps1 -Demo`
-- Linux e macOS: `bash instalar.sh --demo`
-
-Os dados de demonstração são fictícios. Para usar de verdade, faça uma instalação nova sem a opção de demonstração.
-
 ## Problemas comuns
 
 **O Docker não está aberto.** O instalador diz "o Docker está instalado, mas não está rodando". Abra o Docker Desktop, espere ele iniciar e rode o instalador de novo.

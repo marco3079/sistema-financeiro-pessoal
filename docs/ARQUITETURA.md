@@ -10,7 +10,7 @@ Como o Sistema Financeiro Pessoal é montado: contêineres, módulos, autentica�
 | `api` | build de `server/` | API HTTP (Node 20, Express 4, Prisma 5) | `127.0.0.1:API_PORT` (padrão 3092) |
 | `web` | build de `client/` | Site estático no nginx, que encaminha `/api/` para a API | `WEB_PORT` (padrão 8092) |
 
-Na subida, a API aplica o modelo de dados (`prisma db push`), cria o titular e as categorias padrão se o banco estiver vazio (`prisma/seed.ts`) e, com `SEED_DEMO=true`, carrega os dados de demonstração (`prisma/seed-demo.ts`).
+Na subida, a API aplica o modelo de dados (`prisma db push`), e, se o banco estiver vazio, cria a conta do titular e as categorias padrão (`prisma/seed.ts`). Nenhum dado financeiro é criado.
 
 ## Módulos do servidor
 

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Instalador do Sistema Financeiro Pessoal para Linux e macOS.
-# Uso: bash instalar.sh [--demo] [--porta-web N] [--porta-api N] [--sem-perguntas]
+# Uso: bash instalar.sh [--porta-web N] [--porta-api N] [--sem-perguntas]
 # Codigos de saida: 0 = ok; 2 = Docker nao instalado; 3 = Docker parado ou sem Compose;
 #                   4 = falha ao subir os conteineres; 5 = API nao respondeu;
 #                   6 = existe o banco de uma instalacao anterior, mas nao ha .env com a senha dele.
 
 set -euo pipefail
 
-DEMO=0
 PORTA_WEB=8092
 PORTA_API=3092
 SEM_PERGUNTAS=0
@@ -15,9 +14,6 @@ ESCOLHIDA=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --demo)
-      DEMO=1
-      ;;
     --porta-web)
       PORTA_WEB="${2:?informe o numero da porta web}"
       shift
@@ -30,12 +26,12 @@ while [ $# -gt 0 ]; do
       SEM_PERGUNTAS=1
       ;;
     -h|--help)
-      echo "Uso: bash instalar.sh [--demo] [--porta-web N] [--porta-api N] [--sem-perguntas]"
+      echo "Uso: bash instalar.sh [--porta-web N] [--porta-api N] [--sem-perguntas]"
       exit 0
       ;;
     *)
       echo "Opcao desconhecida: $1"
-      echo "Uso: bash instalar.sh [--demo] [--porta-web N] [--porta-api N] [--sem-perguntas]"
+      echo "Uso: bash instalar.sh [--porta-web N] [--porta-api N] [--sem-perguntas]"
       exit 1
       ;;
   esac
@@ -224,9 +220,6 @@ fi
 echo "[5/6] Preparando o arquivo .env..."
 if [ "$ENV_EXISTE" -eq 1 ]; then
   echo "Usando o .env existente."
-  if [ "$DEMO" -eq 1 ]; then
-    echo "Aviso: --demo vale so para instalacao nova; o .env existente nao foi alterado."
-  fi
   EMAIL_LIDO=$(ler_variavel "$ARQ_ENV" ADMIN_EMAIL)
   if [ -n "$EMAIL_LIDO" ]; then
     ADMIN_EMAIL="$EMAIL_LIDO"
@@ -247,10 +240,6 @@ else
   SENHA_BANCO=$(gerar_segredo 24)
   SEGREDO_JWT=$(gerar_segredo 48)
   SENHA_ADMIN="demo1234"
-  SEED_DEMO=false
-  if [ "$DEMO" -eq 1 ]; then
-    SEED_DEMO=true
-  fi
   (
     umask 077
     cat > "$ARQ_ENV" <<EOF
@@ -260,7 +249,6 @@ JWT_SECRET=$SEGREDO_JWT
 ADMIN_NOME=Demo
 ADMIN_EMAIL=$ADMIN_EMAIL
 ADMIN_SENHA=$SENHA_ADMIN
-SEED_DEMO=$SEED_DEMO
 WEB_PORT=$PORTA_WEB_FINAL
 API_PORT=$PORTA_API_FINAL
 DB_PORT=5434

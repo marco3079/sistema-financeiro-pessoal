@@ -26,7 +26,6 @@ services:
       ADMIN_NOME: ${ADMIN_NOME:-Demo}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-demo@financas.local}
       ADMIN_SENHA: ${ADMIN_SENHA:-demo1234}
-      SEED_DEMO: ${SEED_DEMO:-false}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
       PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
       PLUGGY_SANDBOX: ${PLUGGY_SANDBOX:-false}

@@ -18,7 +18,7 @@ Sistema financeiro pessoal (contas, cartões, investimentos e Open Finance) com 
    - Linux e macOS: `bash instalar.sh`
 3. O script faz tudo sozinho: confere o Docker, cria o arquivo `.env` com segredos aleatórios, baixa as dependências (o Docker baixa as imagens e instala os pacotes) e sobe os contêineres. Na primeira vez pode levar vários minutos.
 
-Opções úteis: `-Demo` no Windows ou `--demo` no Linux/macOS carrega dados de demonstração fictícios (só para teste). Portas: `-PortaWeb N` e `-PortaApi N` (ou `--porta-web N` e `--porta-api N`). `-SemPerguntas` ou `--sem-perguntas` faz o script não pedir confirmação.
+Opções úteis. Portas: `-PortaWeb N` e `-PortaApi N` (ou `--porta-web N` e `--porta-api N`). `-SemPerguntas` ou `--sem-perguntas` faz o script não pedir confirmação.
 
 ## Códigos de saída do instalador
 
@@ -56,7 +56,6 @@ Opções úteis: `-Demo` no Windows ou `--demo` no Linux/macOS carrega dados de 
 - **Atualizar**: entre na pasta do projeto, rode `git pull` e depois o instalador de novo (`.\instalar.ps1` ou `bash instalar.sh`). Os dados do banco são mantidos.
 - **Parar**: `docker compose down` (os dados ficam guardados).
 - **Apagar tudo**: `docker compose down -v`. Isso apaga o banco. Só faça com pedido explícito da pessoa.
-- **Dados de demonstração**: `-Demo` ou `--demo`, só em instalação nova.
 
 ## Desenvolvimento
 

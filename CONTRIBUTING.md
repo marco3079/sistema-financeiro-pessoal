@@ -17,8 +17,8 @@ Use as **issues** do repositório: https://github.com/marco3079/sistema-financei
 
 Requisitos: Docker com Docker Compose.
 
-- Windows: `instalar.ps1` (com `-Demo` para carregar dados fictícios).
-- Linux e macOS: `bash instalar.sh --demo`.
+- Windows: `instalar.ps1`.
+- Linux e macOS: `bash instalar.sh`.
 
 O instalador confere o Docker, cria o arquivo `.env` com segredos aleatórios e sobe os contêineres. As instruções completas estão no [README.md](README.md).
 

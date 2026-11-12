@@ -1,11 +1,10 @@
 # Instalador do Sistema Financeiro Pessoal para Windows (PowerShell 5.1 ou mais novo).
-# Uso: powershell -ExecutionPolicy Bypass -File .\instalar.ps1 [-Demo] [-PortaWeb 8092] [-PortaApi 3092] [-SemPerguntas]
+# Uso: powershell -ExecutionPolicy Bypass -File .\instalar.ps1 [-PortaWeb 8092] [-PortaApi 3092] [-SemPerguntas]
 # Codigos de saida: 0 = ok; 2 = Docker nao instalado; 3 = Docker parado ou sem Compose;
 #                   4 = falha ao subir os conteineres; 5 = API nao respondeu;
 #                   6 = existe o banco de uma instalacao anterior, mas nao ha .env com a senha dele.
 
 param(
-    [switch]$Demo,
     [int]$PortaWeb = 8092,
     [int]$PortaApi = 3092,
     [switch]$SemPerguntas
@@ -214,9 +213,6 @@ if ($envExiste) {
 Write-Host '[5/6] Preparando o arquivo .env...'
 if ($envExiste) {
     Write-Host 'Usando o .env existente.'
-    if ($Demo) {
-        Write-Host 'Aviso: -Demo vale so para instalacao nova; o .env existente nao foi alterado.'
-    }
     $adminEmailLido = Ler-Variavel $arquivoEnv 'ADMIN_EMAIL'
     if ($adminEmailLido -ne '') { $adminEmail = $adminEmailLido }
     $adminSenhaExistente = Ler-Variavel $arquivoEnv 'ADMIN_SENHA'
@@ -235,8 +231,6 @@ if ($envExiste) {
     $senhaBanco = Gerar-Segredo -Tamanho 24
     $segredoJwt = Gerar-Segredo -Tamanho 48
     $senhaAdmin = 'demo1234'
-    $seedDemo = 'false'
-    if ($Demo) { $seedDemo = 'true' }
     $linhas = @(
         '# Gerado pelo instalar.ps1. Nao envie este arquivo para o Git.',
         ('POSTGRES_PASSWORD=' + $senhaBanco),
@@ -244,7 +238,6 @@ if ($envExiste) {
         'ADMIN_NOME=Demo',
         ('ADMIN_EMAIL=' + $adminEmail),
         ('ADMIN_SENHA=' + $senhaAdmin),
-        ('SEED_DEMO=' + $seedDemo),
         ('WEB_PORT=' + $portaWeb),
         ('API_PORT=' + $portaApi),
         'DB_PORT=5433'

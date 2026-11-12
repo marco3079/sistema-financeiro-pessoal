@@ -1,11 +1,10 @@
-// Seed padrão: cria só a conta do titular.
+// Seed: cria a conta do titular e as categorias padrão. Nenhum dado financeiro é criado.
 // Senha inicial: ADMIN_SENHA do .env (8 caracteres ou mais) ou, se ausente/curta, a senha padrão demo1234.
 // Idempotente: se já houver usuários, não faz nada.
-// Os dados de demonstração ficam em seed-demo.ts e só entram com SEED_DEMO=true.
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { carregarDemonstracao, criarCategoriasPadrao } from './seed-demo';
+import { criarCategoriasPadrao } from './categorias-padrao';
 
 const prisma = new PrismaClient();
 
@@ -20,7 +19,6 @@ async function main(): Promise<void> {
   const nome = process.env.ADMIN_NOME || 'Demo';
   const email = (process.env.ADMIN_EMAIL || 'demo@financas.local').trim().toLowerCase();
   const senhaEnv = process.env.ADMIN_SENHA || '';
-  const demo = process.env.SEED_DEMO === 'true';
 
   let senha = senhaEnv;
   let padrao = false;
@@ -49,9 +47,6 @@ async function main(): Promise<void> {
   console.log('Troque a senha em "Meu perfil" depois do primeiro acesso.');
   console.log('=======================');
 
-  if (demo) {
-    await carregarDemonstracao(prisma);
-  }
 }
 
 main()
