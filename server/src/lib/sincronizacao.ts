@@ -8,6 +8,8 @@
 
 import type { Prisma, StatusConexao, TipoConta, TipoInvestimento, TipoMovimentoInvestimento } from '@prisma/client';
 import { comPerfil, prisma } from './prisma';
+import { ehPagamentoDeFaturaNaConta, marcarPixNoCreditoNasContas } from './pixNoCredito';
+import { gravarProventosDasContas } from './proventosOpenFinance';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
 import {
   listarContasDoItem,
@@ -52,6 +54,14 @@ function corDoConector(cor: string | null | undefined): string | null {
 
 function dinheiro(valor: number | null | undefined): number {
   return typeof valor === 'number' && Number.isFinite(valor) ? arredondar(valor) : 0;
+}
+
+// Valor do lançamento em reais. Compra em moeda estrangeira vem com `amount` na moeda da compra e o valor
+// convertido em `amountInAccountCurrency`; é esse que o banco cobra na fatura.
+function valorEmReais(t: { amount: number; currencyCode?: string | null; amountInAccountCurrency?: number | null }): number {
+  const convertido = t.amountInAccountCurrency;
+  const usar = t.currencyCode && t.currencyCode !== 'BRL' && typeof convertido === 'number' && Number.isFinite(convertido) && convertido !== 0;
+  return Math.abs(dinheiro(usar ? convertido : t.amount));
 }
 
 function emLotes<T>(lista: T[]): T[][] {
@@ -138,15 +148,17 @@ async function gravarConta(conexao: { id: number; instituicao: string; instituic
 async function gravarFaturas(
   contaLocal: { id: number; saldo: Prisma.Decimal },
   conta: PluggyConta
-): Promise<{ porIdPluggy: Map<string, number>; abertaId: number | null; ultimoFechamento: Date | null }> {
+): Promise<FaturasDaConta> {
   const porIdPluggy = new Map<string, number>();
   const agora = hoje();
   let ultimoFechamento: Date | null = null;
+  let ultimoVencimento: Date | null = null;
 
   const faturas = await listarFaturasDaConta(conta.id).catch(() => []);
   for (const fatura of faturas) {
     const vencimento = diaDe(fatura.dueDate);
     if (!vencimento) continue;
+    if (!ultimoVencimento || vencimento.getTime() > ultimoVencimento.getTime()) ultimoVencimento = vencimento;
     const fechamento = diaDe(fatura.billClosingDate);
     if (fechamento && (!ultimoFechamento || fechamento.getTime() > ultimoFechamento.getTime())) {
       ultimoFechamento = fechamento;
@@ -185,9 +197,19 @@ async function gravarFaturas(
 
   // Fatura em aberto: a Pluggy só lista faturas fechadas; o que está em aberto é o saldo do cartão.
   let abertaId: number | null = null;
-  const vencimentoAberta = diaDe(conta.creditData?.balanceDueDate);
+  let abertaEstimada = false;
+  let vencimentoAberta = diaDe(conta.creditData?.balanceDueDate);
+  let fechamentoAberta = diaDe(conta.creditData?.balanceCloseDate);
+  // Vários bancos (e o MeuPluggy) não informam o vencimento da fatura em aberto. Nesse caso ela é estimada pela
+  // última fatura fechada: mesmo dia, nos meses seguintes, até cair de hoje em diante.
+  if ((!vencimentoAberta || vencimentoAberta.getTime() < agora.getTime()) && ultimoVencimento) {
+    let meses = 1;
+    while (maisMeses(ultimoVencimento, meses).getTime() < agora.getTime() && meses < 24) meses++;
+    vencimentoAberta = maisMeses(ultimoVencimento, meses);
+    fechamentoAberta = ultimoFechamento ? maisMeses(ultimoFechamento, meses) : null;
+    abertaEstimada = true;
+  }
   if (vencimentoAberta && vencimentoAberta.getTime() >= agora.getTime()) {
-    const fechamentoAberta = diaDe(conta.creditData?.balanceCloseDate);
     const existente = await prisma.fatura.findUnique({
       where: { contaId_vencimento: { contaId: contaLocal.id, vencimento: vencimentoAberta } },
       select: { id: true, pluggyBillId: true },
@@ -219,7 +241,254 @@ async function gravarFaturas(
       abertaId = existente.id;
     }
   }
-  return { porIdPluggy, abertaId, ultimoFechamento };
+  return { porIdPluggy, abertaId, ultimoFechamento, abertaFechamento: abertaId !== null ? fechamentoAberta : null, abertaEstimada };
+}
+
+interface FaturasDaConta {
+  porIdPluggy: Map<string, number>;
+  abertaId: number | null;
+  ultimoFechamento: Date | null;
+  abertaFechamento: Date | null; // até quando as compras entram na fatura em aberto
+  abertaEstimada: boolean; // datas calculadas pelo sistema: o total vem da soma das compras
+}
+
+// Mesma data, `meses` meses depois (dia 31 em mês curto vira o último dia).
+function maisMeses(data: Date, meses: number): Date {
+  const alvo = new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth() + meses, 1));
+  const ultimoDia = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  alvo.setUTCDate(Math.min(data.getUTCDate(), ultimoDia));
+  return alvo;
+}
+
+// Fatura em aberto pela "fatura prevista" que o banco informa em cada lançamento pendente do cartão
+// (creditCardMetadata.billForecastDate). É o dado mais fiel que o Open Finance traz sobre a fatura atual:
+// inclui as parcelas de compras antigas, que chegam com a data da compra original.
+// Devolve false quando o banco não informa a fatura prevista (aí vale a estimativa pelas datas).
+async function fecharFaturaPelaPrevisao(
+  contaId: number,
+  contaPluggy: PluggyConta,
+  abertaId: number,
+  faturas: FaturasDaConta
+): Promise<boolean> {
+  const desde = new Date(hoje().getTime() - 400 * MS_DIA);
+  const lista = (await listarTransacoesDaConta(contaPluggy.id, dataISO(desde)).catch(() => [])) as unknown as LancamentoComPrevisao[];
+  const previsao = (t: LancamentoComPrevisao): string | null => {
+    const bruto = t.creditCardMetadata?.billForecastDate;
+    return typeof bruto === 'string' && /^\d{4}-\d{2}/.test(bruto) ? bruto.slice(0, 7) : null;
+  };
+  const pendentes = lista.filter((t) => t.status === 'PENDING' && previsao(t) !== null);
+  if (pendentes.length === 0) return false;
+
+  // Fatura atual: a previsão mais comum entre as compras pendentes dos últimos 45 dias.
+  const agora = hoje().getTime();
+  const contagem = new Map<string, number>();
+  for (const t of pendentes) {
+    const data = diaDe(t.date);
+    if (!data || t.type !== 'DEBIT' || data.getTime() > agora || data.getTime() < agora - 45 * MS_DIA) continue;
+    const p = previsao(t) as string;
+    contagem.set(p, (contagem.get(p) ?? 0) + 1);
+  }
+  const atual = [...contagem].sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0]?.[0];
+  if (!atual) return false;
+
+  const ehPagamento = (t: LancamentoComPrevisao) =>
+    t.type === 'CREDIT' && /pagamento|payment|transfer/i.test(`${t.description ?? ''} ${t.category ?? ''}`);
+  // Compra parcelada com parcela de fatura antiga que nunca foi lançada: o banco continua prevendo as parcelas, mas
+  // não as cobra nem as soma no saldo devedor (compra cancelada ou estornada). Fica fora da fatura.
+  const serie = (t: LancamentoComPrevisao) =>
+    `${t.creditCardMetadata?.purchaseDate ?? ''}|${t.creditCardMetadata?.totalInstallments ?? ''}|${valorEmReais(t).toFixed(2)}`;
+  const seriesParadas = new Set(
+    pendentes.filter((t) => t.type === 'DEBIT' && (previsao(t) as string) < atual && t.creditCardMetadata?.totalInstallments).map(serie)
+  );
+  // Também é do ciclo a compra pendente feita depois do último fechamento, mesmo que o banco a marque com a
+  // previsão da fatura anterior (acontece com compras dos dias seguintes ao fechamento).
+  const depoisDoFechamento = (t: LancamentoComPrevisao) => {
+    const data = diaDe(t.date);
+    if (!data || !faturas.ultimoFechamento || data.getTime() <= faturas.ultimoFechamento.getTime()) return false;
+    return !faturas.abertaFechamento || data.getTime() <= faturas.abertaFechamento.getTime();
+  };
+  const candidatos = pendentes.filter(
+    (t) =>
+      (previsao(t) === atual || ((previsao(t) as string) < atual && depoisDoFechamento(t))) &&
+      !ehPagamento(t) &&
+      !(t.type === 'DEBIT' && t.creditCardMetadata?.totalInstallments && seriesParadas.has(serie(t)))
+  );
+
+  // A mesma compra pendente às vezes vem duas vezes (uma com a cidade na descrição, outra sem): mesma data, mesmo
+  // valor e uma descrição começando com a outra. Fica a mais completa; duas compras de descrição idêntica são
+  // compras diferentes e ficam as duas.
+  const limpa = (t: LancamentoComPrevisao) => (t.description ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const repetidos = new Set<string>();
+  for (const a of candidatos) {
+    if (a.type !== 'DEBIT' || repetidos.has(a.id)) continue;
+    for (const b of candidatos) {
+      if (b === a || b.type !== 'DEBIT' || repetidos.has(b.id)) continue;
+      if (String(a.date).slice(0, 10) !== String(b.date).slice(0, 10) || Math.abs(valorEmReais(a) - valorEmReais(b)) > 0.005) continue;
+      const da = limpa(a);
+      const db = limpa(b);
+      if (da.length > 3 && db.length > da.length && db.startsWith(da)) repetidos.add(a.id);
+    }
+  }
+  const doCiclo = candidatos.filter((t) => !repetidos.has(t.id));
+  let somaDoCiclo = doCiclo.reduce((soma, t) => soma + (t.type === 'CREDIT' ? -valorEmReais(t) : valorEmReais(t)), 0);
+
+  // Quando o banco também lista as parcelas das próximas faturas, a fatura atual é o saldo devedor do cartão menos
+  // essas parcelas: assim entram encargos e ajustes que não vêm como lançamento. Ficam de fora da conta as séries
+  // com parcela antiga que nunca foi lançada (o banco não as soma no saldo devedor).
+  const futuras = pendentes.filter((t) => t.type === 'DEBIT' && (previsao(t) as string) > atual);
+  let total = somaDoCiclo;
+  if (futuras.length > 0 && typeof contaPluggy.balance === 'number' && contaPluggy.balance > 0) {
+    const aVencer = futuras.filter((t) => !seriesParadas.has(serie(t))).reduce((soma, t) => soma + valorEmReais(t), 0);
+    const peloSaldo = contaPluggy.balance - aVencer;
+    if (peloSaldo >= somaDoCiclo - 0.005) total = peloSaldo;
+  }
+
+  // Os lançamentos do ciclo ficam ligados à fatura em aberto; o que estava ligado só pela data e não é dela sai.
+  const ids = doCiclo.map((t) => t.id);
+  await prisma.transacao.updateMany({
+    where: { contaId, faturaId: abertaId, OR: [{ pluggyTransactionId: null }, { pluggyTransactionId: { notIn: ids } }] },
+    data: { faturaId: null },
+  });
+  for (const lote of emLotes(ids)) {
+    await prisma.transacao.updateMany({ where: { contaId, pluggyTransactionId: { in: lote } }, data: { faturaId: abertaId } });
+  }
+  // A cópia repetida sai das despesas (vira transferência, com a explicação na observação).
+  if (repetidos.size > 0) {
+    await prisma.transacao.updateMany({
+      where: { contaId, pluggyTransactionId: { in: [...repetidos] }, transferencia: false },
+      data: { transferencia: true, faturaId: null, observacao: 'Compra pendente enviada duas vezes pelo banco: esta cópia não conta.' },
+    });
+  }
+
+  // Parcelas que o banco ainda não enviou: compras parceladas da última fatura fechada com parcela a vencer e sem
+  // lançamento de mesmo valor neste ciclo entram como "parcela prevista". São recriadas a cada sincronização e
+  // somem quando o banco manda a parcela de verdade.
+  await prisma.transacao.deleteMany({ where: { contaId, pluggyTransactionId: { startsWith: PREFIXO_PREVISTA } } });
+  const abertaInfo = await prisma.fatura.findUnique({ where: { id: abertaId }, select: { vencimento: true } });
+  const anterior = abertaInfo
+    ? await prisma.fatura.findFirst({
+        where: { contaId, vencimento: { lt: abertaInfo.vencimento }, pluggyBillId: { not: null } },
+        orderBy: { vencimento: 'desc' },
+        select: { id: true },
+      })
+    : null;
+  let previstas = 0;
+  if (anterior) {
+    const continuam = await prisma.transacao.findMany({
+      where: { faturaId: anterior.id, tipo: 'DESPESA', transferencia: false, parcela: { not: null } },
+      select: { id: true, data: true, descricao: true, valor: true, parcela: true, totalParcelas: true, categoriaId: true },
+    });
+    const valoresDoCiclo = doCiclo.filter((t) => t.type === 'DEBIT').map((t) => ({ valor: valorEmReais(t), usado: false }));
+    const novas: Prisma.TransacaoCreateManyInput[] = [];
+    for (const t of continuam) {
+      if (t.parcela === null || t.totalParcelas === null || t.parcela >= t.totalParcelas) continue;
+      const igual = valoresDoCiclo.find((v) => !v.usado && Math.abs(v.valor - Number(t.valor)) <= 0.005);
+      if (igual) {
+        igual.usado = true;
+        continue;
+      }
+      previstas += Number(t.valor);
+      novas.push({
+        contaId,
+        faturaId: abertaId,
+        data: t.data,
+        descricao: t.descricao,
+        valor: t.valor,
+        tipo: 'DESPESA',
+        pendente: true,
+        parcela: t.parcela + 1,
+        totalParcelas: t.totalParcelas,
+        categoriaId: t.categoriaId,
+        origem: 'OPEN_FINANCE',
+        observacao: 'Parcela prevista: o banco ainda não enviou este lançamento.',
+        pluggyTransactionId: `${PREFIXO_PREVISTA}${t.id}:${t.parcela + 1}`,
+      });
+    }
+    if (novas.length > 0) await prisma.transacao.createMany({ data: novas, skipDuplicates: true });
+  }
+  // Sem o saldo devedor para conferir, o total é a soma dos itens (com as parcelas previstas).
+  if (Math.abs(total - somaDoCiclo) < 0.005) total = somaDoCiclo + previstas;
+  somaDoCiclo += previstas;
+  await prisma.fatura.update({ where: { id: abertaId }, data: { total: Math.max(0, arredondar(total)) } });
+  return true;
+}
+
+const PREFIXO_PREVISTA = 'prevista:';
+
+type LancamentoComPrevisao = PluggyTransacao & {
+  status?: string;
+  category?: string | null;
+  creditCardMetadata?: { billForecastDate?: string | null; purchaseDate?: string | null; totalInstallments?: number | null } | null;
+};
+
+// Fatura em aberto estimada: liga as compras do ciclo que ainda estavam sem fatura e soma o total por elas.
+async function fecharFaturaEstimada(contaId: number, faturas: FaturasDaConta, contaPluggy: PluggyConta): Promise<void> {
+  if (faturas.abertaId === null || !faturas.abertaEstimada) return;
+  if (await fecharFaturaPelaPrevisao(contaId, contaPluggy, faturas.abertaId, faturas)) return;
+  await prisma.transacao.updateMany({
+    where: {
+      contaId,
+      faturaId: null,
+      origem: 'OPEN_FINANCE',
+      transferencia: false,
+      ...(faturas.ultimoFechamento || faturas.abertaFechamento
+        ? {
+            // Compra do próprio dia do fechamento que ficou sem fatura fechada é da fatura em aberto.
+            data: {
+              ...(faturas.ultimoFechamento ? { gte: faturas.ultimoFechamento } : {}),
+              ...(faturas.abertaFechamento ? { lte: faturas.abertaFechamento } : {}),
+            },
+          }
+        : {}),
+    },
+    data: { faturaId: faturas.abertaId },
+  });
+  const somas = await prisma.transacao.groupBy({
+    by: ['tipo'],
+    where: { faturaId: faturas.abertaId, transferencia: false },
+    _sum: { valor: true },
+  });
+  const compras = Number(somas.find((s) => s.tipo === 'DESPESA')?._sum.valor ?? 0);
+  const estornos = Number(somas.find((s) => s.tipo === 'RECEITA')?._sum.valor ?? 0);
+
+  // Parcelas de compras antigas: alguns bancos só mandam a parcela quando a fatura fecha. As compras parceladas
+  // da última fatura fechada que ainda têm parcela a vencer entram no total como previsão, a não ser que a
+  // parcela seguinte já tenha chegado como lançamento desta fatura.
+  let parcelasPrevistas = 0;
+  const aberta = await prisma.fatura.findUnique({ where: { id: faturas.abertaId }, select: { vencimento: true } });
+  const anterior = aberta
+    ? await prisma.fatura.findFirst({
+        where: { contaId, vencimento: { lt: aberta.vencimento }, pluggyBillId: { not: null } },
+        orderBy: { vencimento: 'desc' },
+        select: { id: true },
+      })
+    : null;
+  if (anterior) {
+    const [continuam, jaVieram] = await Promise.all([
+      prisma.transacao.findMany({
+        where: { faturaId: anterior.id, tipo: 'DESPESA', transferencia: false, parcela: { not: null } },
+        select: { valor: true, parcela: true, totalParcelas: true },
+      }),
+      prisma.transacao.findMany({
+        where: { faturaId: faturas.abertaId, tipo: 'DESPESA', parcela: { not: null } },
+        select: { valor: true, parcela: true, totalParcelas: true },
+      }),
+    ]);
+    const chegadas = jaVieram.map((t) => ({ chave: `${t.parcela}/${t.totalParcelas}|${Number(t.valor).toFixed(2)}`, usada: false }));
+    for (const t of continuam) {
+      if (t.parcela === null || t.totalParcelas === null || t.parcela >= t.totalParcelas) continue;
+      const proxima = chegadas.find((c) => !c.usada && c.chave === `${t.parcela! + 1}/${t.totalParcelas}|${Number(t.valor).toFixed(2)}`);
+      if (proxima) {
+        proxima.usada = true;
+        continue;
+      }
+      parcelasPrevistas += Number(t.valor);
+    }
+  }
+  await prisma.fatura.update({
+    where: { id: faturas.abertaId },
+    data: { total: Math.max(0, arredondar(compras - estornos + parcelasPrevistas)) },
+  });
 }
 
 // ---------- Lançamentos ----------
@@ -311,7 +580,7 @@ async function gravarLancamentos(
   contaLocal: { id: number; tipo: TipoConta },
   contaPluggy: PluggyConta,
   de: Date,
-  faturas: { porIdPluggy: Map<string, number>; abertaId: number | null; ultimoFechamento: Date | null },
+  faturas: FaturasDaConta,
   classificador: Classificador
 ): Promise<void> {
   const cartao = contaLocal.tipo === 'CARTAO';
@@ -339,7 +608,10 @@ async function gravarLancamentos(
         faturaId = faturas.porIdPluggy.get(meta.billId) ?? null;
       } else if (!meta?.billId && faturas.abertaId !== null) {
         // Sem fatura fechada: é da fatura em aberto, se for posterior ao último fechamento conhecido.
-        if (!faturas.ultimoFechamento || data.getTime() > faturas.ultimoFechamento.getTime()) {
+        // As parcelas com data depois do fechamento desta fatura são das próximas.
+        const depoisDoUltimo = !faturas.ultimoFechamento || data.getTime() >= faturas.ultimoFechamento.getTime();
+        const ateOFechamento = !faturas.abertaFechamento || data.getTime() <= faturas.abertaFechamento.getTime();
+        if (depoisDoUltimo && ateOFechamento) {
           faturaId = faturas.abertaId;
         }
       }
@@ -348,7 +620,7 @@ async function gravarLancamentos(
     const comuns = {
       data,
       descricao: texto(t.description, 200) ?? texto(t.descriptionRaw, 200) ?? 'Lançamento',
-      valor: Math.abs(dinheiro(t.amount)),
+      valor: valorEmReais(t),
       tipo,
       pendente: t.status === 'PENDING',
       faturaId,
@@ -367,7 +639,10 @@ async function gravarLancamentos(
       contaId: contaLocal.id,
       categoriaId: classificador.categoriaDe(t.category, tipo),
       // Pagamento de fatura (entrada no cartão) e movimentos entre contas próprias não são receita nem despesa.
-      transferencia: (cartao && tipo === 'RECEITA') || TRECHOS_TRANSFERENCIA.some((trecho) => categoriaPluggy.includes(trecho)),
+      transferencia:
+        (cartao && tipo === 'RECEITA') ||
+        TRECHOS_TRANSFERENCIA.some((trecho) => categoriaPluggy.includes(trecho)) ||
+        (!cartao && tipo === 'DESPESA' && ehPagamentoDeFaturaNaConta(comuns.descricao)),
       origem: 'OPEN_FINANCE',
       pluggyTransactionId: t.id,
     });
@@ -469,6 +744,43 @@ async function gravarInvestimentos(conexao: { id: number; instituicao: string },
       origem: 'OPEN_FINANCE' as const,
       conexaoId: conexao.id,
     };
+    // O mesmo ativo pode já estar no sistema pela planilha da B3 (registro manual, com o histórico de compras e
+    // proventos). Para não contar duas vezes, o ativo do Open Finance é ligado a esse registro: ele guarda o
+    // histórico da B3 e passa a receber daqui só a posição atual (quantidade e saldo).
+    const codigoBolsa = (atualizaveis.codigo ?? '').toUpperCase();
+    if (/^[A-Z]{4}\d{1,2}$/.test(codigoBolsa)) {
+      const ligado = await prisma.investimento.findUnique({
+        where: { pluggyInvestmentId: i.id },
+        select: { id: true, origem: true },
+      });
+      let daPlanilha = ligado && ligado.origem === 'MANUAL' ? ligado.id : null;
+      if (daPlanilha === null) {
+        const gemeo = await prisma.investimento.findFirst({
+          where: { origem: 'MANUAL', pluggyInvestmentId: null, codigo: { equals: codigoBolsa, mode: 'insensitive' } },
+          orderBy: [{ ativo: 'desc' }, { id: 'asc' }],
+          select: { id: true },
+        });
+        if (gemeo) {
+          // Sai o registro repetido do Open Finance (com os movimentos dele) e o da planilha assume a ligação.
+          if (ligado) await prisma.investimento.delete({ where: { id: ligado.id } });
+          await prisma.investimento.update({ where: { id: gemeo.id }, data: { pluggyInvestmentId: i.id } });
+          daPlanilha = gemeo.id;
+        }
+      }
+      if (daPlanilha !== null) {
+        await prisma.investimento.update({
+          where: { id: daPlanilha },
+          data: {
+            saldo: atualizaveis.saldo,
+            quantidade: atualizaveis.quantidade,
+            dataPosicao: atualizaveis.dataPosicao,
+            ativo: atualizaveis.ativo,
+          },
+        });
+        continue; // compras, vendas e proventos deste ativo vêm da planilha da B3 e dos créditos na conta
+      }
+    }
+
     const gravado = await prisma.investimento.upsert({
       where: { pluggyInvestmentId: i.id },
       update: atualizaveis, // o nome é do usuário depois da primeira carga
@@ -534,15 +846,24 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
     const referencia = { id: conexao.id, instituicao, instituicaoCor };
 
     const contas = await listarContasDoItem(conexao.pluggyItemId);
+    const idsDasContas: number[] = [];
     for (const conta of contas) {
       const local = await gravarConta(referencia, conta);
+      idsDasContas.push(local.id);
       const faturas =
         local.tipo === 'CARTAO'
           ? await gravarFaturas(local, conta)
-          : { porIdPluggy: new Map<string, number>(), abertaId: null, ultimoFechamento: null };
+          : { porIdPluggy: new Map<string, number>(), abertaId: null, ultimoFechamento: null, abertaFechamento: null, abertaEstimada: false };
       await gravarLancamentos(local, conta, de, faturas, classificador);
+      if (local.tipo === 'CARTAO') await fecharFaturaEstimada(local.id, faturas, conta);
     }
+    // Pix pago no crédito: o crédito do cartão na conta e a saída de mesmo valor viram transferência.
+    // Olha 2 anos para trás, para acertar também o que já estava no sistema antes desta regra.
+    await marcarPixNoCreditoNasContas(idsDasContas, new Date(hoje().getTime() - 730 * MS_DIA));
     await gravarInvestimentos(referencia, conexao.pluggyItemId);
+    // Proventos: os créditos de dividendos e rendimentos na conta viram movimento do ativo (olha 2 anos para trás;
+    // não repete o que já foi criado).
+    await gravarProventosDasContas(idsDasContas, conexao.id, new Date(hoje().getTime() - 730 * MS_DIA));
 
     await prisma.conexaoBancaria.update({
       where: { id: conexao.id },

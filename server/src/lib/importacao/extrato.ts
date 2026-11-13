@@ -524,7 +524,9 @@ function analisarPdf(texto: string, documentoPedido: TipoDocumento | null, venci
 function marcarPixNoCredito(itens: ItemLido[]): number {
   const dias = (data: string) => Math.round(new Date(data + 'T00:00:00Z').getTime() / 86400000);
   const ehCredito = (i: ItemLido) => i.tipo === 'RECEITA' && chave(i.descricao).includes('valor adicionado') && chave(i.descricao).includes('credito') && /cartao|pix/.test(chave(i.descricao));
-  const ehSaidaPorPix = (i: ItemLido) => i.tipo === 'DESPESA' && !i.transferencia && /\bpix\b/.test(chave(i.descricao));
+  // A saída nem sempre fala em Pix ("Transferência enviada"): vale qualquer saída de mesmo valor, com preferência para as que falam.
+  const ehSaidaPorPix = (i: ItemLido) => i.tipo === 'DESPESA' && !i.transferencia;
+  const falaEmPix = (i: ItemLido) => /\bpix\b/.test(chave(i.descricao));
   const usados = new Set<number>();
   let marcados = 0;
   for (const credito of itens.filter(ehCredito)) {
@@ -533,9 +535,10 @@ function marcarPixNoCredito(itens: ItemLido[]): number {
     itens.forEach((saida, k) => {
       if (usados.has(k) || !ehSaidaPorPix(saida) || Math.abs(saida.valor - credito.valor) > 0.005) return;
       const d = dias(saida.data) - dias(credito.data);
-      if (d >= 0 && d <= 2 && d < distancia) {
+      const nota = d + (falaEmPix(saida) ? 0 : 0.5);
+      if (d >= 0 && d <= 2 && nota < distancia) {
         escolhido = k;
-        distancia = d;
+        distancia = nota;
       }
     });
     if (escolhido >= 0) {

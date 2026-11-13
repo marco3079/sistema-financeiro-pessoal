@@ -176,6 +176,9 @@ model Transacao {
   tipo          TipoTransacao
   // true = movimento entre contas próprias ou pagamento de fatura: não entra em receitas/despesas dos relatórios.
   transferencia Boolean       @default(false)
+  // Crédito de provento na conta da corretora que já virou rendimento do ativo: fica fora da lista de lançamentos
+  // (aparece em Carteira > Proventos) e, por ser também transferência, fora das receitas.
+  provento      Boolean       @default(false)
   pendente      Boolean       @default(false)
   categoriaId   Int?
   categoria     Categoria?    @relation(fields: [categoriaId], references: [id], onDelete: SetNull)

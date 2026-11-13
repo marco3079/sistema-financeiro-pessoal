@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { arredondar, dataISO, num } from '../../lib/financas';
+import { ehPagamentoDeFaturaNaConta } from '../../lib/pixNoCredito';
 
 // Regras de categoria: "quando a descrição contiver X, use a categoria Y".
 // A importação já aplica essas regras; aqui fica o cadastro e o reprocessamento dos lançamentos que já existem.
@@ -118,6 +119,54 @@ router.get(
   })
 );
 
+// Regras padrão: trechos comuns em extratos e faturas brasileiros, ligados às categorias padrão pelo nome.
+// A ordem importa: a primeira regra que casa vence, então os trechos mais específicos vêm antes.
+const REGRAS_PADRAO: { categoria: string; tipo: 'DESPESA' | 'RECEITA'; trechos: string[] }[] = [
+  { categoria: 'Restaurantes', tipo: 'DESPESA', trechos: ['uber eats', 'ifood', 'rappi', 'ze delivery', 'restaurante', 'lanchonete', 'pizzaria', 'hamburgueria', 'padaria', 'cafeteria', 'mcdonald', 'burger king', 'subway', 'outback', 'starbucks', 'sorveteria', 'churrascaria'] },
+  { categoria: 'Mercado', tipo: 'DESPESA', trechos: ['supermercado', 'hipermercado', 'atacadao', 'assai', 'carrefour', 'pao de acucar', 'hortifruti', 'sacolao', 'acougue', 'mercearia', 'sams club', 'minimercado'] },
+  { categoria: 'Transporte', tipo: 'DESPESA', trechos: ['uber', '99app', '99 pop', '99pop', 'cabify', 'auto posto', 'posto de', 'combustivel', 'gasolina', 'estacionamento', 'estapar', 'sem parar', 'conectcar', 'veloe', 'pedagio', 'bilhete unico', 'oficina', 'borracharia'] },
+  { categoria: 'Assinaturas', tipo: 'DESPESA', trechos: ['netflix', 'spotify', 'amazon prime', 'prime video', 'disney', 'hbo', 'globoplay', 'youtube premium', 'apple.com/bill', 'google one', 'icloud', 'deezer', 'paramount', 'crunchyroll', 'microsoft 365', 'chatgpt', 'openai', 'claude.ai', 'anthropic', 'dropbox', 'canva'] },
+  { categoria: 'Saúde', tipo: 'DESPESA', trechos: ['farmacia', 'drogaria', 'drogasil', 'droga raia', 'pague menos', 'panvel', 'unimed', 'hapvida', 'laboratorio', 'clinica', 'hospital', 'dentista', 'odonto', 'psicolog', 'academia', 'smart fit', 'gympass', 'wellhub'] },
+  { categoria: 'Educação', tipo: 'DESPESA', trechos: ['escola', 'colegio', 'faculdade', 'universidade', 'udemy', 'alura', 'coursera', 'duolingo', 'livraria', 'editorial', 'educacao'] },
+  { categoria: 'Contas da casa', tipo: 'DESPESA', trechos: ['energia eletrica', 'enel', 'cemig', 'copel', 'cpfl', 'equatorial', 'neoenergia', 'sabesp', 'copasa', 'sanepar', 'saneamento', 'comgas', 'internet', 'oi fibra', 'telefonica', 'conta de luz', 'conta de agua'] },
+  { categoria: 'Moradia', tipo: 'DESPESA', trechos: ['aluguel', 'condominio', 'imobiliaria', 'quintoandar', 'iptu'] },
+  { categoria: 'Impostos e taxas', tipo: 'DESPESA', trechos: ['ipva', 'licenciamento', 'detran', 'darf', 'receita federal', 'iof', 'tarifa', 'anuidade', 'juros', 'multa'] },
+  { categoria: 'Lazer', tipo: 'DESPESA', trechos: ['cinema', 'cinemark', 'ingresso', 'sympla', 'eventim', 'teatro', 'steam', 'playstation', 'xbox', 'nintendo', 'booking', 'airbnb', 'hotel', 'pousada', 'latam', 'gol linhas', 'azul linhas', 'decolar'] },
+  { categoria: 'Compras', tipo: 'DESPESA', trechos: ['amazon', 'mercadolivre', 'mercado livre', 'shopee', 'aliexpress', 'shein', 'magazine luiza', 'magalu', 'americanas', 'casas bahia', 'kabum', 'renner', 'riachuelo', 'centauro', 'netshoes', 'leroy merlin', 'petz', 'cobasi'] },
+  { categoria: 'Salário', tipo: 'RECEITA', trechos: ['salario', 'folha de pagamento', 'adiantamento salarial', 'ferias'] },
+  { categoria: 'Rendimentos', tipo: 'RECEITA', trechos: ['rendimento', 'rend pago', 'juros sobre capital', 'dividendo', 'cashback'] },
+  { categoria: 'Reembolsos', tipo: 'RECEITA', trechos: ['reembolso', 'estorno', 'devolucao'] },
+];
+
+// Cria as regras padrão que ainda não existem neste perfil. Pula trecho já usado e categoria que não existe mais.
+router.post(
+  '/regras/padrao',
+  asyncHandler(async (_req, res) => {
+    const [categorias, existentes] = await Promise.all([
+      prisma.categoria.findMany({ select: { id: true, nome: true, tipo: true } }),
+      prisma.regraCategoria.findMany({ select: { trecho: true } }),
+    ]);
+    const categoriaPorChave = new Map(categorias.map((c) => [c.tipo + '|' + semAcento(c.nome), c.id]));
+    const usados = new Set(existentes.map((r) => semAcento(r.trecho).trim()));
+    const novas: { trecho: string; categoriaId: number }[] = [];
+    const semCategoria: string[] = [];
+    for (const grupo of REGRAS_PADRAO) {
+      const categoriaId = categoriaPorChave.get(grupo.tipo + '|' + semAcento(grupo.categoria));
+      if (categoriaId === undefined) {
+        semCategoria.push(grupo.categoria);
+        continue;
+      }
+      for (const trecho of grupo.trechos) {
+        if (usados.has(trecho)) continue;
+        usados.add(trecho);
+        novas.push({ trecho, categoriaId });
+      }
+    }
+    if (novas.length > 0) await prisma.regraCategoria.createMany({ data: novas });
+    res.status(201).json({ criadas: novas.length, semCategoria });
+  })
+);
+
 router.post(
   '/regras',
   asyncHandler(async (req, res) => {
@@ -159,9 +208,11 @@ router.post(
       const d = semAcento(l.descricao);
       return d.includes('valor adicionado') && d.includes('credito');
     });
-    const pixDespesas = lancamentos.filter(
-      (l) => l.tipo === 'DESPESA' && l.conta.tipo !== 'CARTAO' && /\bpix\b/.test(semAcento(l.descricao))
-    );
+    // A saída nem sempre fala em Pix ("Transferência enviada"): vale qualquer saída de mesmo valor; as que falam em Pix escolhem primeiro.
+    const falaEmPix = (l: Lancamento) => /\bpix\b/.test(semAcento(l.descricao));
+    const pixDespesas = lancamentos
+      .filter((l) => l.tipo === 'DESPESA' && l.conta.tipo !== 'CARTAO')
+      .sort((a, b) => Number(falaEmPix(b)) - Number(falaEmPix(a)));
 
     const usados = new Set<number>();
     const pares: { credito: Lancamento; despesa: Lancamento }[] = [];
@@ -184,8 +235,15 @@ router.post(
       }
     }
 
+    // Pagamento da fatura do cartão saindo da conta: também é transferência.
+    const jaNosPares = new Set(pares.flatMap((p) => [p.credito.id, p.despesa.id]));
+    const pagamentosDeFatura = lancamentos.filter(
+      (l) => l.tipo === 'DESPESA' && l.conta.tipo !== 'CARTAO' && !jaNosPares.has(l.id) && ehPagamentoDeFaturaNaConta(l.descricao)
+    );
+
     const pernasDasTransferencias = pares
       .flatMap((p) => [p.credito, p.despesa])
+      .concat(pagamentosDeFatura)
       .sort((a, b) => a.data.getTime() - b.data.getTime() || a.id - b.id);
 
     const categorizarTodos = categorizarInterno.map(({ lancamento: l, regra }) => ({

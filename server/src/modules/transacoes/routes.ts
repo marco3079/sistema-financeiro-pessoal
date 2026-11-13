@@ -151,7 +151,8 @@ router.delete(
 router.get(
   '/transacoes',
   asyncHandler(async (req, res) => {
-    const where: Prisma.TransacaoWhereInput = {};
+    // Créditos de provento já registrados no ativo não entram na lista: aparecem em Carteira > Proventos.
+    const where: Prisma.TransacaoWhereInput = { provento: false };
 
     const mes = textoQuery(req.query.mes);
     const de = textoQuery(req.query.de);
@@ -185,6 +186,37 @@ router.get(
     const busca = textoQuery(req.query.busca);
     if (busca !== undefined) where.descricao = { contains: busca, mode: 'insensitive' };
 
+    // Cartão de crédito no mês atual: a lista é a da fatura em aberto (inclui as parcelas de compras antigas, que
+    // têm a data da compra original), para a soma dos itens ser o valor da fatura.
+    let faturaAberta: { total: number; vencimento: string; naoDetalhado: number } | null = null;
+    if (contaId !== undefined) {
+      const aberta = await prisma.fatura.findFirst({
+        where: { contaId, status: { in: ['ABERTA', 'FECHADA'] }, conta: { tipo: 'CARTAO' } },
+        orderBy: { vencimento: 'desc' },
+        select: { id: true, total: true, vencimento: true },
+      });
+      if (aberta) {
+        const itens = await prisma.transacao.groupBy({
+          by: ['tipo'],
+          where: { faturaId: aberta.id, transferencia: false, provento: false },
+          _sum: { valor: true },
+        });
+        const somaDosItens =
+          num(itens.find((s) => s.tipo === 'DESPESA')?._sum.valor) - num(itens.find((s) => s.tipo === 'RECEITA')?._sum.valor);
+        faturaAberta = {
+          total: arredondar(num(aberta.total)),
+          vencimento: aberta.vencimento.toISOString().slice(0, 10),
+          // Parte do total que o banco não manda como lançamento (encargos, ajustes, compras ainda não enviadas).
+          naoDetalhado: Math.max(0, arredondar(num(aberta.total) - somaDosItens)),
+        };
+        const mesDeHoje = new Date().toISOString().slice(0, 7);
+        if (mes === mesDeHoje && faturaId === undefined) {
+          delete where.data;
+          where.faturaId = aberta.id;
+        }
+      }
+    }
+
     const pagina = Math.max(1, inteiroQuery(req.query.pagina) ?? 1);
     const porPagina = Math.max(1, Math.min(inteiroQuery(req.query.porPagina) ?? 50, 200));
 
@@ -204,9 +236,32 @@ router.get(
       }),
     ]);
 
+    // Saldo que veio do mês anterior: o saldo de hoje das contas (sem cartões) menos tudo o que entrou e saiu
+    // delas do primeiro dia do mês consultado em diante (transferências incluídas, porque também mexem no saldo).
+    let saldoAnterior: number | null = null;
+    if (mes !== undefined) {
+      const { inicio } = intervaloDoMes(mes);
+      const contas = await prisma.conta.findMany({
+        where: { tipo: { not: 'CARTAO' }, ...(contaId !== undefined ? { id: contaId } : {}) },
+        select: { id: true, saldo: true },
+      });
+      if (contas.length > 0) {
+        const depois = await prisma.transacao.groupBy({
+          by: ['tipo'],
+          where: { contaId: { in: contas.map((c) => c.id) }, data: { gte: inicio } },
+          _sum: { valor: true },
+        });
+        const entrou = num(depois.find((s) => s.tipo === 'RECEITA')?._sum.valor);
+        const saiu = num(depois.find((s) => s.tipo === 'DESPESA')?._sum.valor);
+        saldoAnterior = arredondar(contas.reduce((soma, c) => soma + num(c.saldo), 0) - entrou + saiu);
+      }
+    }
+
     res.json({
       itens: lista.map(transacaoDTO),
       total,
+      saldoAnterior,
+      faturaAberta,
       receitas: num(somas.find((s) => s.tipo === 'RECEITA')?._sum.valor),
       despesas: num(somas.find((s) => s.tipo === 'DESPESA')?._sum.valor),
     });

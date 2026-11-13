@@ -24,6 +24,8 @@ interface RespostaTransacoes {
   total: number;
   receitas: number;
   despesas: number;
+  faturaAberta: { total: number; vencimento: string; naoDetalhado: number } | null; // só com filtro por cartão de crédito
+  saldoAnterior: number | null; // saldo das contas no fim do mês anterior (null fora da visão por mês)
 }
 
 export function Lancamentos() {
@@ -51,8 +53,20 @@ export function Lancamentos() {
         porPagina: POR_PAGINA,
       })
   );
+  // O saldo do mês parte do que sobrou no mês anterior. Com filtro de categoria, tipo ou busca a conta deixa de
+  // fazer sentido, e vale só receitas menos despesas do que está listado.
+  const comSaldoAnterior = !!dados && dados.saldoAnterior !== null && categoriaId === '' && tipo === '' && busca === '';
   const { dados: contas } = useDados<ContaDTO[]>('/contas?inativas=true');
+  // Com filtro por um cartão de crédito, no mês atual e sem outros filtros, "Despesas" é o total da fatura em
+  // aberto, que é o número que o banco mostra (inclui parcelas de compras antigas).
+  const faturaAtual =
+    dados?.faturaAberta && mes === mesAtual() && categoriaId === '' && tipo === '' && busca === '' ? dados.faturaAberta : null;
+  // "Despesas" é sempre a soma dos itens listados (com filtro por cartão no mês atual, os itens da fatura em aberto).
+  const despesasMostradas = dados?.despesas ?? 0;
   const { dados: categorias } = useDados<CategoriaDTO[]>('/categorias');
+  // Filtrando por um cartão de crédito, mostra também a dívida total dele (com as parcelas futuras), que é o
+  // número que o banco informa. "Despesas" continua sendo só as compras do mês.
+  const cartaoFiltrado = (contas ?? []).find((c) => String(c.id) === contaId && c.tipo === 'CARTAO') ?? null;
 
   // Mudar qualquer filtro volta para a primeira página.
   function filtrar(atualizar: (valor: string) => void) {
@@ -130,17 +144,35 @@ export function Lancamentos() {
       {dados && (
         <div className="resumo">
           <ResumoItem icone="seta-cima" cor="verde" valor={formatarReais(dados.receitas)} rotulo="Receitas" />
-          <ResumoItem icone="seta-baixo" cor="vermelho" valor={formatarReais(dados.despesas)} rotulo="Despesas" />
+          <ResumoItem
+            icone="seta-baixo"
+            cor="vermelho"
+            valor={formatarReais(despesasMostradas)}
+            rotulo={faturaAtual ? `Despesas (fatura de ${formatarDia(faturaAtual.vencimento)})` : 'Despesas'}
+          />
+          {cartaoFiltrado && (
+            <ResumoItem icone="cartao" cor="laranja" valor={formatarReais(cartaoFiltrado.saldo)} rotulo="Dívida do cartão" />
+          )}
+          {comSaldoAnterior && (
+            <ResumoItem icone="contas" cor="laranja" valor={formatarReais(dados.saldoAnterior ?? 0)} rotulo="Veio do mês anterior" />
+          )}
           <ResumoItem
             icone="financeiro"
             cor="azul"
-            valor={formatarReais(dados.receitas - dados.despesas)}
+            valor={formatarReais((comSaldoAnterior ? (dados.saldoAnterior ?? 0) : 0) + dados.receitas - despesasMostradas)}
             rotulo="Saldo do mês"
           />
           <ResumoItem icone="transacoes" cor="roxo" valor={dados.total} rotulo="Lançamentos" />
         </div>
       )}
 
+      {faturaAtual && faturaAtual.naoDetalhado > 0.005 && (
+        <Aviso tipo="info">
+          Pelo saldo devedor que o banco informa, esta fatura está em {formatarReais(faturaAtual.total)}. Os itens que ele
+          enviou somam {formatarReais(faturaAtual.total - faturaAtual.naoDetalhado)}: faltam{' '}
+          {formatarReais(faturaAtual.naoDetalhado)} que não vêm detalhados (encargos, ajustes ou compras ainda não enviadas).
+        </Aviso>
+      )}
       {carregando && <Carregando />}
       {dados && (
         <Tabela<TransacaoDTO>

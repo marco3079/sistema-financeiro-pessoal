@@ -49,6 +49,8 @@ export interface PluggyTransacao {
   description?: string | null;
   descriptionRaw?: string | null;
   amount: number;
+  currencyCode?: string | null;
+  amountInAccountCurrency?: number | null;
   date: string;
   type?: 'DEBIT' | 'CREDIT' | string;
   status?: 'POSTED' | 'PENDING' | string;

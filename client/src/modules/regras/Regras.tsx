@@ -274,6 +274,30 @@ export function Regras() {
   const [ocupadoApagar, setOcupadoApagar] = useState(false);
   const [erroApagar, setErroApagar] = useState<string | null>(null);
 
+  const [ocupadoPadrao, setOcupadoPadrao] = useState(false);
+  const [avisoPadrao, setAvisoPadrao] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
+
+  async function criarPadrao() {
+    setAvisoPadrao(null);
+    setOcupadoPadrao(true);
+    try {
+      const r = await api.post<{ criadas: number; semCategoria: string[] }>('/regras/padrao');
+      const faltou = r.semCategoria.length > 0 ? ' Sem regras para ' + r.semCategoria.join(', ') + ': a categoria não existe neste perfil.' : '';
+      setAvisoPadrao({
+        tipo: 'sucesso',
+        texto:
+          (r.criadas > 0
+            ? r.criadas + ' regra(s) padrão criada(s). Use "Ver o que mudaria" abaixo para aplicar aos lançamentos que já existem.'
+            : 'As regras padrão já estavam todas criadas.') + faltou,
+      });
+      regras.recarregar();
+    } catch (err) {
+      setAvisoPadrao({ tipo: 'erro', texto: mensagemErro(err) });
+    } finally {
+      setOcupadoPadrao(false);
+    }
+  }
+
   function fecharApagar() {
     if (ocupadoApagar) return;
     setAApagar(null);
@@ -325,9 +349,14 @@ export function Regras() {
     <Pagina
       titulo="Regras de categoria"
       acoes={
-        <Botao aoClicar={() => setFormulario({ regra: null })} desabilitado={!categorias.dados}>
-          Nova regra
-        </Botao>
+        <>
+          <Botao variante="secundario" aoClicar={() => void criarPadrao()} desabilitado={ocupadoPadrao || !categorias.dados}>
+            {ocupadoPadrao ? 'Criando...' : 'Criar regras padrão'}
+          </Botao>
+          <Botao aoClicar={() => setFormulario({ regra: null })} desabilitado={!categorias.dados}>
+            Nova regra
+          </Botao>
+        </>
       }
     >
       <p className="regras-ajuda">
@@ -335,6 +364,7 @@ export function Regras() {
         regras.
       </p>
 
+      {avisoPadrao && <Aviso tipo={avisoPadrao.tipo}>{avisoPadrao.texto}</Aviso>}
       {regras.erro && <Aviso tipo="erro">{regras.erro}</Aviso>}
       {regras.carregando && <Carregando />}
 
@@ -344,7 +374,7 @@ export function Regras() {
             <Vazio
               icone="categorias"
               titulo="Nenhuma regra ainda"
-              texto="Crie uma regra para o sistema categorizar sozinho os próximos lançamentos."
+              texto="Crie uma regra, ou use Criar regras padrão, para o sistema categorizar sozinho os próximos lançamentos."
             />
           ) : (
             <Tabela colunas={colunas} dados={regras.dados} chave={(r) => r.id} />

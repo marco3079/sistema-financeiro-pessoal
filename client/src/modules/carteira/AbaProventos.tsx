@@ -97,7 +97,7 @@ export function AbaProventos() {
         <Vazio
           icone="investimentos"
           titulo="Nenhum provento registrado"
-          texto="Os dividendos e rendimentos aparecem aqui depois que você importa a planilha de movimentação da B3."
+          texto="Os dividendos e rendimentos aparecem aqui depois que você importa a planilha de movimentação da B3 ou sincroniza a corretora em Conexões."
         />
       )}
       {dados && !vazio && (
