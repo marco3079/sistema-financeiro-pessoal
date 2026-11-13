@@ -1,0 +1,43 @@
+.imp {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.imp p {
+  margin: 0;
+}
+
+.imp-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.imp-arquivo {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.imp-arquivo input {
+  max-width: 100%;
+  color: var(--cor-texto);
+}
+
+.imp-progresso {
+  color: var(--cor-texto-suave);
+}
+
+.imp-resultado {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.imp-falhas {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--cor-perigo);
+  overflow-wrap: anywhere;
+}

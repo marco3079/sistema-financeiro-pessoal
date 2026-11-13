@@ -46,6 +46,11 @@ const TABELAS = [
   'orcamento',
   'meta',
   'importacao',
+  'regraCategoria',
+  'contaFixa',
+  'pagamentoContaFixa',
+  'alocacaoAlvo',
+  'divisao',
 ] as const;
 type Tabela = (typeof TABELAS)[number];
 
@@ -64,6 +69,11 @@ const NOME_NO_BANCO: Record<Tabela, string> = {
   orcamento: 'Orcamento',
   meta: 'Meta',
   importacao: 'Importacao',
+  regraCategoria: 'RegraCategoria',
+  contaFixa: 'ContaFixa',
+  pagamentoContaFixa: 'PagamentoContaFixa',
+  alocacaoAlvo: 'AlocacaoAlvo',
+  divisao: 'Divisao',
 };
 
 type Linhas = Record<string, unknown>[];

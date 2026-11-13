@@ -1,0 +1,66 @@
+/* Tela Cobranças estranhas: cores só pelas variáveis do tema. Cabe em 360 px sem rolagem horizontal. */
+
+.alertas-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.alertas-selo {
+  margin: 0 0 0.5rem;
+}
+
+.alertas-texto {
+  color: var(--cor-texto-suave);
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.alertas-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.alertas-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.alertas-data {
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.alertas-descricao {
+  flex: 1 1 120px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.alertas-conta {
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+}
+
+.alertas-valor {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.alertas-ver {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--cor-primaria);
+}
+
+.alertas-rodape {
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+  margin: 1rem 0 0;
+}

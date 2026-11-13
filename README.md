@@ -26,6 +26,8 @@
 - [Drive: os mesmos dados em mais de um computador](#drive-os-mesmos-dados-em-mais-de-um-computador)
 - [Conectar IA (MCP)](#conectar-ia-mcp)
 - [Atualizar o sistema](#atualizar-o-sistema)
+- [Verificação em duas etapas](#verificação-em-duas-etapas)
+- [Restaurar uma cópia do banco](#restaurar-uma-cópia-do-banco)
 - [Abrir no celular](#abrir-no-celular)
 - [Rendimento e índices](#rendimento-e-índices)
 - [Open Finance (opcional)](#open-finance-opcional)
@@ -85,6 +87,31 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 
 - Servidor MCP embutido: assistentes como Claude, ChatGPT, Cursor e VS Code consultam seus dados para responder perguntas ("quanto gastei com mercado este ano?").
 - Cada chave de acesso é "só consulta" ou "consulta e lança", vale para um perfil financeiro e pode ser apagada a qualquer momento.
+
+**Dia a dia**
+
+- **Lançar rápido**: tela para o celular, com valor, categoria e conta em poucos toques e "Desfazer".
+- **Contas a pagar e a receber**: contas fixas e faturas no calendário do mês, com marcação de pago, e o **fluxo de caixa** projetado para os próximos meses (contas fixas, faturas e parcelas previstas).
+- **Cobranças estranhas**: indícios de cobrança em dobro, assinatura que subiu de preço, parcela além da última e assinatura nova.
+- **Relatório do mês** em uma página, para imprimir ou salvar em PDF.
+- **Divisão de gastos**: quanto cada pessoa deve de um lançamento, com marcação de recebido e resumo para copiar.
+- **Conciliação dos cartões**: compara a dívida registrada com as faturas não pagas e o total de cada fatura com os lançamentos, e corrige os totais.
+
+**Menos trabalho manual**
+
+- **Regras de categoria** ("contém UBER" → Transporte), aplicadas na importação e, com prévia, aos lançamentos que já existem. O mesmo reprocessamento marca como transferência o Pix pago no crédito.
+- **Pasta de entrada**: arquivos CSV e OFX colocados em `financas-pessoais/entrada`, na pasta do Drive, são importados sozinhos e movidos para `importados` ou `com-erro`.
+- **Planilha de investimentos**: CDB, fundos e outros ativos de fora da B3 por um CSV modelo.
+
+**Investimentos, além da carteira**
+
+- **Carteira-alvo**: percentual desejado por classe e a distância até ele (só mostra o desvio).
+- **Imposto de renda**: vendas por mês com o resultado pelo custo médio, posição em 31/12 e proventos do ano. É um apoio à declaração: não calcula o imposto a pagar.
+
+**Segurança**
+
+- **Verificação em duas etapas** no login, com aplicativo autenticador e códigos de recuperação.
+- **Cópias do banco**: lista das cópias feitas antes de cada atualização, com a opção de restaurar uma delas.
 
 **Atualização**
 
@@ -267,6 +294,19 @@ O que a atualização faz, nesta ordem: guarda uma cópia do banco em `backups/`
 
 A tarefa só sabe fazer isso: o servidor grava um arquivo de pedido em `atualizacao/` e a tarefa responde atualizando a partir do repositório de origem; nenhum comando vem da tela. Para remover: `atualizar.ps1 -Desinstalar`. Para a tela saber qual versão está instalada, o repositório precisa ser público no GitHub.
 
+## Verificação em duas etapas
+
+Em **Segurança**, clique em **Ativar**, leia o QR code com um aplicativo autenticador (Google Authenticator, Authy, Microsoft Authenticator) e digite o código de 6 dígitos. O sistema mostra 8 códigos de recuperação uma única vez: guarde-os fora do computador. A partir daí, o login pede a senha e o código.
+
+- Cada código de recuperação vale uma vez.
+- Perdeu o aparelho e os códigos: ponha `DESATIVAR_2FA=true` no `.env`, rode `docker compose up -d`, entre só com a senha, desative a verificação na tela e volte a variável para `false`.
+- O segredo fica cifrado com uma chave derivada do `JWT_SECRET`. Se o `JWT_SECRET` mudar (ou for diferente em outro computador que receba os dados pelo Drive), o segredo não pode ser lido e o login volta a pedir só a senha. Defina um `JWT_SECRET` próprio e igual nos seus computadores.
+- As chaves de IA (MCP) não passam pelo segundo passo: elas são a própria credencial.
+
+## Restaurar uma cópia do banco
+
+Em **Atualização > Cópias do banco de dados**, escolha a cópia e confirme digitando RESTAURAR. O atualizador guarda primeiro o estado atual, depois troca todos os dados pelos da cópia, em uma única transação (se algo falhar, nada muda). Sem o atualizador ligado: `powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Restaurar financas-AAAAMMDD-HHMMSS.sql`. Com o Drive ligado, o banco restaurado passa a valer como a alteração mais recente deste computador.
+
 ## Abrir no celular
 
 Com o celular na mesma rede Wi-Fi do computador, clique no ícone de celular no topo e aponte a câmera para o QR code.
@@ -323,6 +363,7 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 | `WEB_PORT` | Porta do site | `8092` |
 | `API_PORT` | Porta da API (só neste computador) | `3092` |
 | `DB_PORT` | Porta do banco (só neste computador) | `5434` |
+| `DESATIVAR_2FA` | `true` ignora a verificação em duas etapas (emergência) | `false` |
 | `PASTA_DRIVE` | Pasta sincronizada que guarda os dados (escolhida pelo `conectar-drive.ps1`) | vazio (desligado) |
 | `ENDERECO_REDE` | Endereço do computador na rede para o QR code (IP ou nome `.local`) | nome do computador |
 | `BRAPI_TOKEN` | Token das cotações (opcional; também dá para informar na tela) | vazio |

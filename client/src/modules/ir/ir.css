@@ -1,0 +1,36 @@
+/* Imposto de renda: só variáveis do tema, sem rolagem horizontal em 360 px. */
+
+.ir-ano {
+  max-width: 220px;
+  margin-bottom: 16px;
+}
+
+.ir-ajuda {
+  margin: 0 0 12px;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+.ir-lista {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.ir-nao-imprimir {
+  display: inline-block;
+}
+
+@media print {
+  .ir-nao-imprimir {
+    display: none;
+  }
+
+  .cartao {
+    break-inside: avoid;
+    border-color: var(--cor-borda);
+  }
+}

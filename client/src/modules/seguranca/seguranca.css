@@ -1,0 +1,56 @@
+.seguranca-texto {
+  color: var(--cor-texto-suave);
+  margin: 0 0 12px;
+}
+
+.seguranca-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.seguranca-qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.seguranca-segredo {
+  word-break: break-all;
+  margin: 8px 0 16px;
+}
+
+.seguranca-segredo code {
+  font-family: monospace;
+  color: var(--cor-texto);
+}
+
+.seguranca-codigos {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.seguranca-codigos code {
+  display: block;
+  font-family: monospace;
+  padding: 8px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  text-align: center;
+  color: var(--cor-texto);
+}
+
+@media (max-width: 360px) {
+  .seguranca-codigos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

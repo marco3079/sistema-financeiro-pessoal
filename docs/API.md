@@ -164,6 +164,31 @@ Métodos atendidos em `/mcp`: `initialize`, `ping`, `tools/list` e `tools/call`;
 | GET | `/atualizacao` | versão instalada, último commit do GitHub, commits que faltam, se o atualizador está ligado e a situação da última atualização (`?conferir=1` consulta o GitHub na hora) |
 | POST | `/atualizacao/pedir` | grava o pedido para o atualizador do computador; 400 se ele não está ligado, 409 se já há uma atualização em andamento |
 
+## Lote 3: rotinas do dia a dia, investimentos e segurança
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET, POST, PUT, DELETE | `/regras`, `/regras/:id` | regras de categoria (`{ trecho, categoriaId }`) |
+| POST | `/regras/reprocessar` | `{ aplicar, sobrescrever }` → prévia ou aplicação das regras e do Pix no crédito aos lançamentos existentes |
+| GET, POST | `/entrada`, `/entrada/processar` | situação da pasta de entrada e processamento imediato |
+| GET, POST, PUT, DELETE | `/contas-fixas`, `/contas-fixas/:id` | contas fixas a pagar e a receber |
+| POST, DELETE | `/contas-fixas/:id/pagar` | marca ou desmarca como paga em um mês |
+| GET | `/agenda?mes=AAAA-MM` | faturas e contas fixas do mês, com a situação |
+| GET | `/fluxo?meses=3\|6\|12` | saldo projetado mês a mês |
+| GET | `/alertas` | indícios de cobrança estranha |
+| GET, PUT, DELETE | `/alvo` | carteira-alvo por classe e o desvio |
+| GET | `/ir?ano=AAAA` | vendas por mês, posição em 31/12 e proventos do ano |
+| GET | `/conciliacao` | dívida de cada cartão contra as faturas e os lançamentos |
+| POST | `/conciliacao/:contaId/corrigir` | recalcula os totais das faturas e a dívida do cartão |
+| GET, POST, DELETE | `/divisoes`, `/divisoes/:id` | partes de um lançamento que outra pessoa deve |
+| POST | `/divisoes/:id/quitar`, `/divisoes/:id/reabrir` | marca como recebido ou reabre |
+| GET | `/seguranca/2fa` | estado da verificação em duas etapas |
+| POST | `/seguranca/2fa/iniciar`, `/ativar`, `/desativar` | configura, ativa (devolve os códigos de recuperação uma vez) e desativa |
+| GET | `/atualizacao/copias` | cópias do banco na pasta `backups` |
+| POST | `/atualizacao/restaurar` | `{ arquivo }` → pede a restauração ao atualizador |
+
+`POST /auth/login` aceita `codigo` opcional; com a verificação em duas etapas ativa e sem código (ou com código errado) responde 401 com `precisaCodigo: true`.
+
 ## Open Finance
 
 | Método | Rota | O que faz |

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { ErroCodigo, useAuth } from '../lib/auth';
 import { usePlataforma } from '../lib/plataforma';
 import { Aviso, Botao, Campo } from '../ui';
 import { Icone } from '../ui/icones';
@@ -18,6 +18,9 @@ export function Login() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Segundo passo (verificação em duas etapas) na mesma tela.
+  const [etapa, setEtapa] = useState<'senha' | 'codigo'>('senha');
+  const [codigo, setCodigo] = useState('');
 
   if (usuario) return <Navigate to={caminhoDoPerfil(usuario.perfil)} replace />;
 
@@ -26,11 +29,20 @@ export function Login() {
     setErro(null);
     setEnviando(true);
     try {
-      await entrar(email, senha);
+      await entrar(email, senha, etapa === 'codigo' ? codigo : undefined);
     } catch (e) {
+      if (e instanceof ErroCodigo) {
+        setEtapa('codigo');
+      }
       setErro(e instanceof Error ? e.message : 'Erro inesperado');
       setEnviando(false);
     }
+  }
+
+  function voltar() {
+    setEtapa('senha');
+    setCodigo('');
+    setErro(null);
   }
 
   return (
@@ -74,14 +86,38 @@ export function Login() {
           </div>
           <h1 className="entrada-titulo">Entrar</h1>
           {avisoRecebido && <Aviso tipo="sucesso">{avisoRecebido}</Aviso>}
-          <p className="entrada-apoio">Use seu e-mail e sua senha.</p>
+          <p className="entrada-apoio">
+            {etapa === 'codigo'
+              ? 'Abra o aplicativo autenticador e digite o código de 6 dígitos, ou use um código de recuperação.'
+              : 'Use seu e-mail e sua senha.'}
+          </p>
           <Campo rotulo="E-mail" tipo="email" valor={email} aoMudar={setEmail} obrigatorio />
           <Campo rotulo="Senha" tipo="password" valor={senha} aoMudar={setSenha} obrigatorio />
+          {etapa === 'codigo' && (
+            // Campo da ui não aceita inputMode/autoComplete: usa a mesma marcação com os atributos do celular.
+            <label className="campo">
+              <span className="campo-rotulo">Código de verificação</span>
+              <input
+                className="campo-controle"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={codigo}
+                required
+                onChange={(e) => setCodigo(e.target.value)}
+              />
+            </label>
+          )}
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
           <div className="entrada-botao">
             <Botao tipo="submit" desabilitado={enviando}>
               {enviando ? 'Entrando...' : 'Entrar'}
             </Botao>
+            {etapa === 'codigo' && (
+              <Botao variante="secundario" aoClicar={voltar} desabilitado={enviando}>
+                Voltar
+              </Botao>
+            )}
           </div>
           {plataforma.recuperacaoSenha && (
             <Link to="/esqueci-senha" className="entrada-esqueci">

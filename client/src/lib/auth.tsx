@@ -17,9 +17,17 @@ interface UsuarioBruto {
   foto?: string | null;
 }
 
+// Login pede o código de verificação em duas etapas (o servidor respondeu precisaCodigo).
+export class ErroCodigo extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'ErroCodigo';
+  }
+}
+
 interface AuthContexto {
   usuario: UsuarioLogado | null;
-  entrar(email: string, senha: string): Promise<void>;
+  entrar(email: string, senha: string, codigo?: string): Promise<void>;
   sair(): void;
   atualizarFoto(foto: string | null): void;
 }
@@ -73,11 +81,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, [usuario, atualizarFoto]);
 
-  async function entrar(email: string, senha: string): Promise<void> {
-    const resposta = await api.post<{ token: string; usuario: UsuarioBruto }>('/auth/login', {
-      email,
-      senha,
+  async function entrar(email: string, senha: string, codigo?: string): Promise<void> {
+    // Fetch direto (e não api.post) para ler o campo precisaCodigo da resposta de erro.
+    const corpo: { email: string; senha: string; codigo?: string } = { email, senha };
+    if (codigo) corpo.codigo = codigo;
+    const http = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
     });
+    let dados: { erro?: string; precisaCodigo?: boolean; token?: string; usuario?: UsuarioBruto } | null = null;
+    try {
+      dados = await http.json();
+    } catch {
+      dados = null;
+    }
+    if (!http.ok) {
+      if (dados?.precisaCodigo === true) {
+        throw new ErroCodigo(dados.erro ?? 'Informe o código de verificação');
+      }
+      throw new Error(dados?.erro ?? 'Erro inesperado');
+    }
+    if (!dados?.token || !dados.usuario) {
+      throw new Error('Erro inesperado');
+    }
+    const resposta = { token: dados.token, usuario: dados.usuario };
     const usuarioNormalizado = normalizarUsuario(resposta.usuario);
     localStorage.setItem(CHAVE_TOKEN, resposta.token);
     localStorage.setItem(CHAVE_USUARIO, JSON.stringify(usuarioNormalizado));

@@ -18,6 +18,11 @@ const MODELOS_DO_PERFIL = new Set([
   'Importacao',
   'Orcamento',
   'Meta',
+  'RegraCategoria',
+  'ContaFixa',
+  'PagamentoContaFixa',
+  'AlocacaoAlvo',
+  'Divisao',
 ]);
 
 const contexto = new AsyncLocalStorage<{ perfilId: number }>();

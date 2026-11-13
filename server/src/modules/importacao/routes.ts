@@ -262,6 +262,14 @@ router.post(
 
     const { chaves, repetido } = await itensJaRegistrados(conta.id, dados.itens);
     const classificar = await montarClassificador();
+    const regras = (await prisma.regraCategoria.findMany({ orderBy: { id: 'asc' } })).map((r) => ({ trecho: semAcento(r.trecho).trim(), categoriaId: r.categoriaId }));
+    // A regra só vale se a categoria dela ainda existe e é do mesmo tipo do lançamento (regra de categoria apagada
+    // não pode derrubar a importação).
+    const tipoDaCategoria = new Map((await prisma.categoria.findMany({ select: { id: true, tipo: true } })).map((c) => [c.id, c.tipo]));
+    const pelaRegra = (descricao: string, tipo: string): number | null => {
+      const d = semAcento(descricao);
+      return regras.find((r) => r.trecho !== '' && d.includes(r.trecho) && tipoDaCategoria.get(r.categoriaId) === tipo)?.categoriaId ?? null;
+    };
     const historico = await categoriasPorHistorico(dados.itens.map((i) => i.descricao));
     const agora = hoje();
 
@@ -300,7 +308,7 @@ router.post(
             valor: item.valor,
             tipo: item.tipo,
             transferencia: item.transferencia,
-            categoriaId: item.transferencia ? null : item.tipo === 'DESPESA' ? (historico.get(item.descricao) ?? classificar(item)) : (historico.get(item.descricao) ?? null),
+            categoriaId: item.transferencia ? null : (pelaRegra(item.descricao, item.tipo) ?? (item.tipo === 'DESPESA' ? (historico.get(item.descricao) ?? classificar(item)) : (historico.get(item.descricao) ?? null))),
             faturaId,
             parcela: item.parcela,
             totalParcelas: item.totalParcelas,

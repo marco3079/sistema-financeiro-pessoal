@@ -7,6 +7,8 @@ import { gerarToken, UsuarioToken } from '../../lib/auth';
 import { registrarLog } from '../../lib/log';
 import { emailHabilitado, enderecoDoSite, enfileirarEmail, lerConfiguracao } from '../../lib/email';
 import { consultarTokenSenha, consumirTokenSenha, criarTokenSenha } from '../../lib/tokens-senha';
+import { decifrar } from '../../lib/cripto';
+import { conferirCodigo, hashCodigoRecuperacao } from '../../lib/totp';
 
 // Rotas públicas (montadas antes de qualquer autenticação)
 export const publico = Router();
@@ -96,12 +98,24 @@ publico.get('/saude', (_req, res) => {
 const loginSchema = z.object({
   email: z.string().min(1),
   senha: z.string().min(1),
+  codigo: z.string().max(40).optional(),
 });
+
+// Lista de hashes dos códigos de recuperação ainda não usados (JSON no banco).
+function hashesDeRecuperacao(bruto: string | null): string[] {
+  if (!bruto) return [];
+  try {
+    const lista: unknown = JSON.parse(bruto);
+    return Array.isArray(lista) ? lista.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 publico.post(
   '/auth/login',
   asyncHandler(async (req, res) => {
-    const { email, senha } = validar(loginSchema, req.body);
+    const { email, senha, codigo } = validar(loginSchema, req.body);
     const contexto = contextoRequisicao(req);
     const chave = (req.ip ?? '') + '|' + email.toLowerCase();
     const agora = Date.now();
@@ -139,6 +153,36 @@ publico.post(
     if (!confere) {
       registrarFalhaNoLimite();
       throw falhaLogin(401, 'E-mail ou senha inválidos');
+    }
+    // Segundo passo (verificação em duas etapas). DESATIVAR_2FA=true pula este passo: saída de emergência
+    // para quem perdeu o aparelho com o aplicativo. Depois de recuperar o acesso, tire a variável.
+    if (usuario.totpAtivo && process.env.DESATIVAR_2FA !== 'true') {
+      const segredo = usuario.totpSegredoCifrado ? decifrar(usuario.totpSegredoCifrado) : null;
+      if (segredo === null) {
+        // Segredo ilegível (o JWT_SECRET mudou): entra como se a verificação estivesse desligada.
+        console.warn(`2FA do usuário ${usuario.id} não pôde ser lido; o segundo passo foi ignorado.`);
+      } else {
+        const informado = (codigo ?? '').trim();
+        if (informado === '') {
+          res.status(401).json({ erro: 'Informe o código de verificação', precisaCodigo: true });
+          return;
+        }
+        if (!conferirCodigo(segredo, informado)) {
+          // Código de recuperação: vale uma vez; o hash sai da lista depois de usado.
+          const hash = hashCodigoRecuperacao(informado);
+          const restantes = hashesDeRecuperacao(usuario.totpRecuperacao);
+          if (!restantes.includes(hash)) {
+            registrarFalhaNoLimite();
+            falhaLogin(401, 'Código incorreto');
+            res.status(401).json({ erro: 'Código incorreto', precisaCodigo: true });
+            return;
+          }
+          await prisma.usuario.update({
+            where: { id: usuario.id },
+            data: { totpRecuperacao: JSON.stringify(restantes.filter((h) => h !== hash)) },
+          });
+        }
+      }
     }
     falhasLogin.delete(chave);
     const dados = paraUsuarioResposta(usuario);

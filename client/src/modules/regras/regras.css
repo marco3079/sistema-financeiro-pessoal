@@ -1,0 +1,24 @@
+/* Tela de regras de categoria. Cores só por variáveis do tema. */
+
+.regras-ajuda {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--cor-texto-suave);
+}
+
+.regras-previa {
+  margin-top: 1rem;
+  min-width: 0;
+}
+
+.regras-resumo {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.regras-subtitulo {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+  color: var(--cor-texto);
+}

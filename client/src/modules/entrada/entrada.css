@@ -1,0 +1,44 @@
+.entrada-blocos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.entrada-passos {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.entrada-passos li {
+  margin-bottom: 0.5rem;
+}
+
+.entrada-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.entrada-lista li {
+  margin-bottom: 0.25rem;
+}
+
+.entrada-suave {
+  color: var(--cor-texto-suave);
+}
+
+.entrada-resultado h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.entrada-acao {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 360px) {
+  .entrada-acao .botao {
+    width: 100%;
+  }
+}

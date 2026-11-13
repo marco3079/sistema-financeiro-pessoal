@@ -19,6 +19,7 @@ import { Aviso, Botao, Caixa, Campo, Cartao, Carregando, Modal, MenuAcoes, Pagin
 import type { AcaoMenu } from '../../ui';
 import { BarraProgresso, NomeComCor, ResumoItem, Rosca, SeloOrigem, Valor } from '../../ui/financas';
 import { DetalheInvestimento } from './DetalheInvestimento';
+import { ImportarPlanilha } from './ImportarPlanilha';
 import './investimentos.css';
 
 interface RespostaInvestimentos {
@@ -180,6 +181,7 @@ export function Investimentos() {
   const [tipo, setTipo] = useState('');
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [novo, setNovo] = useState(false);
+  const [importando, setImportando] = useState(false);
   const [editando, setEditando] = useState<InvestimentoDTO | null>(null);
   const [detalheId, setDetalheId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
@@ -243,6 +245,9 @@ export function Investimentos() {
             aoMudar={setMostrarInativos}
           />
         </div>
+        <Botao variante="secundario" aoClicar={() => setImportando(true)}>
+          Importar planilha
+        </Botao>
         <Botao aoClicar={() => setNovo(true)}>Novo investimento</Botao>
       </div>
 
@@ -377,6 +382,12 @@ export function Investimentos() {
           />
         )}
       </Modal>
+
+      <ImportarPlanilha
+        aberto={importando}
+        aoFechar={() => setImportando(false)}
+        aoConcluir={recarregar}
+      />
 
       {detalheId !== null && (
         <DetalheInvestimento

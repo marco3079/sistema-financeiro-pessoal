@@ -81,6 +81,12 @@ function consulta(parametros: Record<string, string | number | undefined>): stri
   return pares.length === 0 ? '' : '?' + pares.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
 }
 
+// A mesma chamada interna, para outros módulos do servidor que precisam usar uma rota como a tela usaria
+// (com as mesmas validações e o mesmo perfil financeiro). Lança Error com a mensagem da API quando falha.
+export function chamarApiInterna(perfilId: number, metodo: 'GET' | 'POST' | 'PUT', caminho: string, corpo?: unknown): Promise<unknown> {
+  return api({ id: 0, nome: 'interno', permissao: 'ESCRITA', perfilId }, metodo, caminho, corpo);
+}
+
 // ---------- Ferramentas ----------
 
 const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use o formato AAAA-MM-DD');

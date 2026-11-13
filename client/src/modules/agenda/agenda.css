@@ -1,0 +1,90 @@
+/* Contas a pagar e fluxo de caixa. Só variáveis do tema; cabe em 360 px sem rolagem horizontal. */
+
+.agenda-controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+  max-width: 100%;
+}
+
+.agenda-controles > * {
+  min-width: 0;
+}
+
+.agenda-texto-suave {
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.agenda-dia {
+  margin-top: 16px;
+  min-width: 0;
+}
+
+.agenda-dia h3 {
+  font-size: 0.95rem;
+  color: var(--cor-texto-suave);
+  margin: 0 0 6px;
+}
+
+.agenda-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.agenda-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  min-width: 0;
+}
+
+.agenda-item-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agenda-item-origem {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.agenda-item-direita {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.agenda-item-acao {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.agenda-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.agenda-negativo {
+  color: var(--cor-perigo);
+}
+
+.agenda-positivo {
+  color: var(--cor-verde);
+}

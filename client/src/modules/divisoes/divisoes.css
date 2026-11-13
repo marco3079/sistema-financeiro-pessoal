@@ -1,0 +1,152 @@
+/* Divisão de gastos. Só variáveis do tema; cabe em 360 px sem rolagem horizontal. */
+
+.divisoes-texto-suave {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.divisoes-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.divisoes-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.divisoes-nome {
+  display: block;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.divisoes-total {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+.divisoes-itens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.divisoes-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.divisoes-item-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.divisoes-item-valor {
+  white-space: nowrap;
+}
+
+.divisoes-item-acoes {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.divisoes-nova {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.divisoes-escolhas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.divisoes-escolha {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.divisoes-escolha:hover,
+.divisoes-escolha:focus-visible {
+  border-color: var(--cor-primaria);
+}
+
+.divisoes-escolha-nome {
+  font-weight: 600;
+}
+
+.divisoes-escolhido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  overflow-wrap: anywhere;
+}
+
+.divisoes-escolhido > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.divisoes-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.divisoes-parte {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.divisoes-parte > .botao {
+  justify-self: start;
+}
+
+.divisoes-sua-parte {
+  margin: 0;
+  font-weight: 600;
+  color: var(--cor-verde);
+}

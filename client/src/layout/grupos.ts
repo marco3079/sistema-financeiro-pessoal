@@ -9,12 +9,12 @@ export interface GrupoMenu {
 // Seções da barra lateral e da gaveta. A rota entra no grupo pelo ícone dela.
 export const GRUPOS: GrupoMenu[] = [
   { titulo: '', icones: ['inicio'] },
-  { titulo: 'Dia a dia', icones: ['contas', 'transacoes', 'cartao'] },
+  { titulo: 'Dia a dia', icones: ['raio', 'contas', 'transacoes', 'cartao', 'calendario', 'sino', 'documento', 'grupo'] },
   { titulo: 'Patrimônio', icones: ['investimentos'] },
   { titulo: 'Planejamento', icones: ['orcamento', 'metas', 'categorias'] },
   { titulo: 'Trazer dados', icones: ['importar', 'conexoes', 'sincronizar'] },
   { titulo: 'Sistema', icones: ['usuarios', 'atividade', 'log', 'engrenagem'] },
-  { titulo: 'Conta', icones: ['perfil'] },
+  { titulo: 'Conta', icones: ['perfil', 'cadeado'] },
 ];
 
 const TITULO_OUTROS = 'Outros';

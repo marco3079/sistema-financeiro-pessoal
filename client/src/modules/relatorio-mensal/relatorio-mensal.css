@@ -1,0 +1,89 @@
+/* Relatório mensal para imprimir. Cores só por variáveis do tema. */
+
+.relmes {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.relmes-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Faixa de números: 4 colunas, 2 em telas estreitas */
+
+.relmes-faixa {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.relmes-faixa-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.9rem 1.1rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.relmes-faixa-rotulo {
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+.relmes-faixa-valor {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.relmes-positivo {
+  color: var(--cor-verde);
+}
+
+.relmes-negativo {
+  color: var(--cor-perigo);
+}
+
+@media (max-width: 700px) {
+  .relmes-faixa {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.relmes-rodape {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+@media print {
+  .casca-lateral,
+  .casca-topo,
+  .casca-topo-celular,
+  .casca-inferior,
+  .casca-gaveta-fundo,
+  .relmes-acoes {
+    display: none !important;
+  }
+
+  .casca-principal,
+  .casca-area {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .cartao {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+}

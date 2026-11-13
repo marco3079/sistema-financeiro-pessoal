@@ -62,6 +62,11 @@ export async function apagarPerfil(perfilId: number): Promise<void> {
   await comPerfil(perfilId, async () => {
     await prisma.$transaction(
       async (db) => {
+        await db.divisao.deleteMany({});
+        await db.pagamentoContaFixa.deleteMany({});
+        await db.contaFixa.deleteMany({});
+        await db.regraCategoria.deleteMany({});
+        await db.alocacaoAlvo.deleteMany({});
         await db.orcamento.deleteMany({});
         await db.meta.deleteMany({});
         await db.movimentoInvestimento.deleteMany({});

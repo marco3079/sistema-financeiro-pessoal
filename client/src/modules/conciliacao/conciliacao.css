@@ -1,0 +1,94 @@
+/* Conciliação dos cartões (módulo conciliacao). */
+
+.conciliacao-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.conciliacao-grade {
+  display: grid;
+  gap: 16px;
+}
+
+.conciliacao-cartao {
+  break-inside: avoid;
+}
+
+.conciliacao-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.conciliacao-nome {
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.conciliacao-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 16px;
+  margin: 0 0 12px;
+}
+
+.conciliacao-numeros dt {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.conciliacao-numeros dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.conciliacao-diferenca-ok {
+  color: var(--cor-verde);
+}
+
+.conciliacao-diferenca-erro {
+  color: var(--cor-perigo);
+}
+
+.conciliacao-secao {
+  margin-top: 16px;
+}
+
+.conciliacao-secao h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--cor-texto);
+}
+
+.conciliacao-explicacao {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.conciliacao-texto-suave {
+  color: var(--cor-texto-suave);
+}
+
+.conciliacao-acoes {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.conciliacao-confirma {
+  margin: 0 0 16px;
+  color: var(--cor-texto);
+}
+
+@media (max-width: 360px) {
+  .conciliacao-numeros {
+    grid-template-columns: 1fr;
+  }
+}

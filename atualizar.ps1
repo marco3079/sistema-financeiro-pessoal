@@ -4,6 +4,8 @@
 #   atualizar.ps1 -Instalar     liga o botao "Atualizar" da tela: cria uma tarefa do Windows que fica esperando
 #                               o pedido da tela e roda a atualizacao. A tarefa so sabe fazer isso.
 #   atualizar.ps1 -Desinstalar  remove a tarefa
+#   atualizar.ps1 -Restaurar financas-AAAAMMDD-HHMMSS.sql
+#                               troca o banco de dados por uma copia da pasta backups (guarda antes o banco atual)
 #   atualizar.ps1 -Vigiar       (uso interno da tarefa) espera pedidos da tela
 #
 # Para rodar: botao direito > "Executar com o PowerShell", ou
@@ -12,7 +14,8 @@
 param(
   [switch]$Instalar,
   [switch]$Desinstalar,
-  [switch]$Vigiar
+  [switch]$Vigiar,
+  [string]$Restaurar = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,13 +73,15 @@ function Gravar-Versao {
 }
 
 # Copia do banco antes de atualizar: backups/financas-AAAAMMDD-HHMMSS.sql (ficam as 5 mais recentes).
-function Copiar-Banco {
+function Copiar-Banco([switch]$SemPodar) {
   if (-not (Test-Path -LiteralPath $PastaBackups)) { New-Item -ItemType Directory -Path $PastaBackups | Out-Null }
   $nome = "financas-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".sql"
   Rodar "docker" @("compose", "exec", "-T", "db", "sh", "-c", "pg_dump -U financas -d financas > /tmp/copia.sql") | Out-Null
   Rodar "docker" @("compose", "cp", "db:/tmp/copia.sql", (Join-Path $PastaBackups $nome)) | Out-Null
   Rodar "docker" @("compose", "exec", "-T", "db", "rm", "-f", "/tmp/copia.sql") | Out-Null
-  Get-ChildItem -LiteralPath $PastaBackups -Filter "financas-*.sql" | Sort-Object Name -Descending | Select-Object -Skip 5 | Remove-Item -Force
+  if (-not $SemPodar) {
+    Get-ChildItem -LiteralPath $PastaBackups -Filter "financas-*.sql" | Sort-Object Name -Descending | Select-Object -Skip 5 | Remove-Item -Force
+  }
   return $nome
 }
 
@@ -96,6 +101,46 @@ function Atualizar {
     Gravar-Estado "OK" "O sistema ja estava na ultima versao. Copia do banco: $copia"
   } else {
     Gravar-Estado "OK" "Atualizado de $($antes.Substring(0,7)) para $($depois.Substring(0,7)). Copia do banco: $copia"
+  }
+}
+
+# Nome de copia aceito: so o formato que este script gera, sem pasta nem outro caractere.
+function Copia-Valida([string]$Nome) {
+  if ($Nome -cnotmatch '\Afinancas-\d{8}-\d{6}\.sql\z') { return $false }
+  return (Test-Path -LiteralPath (Join-Path $PastaBackups $Nome) -PathType Leaf)
+}
+
+# Troca o banco de dados pelo conteudo de uma copia. Antes, guarda o banco como esta agora.
+function Restaurar-Banco([string]$Nome) {
+  if (-not (Copia-Valida $Nome)) { throw "Copia nao encontrada ou com nome invalido." }
+  Gravar-Estado "ATUALIZANDO" "Guardando uma copia do banco como esta agora..."
+  $anterior = Copiar-Banco -SemPodar
+  Gravar-Estado "ATUALIZANDO" "Restaurando a copia $Nome..."
+  Rodar "docker" @("compose", "stop", "web", "api") | Out-Null
+  Rodar "docker" @("compose", "cp", (Join-Path $PastaBackups $Nome), "db:/tmp/restaurar.sql") | Out-Null
+  # Tudo em uma transacao so: se a copia falhar no meio, nada muda e o banco continua como estava.
+  Rodar "docker" @("compose", "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "--single-transaction", "-q", "-U", "financas", "-d", "financas", "-c", "DROP SCHEMA public CASCADE", "-c", "CREATE SCHEMA public", "-f", "/tmp/restaurar.sql") | Out-Null
+  # Drive: o banco restaurado conta como alteracao deste computador, para a pasta nao desfazer a restauracao.
+  # (Sem aspas duplas no SQL: o PowerShell 5.1 as remove ao passar o argumento. Os nomes entram por format/%I.)
+  $marcar = 'DO $$ BEGIN EXECUTE format(''INSERT INTO %I (id, sujo, %I) VALUES (1, true, now()) ON CONFLICT (id) DO UPDATE SET sujo = true, %I = now()'', ''EstadoDrive'', ''alteradoEm'', ''alteradoEm''); END $$;'
+  try { Rodar "docker" @("compose", "exec", "-T", "db", "psql", "-U", "financas", "-d", "financas", "-c", $marcar) | Out-Null } catch { }
+  Rodar "docker" @("compose", "exec", "-T", "db", "rm", "-f", "/tmp/restaurar.sql") | Out-Null
+  Gravar-Estado "ATUALIZANDO" "Ligando o sistema de novo..."
+  Rodar "docker" @("compose", "up", "-d") | Out-Null
+  Gravar-Estado "OK" "Banco restaurado da copia $Nome. O banco de antes ficou em $anterior."
+}
+
+function Restaurar-ComRegistro([string]$Nome) {
+  try {
+    Restaurar-Banco $Nome
+    return $true
+  } catch {
+    $mensagem = "$($_.Exception.Message)"
+    if ($mensagem.Length -gt 400) { $mensagem = $mensagem.Substring(0, 400) }
+    # Se parou no meio, tenta religar o sistema para ele nao ficar fora do ar.
+    try { Rodar "docker" @("compose", "up", "-d") | Out-Null } catch { }
+    Gravar-Estado "ERRO" "A restauracao falhou: $mensagem"
+    return $false
   }
 }
 
@@ -141,8 +186,22 @@ if ($Vigiar) {
   while ($true) {
     try {
       if (Test-Path -LiteralPath $ArquivoPedido) {
+        # O pedido diz so o tipo e, na restauracao, o nome da copia. Nada do pedido e executado: o nome so e
+        # aceito se tiver exatamente o formato das copias e existir na pasta backups.
+        $tipo = ""
+        $copiaPedida = ""
+        try {
+          $pedido = Get-Content -LiteralPath $ArquivoPedido -Raw -Encoding utf8 | ConvertFrom-Json
+          $tipo = "$($pedido.tipo)"
+          $copiaPedida = "$($pedido.arquivo)"
+        } catch { }
         Remove-Item -LiteralPath $ArquivoPedido -Force
-        Atualizar-ComRegistro | Out-Null
+        if ($tipo -eq "RESTAURAR") {
+          if (Copia-Valida $copiaPedida) { Restaurar-ComRegistro $copiaPedida | Out-Null }
+          else { Gravar-Estado "ERRO" "Pedido de restauracao com copia invalida." }
+        } else {
+          Atualizar-ComRegistro | Out-Null
+        }
       } else {
         # Batimento: a tela sabe que o vigia esta vivo.
         $estado = @{ situacao = "PARADO"; mensagem = ""; em = (Agora) }
@@ -157,6 +216,13 @@ if ($Vigiar) {
     } catch { }
     Start-Sleep -Seconds 5
   }
+}
+
+if ($Restaurar -ne "") {
+  Write-Host "Restaurando o banco de dados..."
+  $deuCerto = Restaurar-ComRegistro $Restaurar
+  Write-Host ((Get-Content -LiteralPath $ArquivoEstado -Raw -Encoding utf8 | ConvertFrom-Json).mensagem)
+  if ($deuCerto) { exit 0 } else { exit 1 }
 }
 
 # Sem parametros: atualiza agora.

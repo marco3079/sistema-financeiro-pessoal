@@ -79,16 +79,20 @@ enum StatusConexao {
 // ---------- Pessoas ----------
 
 model Usuario {
-  id        Int      @id @default(autoincrement())
-  nome      String
-  email     String   @unique
-  senhaHash String
-  perfil    Perfil   @default(TITULAR)
-  ativo     Boolean  @default(true)
-  cpf       String?
-  telefone  String?
-  foto      String? // endereço http(s) ou data URL (imagem reduzida enviada pelo usuário)
-  criadoEm  DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  nome               String
+  email              String   @unique
+  senhaHash          String
+  // Verificação em duas etapas (código de aplicativo autenticador).
+  totpAtivo          Boolean  @default(false)
+  totpSegredoCifrado String? // segredo base32 cifrado (lib/cripto)
+  totpRecuperacao    String? // JSON com os hashes sha256 dos códigos de recuperação ainda não usados
+  perfil             Perfil   @default(TITULAR)
+  ativo              Boolean  @default(true)
+  cpf                String?
+  telefone           String?
+  foto               String? // endereço http(s) ou data URL (imagem reduzida enviada pelo usuário)
+  criadoEm           DateTime @default(now())
 }
 
 // ---------- Open Finance (Pluggy) ----------
@@ -390,6 +394,71 @@ model PrecoAtivo {
   valor  Float
 
   @@id([codigo, data])
+}
+
+// ===== Regras, agenda, alvo e divisões (todos por perfil financeiro) =====
+
+// Regra de categoria: lançamento cuja descrição contém o trecho recebe a categoria.
+model RegraCategoria {
+  id          Int      @id @default(autoincrement())
+  perfilId    Int      @default(1)
+  trecho      String // comparado sem acento e sem diferenciar maiúsculas
+  categoriaId Int
+  criadoEm    DateTime @default(now())
+
+  @@index([perfilId])
+}
+
+// Conta fixa: algo que se repete todo mês (aluguel, salário, mensalidade).
+model ContaFixa {
+  id          Int           @id @default(autoincrement())
+  perfilId    Int           @default(1)
+  descricao   String
+  tipo        TipoTransacao // DESPESA = a pagar; RECEITA = a receber
+  valor       Decimal       @db.Decimal(14, 2)
+  diaDoMes    Int // 1 a 31 (em mês curto vale o último dia)
+  categoriaId Int?
+  contaId     Int?
+  ativa       Boolean       @default(true)
+  criadoEm    DateTime      @default(now())
+
+  @@index([perfilId])
+}
+
+// Marca de "paga" (ou "recebida") de uma conta fixa em um mês.
+model PagamentoContaFixa {
+  id          Int      @id @default(autoincrement())
+  perfilId    Int      @default(1)
+  contaFixaId Int
+  mes         String // 'AAAA-MM'
+  pagoEm      DateTime @default(now())
+
+  @@index([perfilId])
+  @@index([contaFixaId, mes])
+}
+
+// Percentual desejado de cada classe da carteira (RENDA_VARIAVEL, RENDA_FIXA, FUNDOS, OUTROS).
+model AlocacaoAlvo {
+  id         Int     @id @default(autoincrement())
+  perfilId   Int     @default(1)
+  classe     String
+  percentual Decimal @db.Decimal(5, 2)
+
+  @@index([perfilId])
+}
+
+// Parte de um lançamento que outra pessoa deve a você.
+model Divisao {
+  id          Int       @id @default(autoincrement())
+  perfilId    Int       @default(1)
+  transacaoId Int
+  pessoa      String
+  valor       Decimal   @db.Decimal(14, 2)
+  quitadoEm   DateTime?
+  criadoEm    DateTime  @default(now())
+
+  @@index([perfilId])
+  @@index([transacaoId])
 }
 
 // Estado do Drive NESTE computador (linha única). Não viaja para a pasta.
