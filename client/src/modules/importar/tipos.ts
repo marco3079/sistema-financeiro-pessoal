@@ -98,6 +98,7 @@ export interface AnaliseB3 {
   posicoes: PosicaoB3[];
   movimentos: MovimentoB3[];
   encerradas: string[];
+  eventos: { chave: string; data: string; tipo: 'DESDOBRAMENTO' | 'GRUPAMENTO' | 'BONIFICACAO'; fator: number; descricao: string }[];
   totalProventos: number;
 }
 
@@ -112,6 +113,7 @@ export interface ConfirmarB3 {
   >[];
   movimentos: MovimentoB3[]; // só os das posições marcadas
   encerradas: string[];
+  eventos?: { chave: string; data: string; tipo: 'DESDOBRAMENTO' | 'GRUPAMENTO' | 'BONIFICACAO'; fator: number; descricao: string }[];
 }
 
 // Resposta de POST /importacao/b3/confirmar.

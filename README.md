@@ -29,6 +29,9 @@
 - [Verificação em duas etapas](#verificação-em-duas-etapas)
 - [Restaurar uma cópia do banco](#restaurar-uma-cópia-do-banco)
 - [Abrir no celular](#abrir-no-celular)
+- [Foto do cupom](#foto-do-cupom)
+- [Avisos por e-mail e Telegram](#avisos-por-e-mail-e-telegram)
+- [Acesso só de leitura](#acesso-só-de-leitura)
 - [Rendimento e índices](#rendimento-e-índices)
 - [Open Finance (opcional)](#open-finance-opcional)
 - [Configuração](#configuração)
@@ -86,6 +89,7 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 **Conectar IA (MCP)**
 
 - Servidor MCP embutido: assistentes como Claude, ChatGPT, Cursor e VS Code consultam seus dados para responder perguntas ("quanto gastei com mercado este ano?").
+- Além de lançamentos, faturas e carteira, o assistente consulta contas a pagar, fluxo de caixa, cobranças estranhas, conciliação, divisões, imposto de renda, visão do ano, carteira-alvo e regras de categoria.
 - Cada chave de acesso é "só consulta" ou "consulta e lança", vale para um perfil financeiro e pode ser apagada a qualquer momento.
 
 **Dia a dia**
@@ -96,6 +100,9 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 - **Relatório do mês** em uma página, para imprimir ou salvar em PDF.
 - **Divisão de gastos**: quanto cada pessoa deve de um lançamento, com marcação de recebido e resumo para copiar.
 - **Conciliação dos cartões**: compara a dívida registrada com as faturas não pagas e o total de cada fatura com os lançamentos, e corrige os totais.
+- **Foto do cupom**: no Lançar rápido, tire a foto do cupom e o sistema preenche valor, data, estabelecimento e categoria para você conferir antes de gravar. Usa a API da Claude com a sua chave (veja [Foto do cupom](#foto-do-cupom)).
+- **Avisos fora do sistema**: fatura vencendo ou atrasada, conta fixa a pagar nos próximos 3 dias e cobrança estranha, por e-mail e pelo Telegram, uma vez por dia.
+- **Visão do ano**: receitas, despesas e saldo dos 12 meses lado a lado, por categoria, com média mensal e comparação com o ano anterior.
 
 **Menos trabalho manual**
 
@@ -106,7 +113,10 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 **Investimentos, além da carteira**
 
 - **Carteira-alvo**: percentual desejado por classe e a distância até ele (só mostra o desvio).
-- **Imposto de renda**: vendas por mês com o resultado pelo custo médio, posição em 31/12 e proventos do ano. É um apoio à declaração: não calcula o imposto a pagar.
+- **Imposto de renda**: vendas por mês com o resultado pelo custo médio, posição em 31/12 e proventos do ano, mais o **imposto estimado das vendas** mês a mês (15% em ações e ETFs, 20% em fundos imobiliários, isenção das vendas de ações até R$ 20 mil no mês e compensação de prejuízo por classe). É uma estimativa de apoio: não considera day trade, IR retido na fonte nem prejuízos de anos que não estão no sistema.
+- **Desdobramentos, grupamentos e bonificações**: lidos da planilha da B3 e aplicados ao histórico, para a quantidade e o preço médio de antes do evento baterem com os de hoje.
+- **Ficha do ativo**: posição, preço médio, histórico de preço, movimentos, proventos e eventos de um ativo em uma tela.
+- **Simulador de aportes**: quanto um valor inicial mais aportes mensais viram em até 50 anos, em três cenários de taxa.
 
 **Segurança**
 
@@ -120,6 +130,12 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 **Abrir no celular**
 
 - O botão com o ícone de celular, no topo, mostra um QR code com o endereço deste computador na rede.
+- **Instalar como aplicativo**: no celular ou no computador, o sistema pode ser instalado e abre em janela própria, com ícone.
+- **Acesso de fora de casa com HTTPS**, pelo Tailscale: [docs/ACESSO-EXTERNO.md](docs/ACESSO-EXTERNO.md).
+
+**Acesso só de leitura**
+
+- Um segundo usuário (cônjuge, contador) pode ser criado como **somente leitura**: vê um único perfil financeiro e não grava, importa nem configura nada.
 
 **Open Finance (opcional)**
 
@@ -152,12 +168,13 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 
 **Planejamento**
 
-- Orçamento: limite mensal por categoria, com barra de progresso e os gastos sem limite definido.
-- Metas com valor alvo, valor guardado e prazo.
+- Orçamento: limite mensal por categoria, com barra de progresso e os gastos sem limite definido. O botão de **sugestão** propõe limites a partir da média dos seus gastos recentes; você aceita ou ajusta.
+- Metas com valor alvo, valor guardado e prazo. Uma meta pode ser **ligada a uma conta ou a um investimento**: o valor guardado passa a acompanhar o saldo.
 
 **Painel e sistema**
 
-- Painel com patrimônio, saldo em contas, investimentos e despesas do mês, evolução do patrimônio em 12 meses, lançamentos recentes e a próxima fatura.
+- Painel com patrimônio, saldo em contas, investimentos e despesas do mês, evolução do patrimônio em 12 meses, lançamentos recentes, os próximos vencimentos, o saldo projetado para três meses e as cobranças que pedem atenção.
+- Menu em sete grupos (Início, Dia a dia, Análises, Investimentos, Planejamento, Dados e Sistema). As telas de uso menos frequente ficam em três páginas de atalhos: **Mais de investimentos**, **Mais de dados** e **Configurações**; a busca do topo acha todas.
 - Sino de avisos: fatura vencendo ou atrasada, orçamento estourado e conexão que precisa ser refeita.
 - Busca no topo por contas, lançamentos, investimentos e telas.
 - Usuários, log de atividades, identidade visual (nome, logo e cores) e envio de e-mails de recuperação de senha.
@@ -168,6 +185,9 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 |---|---|
 | ![Lançamentos](docs/imagens/lancamentos.png) | ![Cartões e faturas](docs/imagens/cartoes.png) |
 | ![Investimentos](docs/imagens/investimentos.png) | ![Orçamento](docs/imagens/orcamento.png) |
+| ![Carteira](docs/imagens/carteira.png) | ![Análise](docs/imagens/analise.png) |
+| ![Visão do ano](docs/imagens/ano.png) | ![Contas a pagar e a receber](docs/imagens/agenda.png) |
+| ![Ficha do ativo](docs/imagens/ativo.png) | ![Simulador de aportes](docs/imagens/simulador.png) |
 | ![Importar arquivos](docs/imagens/importar.png) | ![Painel no tema escuro](docs/imagens/painel-escuro.png) |
 
 Os dados dos prints são fictícios. O sistema é instalado vazio, só com a conta demo e as categorias padrão.
@@ -315,6 +335,24 @@ O endereço usado é, nesta ordem: o que você digitar no próprio popup; `ENDER
 
 Se o celular não abrir, libere a porta `8092` no firewall do computador. O acesso é por HTTP, só para a rede de casa: não exponha essa porta à internet.
 
+**Instalar como aplicativo.** No Chrome ou no Edge, use o botão de instalar do mesmo popup (ou o ícone de instalar na barra de endereço). No iPhone, abra no Safari, toque em Compartilhar e em **Adicionar à Tela de Início**. Os navegadores só oferecem a instalação em endereço HTTPS ou em `localhost`.
+
+**De fora de casa.** O guia [docs/ACESSO-EXTERNO.md](docs/ACESSO-EXTERNO.md) mostra como publicar o sistema com HTTPS só para os seus aparelhos, pelo Tailscale. Depois, ponha o endereço em `URL_PUBLICA` no `.env`: ele passa a ser o primeiro do QR code.
+
+## Foto do cupom
+
+1. Crie uma chave em [platform.claude.com](https://platform.claude.com) (o uso da API é cobrado pela Anthropic, por foto lida).
+2. Em **Configurações > Leitura de cupom**, cole a chave e escolha o modelo. A chave fica cifrada no banco e nunca é mostrada de novo. Também pode vir de `ANTHROPIC_API_KEY` no `.env`.
+3. Em **Lançar rápido**, toque em **Foto do cupom**. A foto é reduzida no aparelho, enviada à API e não fica guardada no sistema. O resultado só preenche o formulário: confira e grave.
+
+## Avisos por e-mail e Telegram
+
+Em **Configurações > Avisos**, ligue os avisos e informe o e-mail de destino (usa a conta de e-mail das Configurações) e, se quiser, o Telegram: crie um bot com o @BotFather, cole o token e o seu chat id. O sistema envia às 8h o que há de novo (fatura vencendo em até 3 dias ou atrasada, conta fixa a pagar, cobrança estranha) e não repete o mesmo aviso. O botão de teste confere os dois canais.
+
+## Acesso só de leitura
+
+Em **Configurações > Usuários**, crie o usuário com o acesso **Somente leitura** e escolha o perfil financeiro que ele pode ver. O leitor abre painel, lançamentos, faturas, carteira e relatórios desse perfil, e o servidor recusa qualquer gravação, importação ou configuração feita com o login dele.
+
 ## Rendimento e índices
 
 A tela **Rendimento** busca os índices em fontes públicas, sem cadastro: Selic e IPCA na API de séries do Banco Central; Ibovespa e IFIX nas estatísticas históricas da B3. A primeira consulta baixa o histórico desde o ano do seu movimento mais antigo e depois atualiza a cada 12 horas.
@@ -324,7 +362,7 @@ A tela **Rendimento** busca os índices em fontes públicas, sem cadastro: Selic
 - **Renda fixa**: escreva a taxa no cadastro do título. O saldo é uma estimativa bruta pela taxa (sem imposto de renda nem marcação a mercado) e substitui o saldo digitado.
 - **Projeção**: é uma conta, não uma previsão. Rendimento passado não garante rendimento futuro.
 
-A tela **Carteira** usa outra conta, a rentabilidade ponderada pelo tempo: em cada dia, a variação do valor dos ativos mais os proventos, sem o efeito de aplicar ou resgatar. Por isso os percentuais das duas telas não são iguais. O histórico usa a quantidade de cada dia, reconstruída pelos movimentos, e o fechamento do Yahoo Finance; desdobramentos antigos são ajustados por aproximação.
+A tela **Carteira** usa outra conta, a rentabilidade ponderada pelo tempo: em cada dia, a variação do valor dos ativos mais os proventos, sem o efeito de aplicar ou resgatar. Por isso os percentuais das duas telas não são iguais. O histórico usa a quantidade de cada dia, reconstruída pelos movimentos, e o fechamento do Yahoo Finance; desdobramentos, grupamentos e bonificações importados da planilha da B3 são aplicados na data de cada um, e os que não estão no sistema são ajustados por aproximação.
 
 ## Open Finance (opcional)
 
@@ -366,6 +404,8 @@ O arquivo `.env` (criado pelo instalador a partir de [.env.example](.env.example
 | `DESATIVAR_2FA` | `true` ignora a verificação em duas etapas (emergência) | `false` |
 | `PASTA_DRIVE` | Pasta sincronizada que guarda os dados (escolhida pelo `conectar-drive.ps1`) | vazio (desligado) |
 | `ENDERECO_REDE` | Endereço do computador na rede para o QR code (IP ou nome `.local`) | nome do computador |
+| `URL_PUBLICA` | Endereço HTTPS publicado (ex.: pelo Tailscale); vem primeiro no QR code | vazio |
+| `ANTHROPIC_API_KEY` | Chave da API da Claude para a foto do cupom (opcional; também dá para informar na tela) | vazio |
 | `BRAPI_TOKEN` | Token das cotações (opcional; também dá para informar na tela) | vazio |
 | `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET` | Credenciais do Open Finance (opcional; também dá para informar na tela) | vazias |
 | `PLUGGY_SANDBOX` | `true` mostra os bancos de teste da Pluggy | `false` |
@@ -407,6 +447,8 @@ Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) e a lista de rotas em [do
 cd server && npm install && npx tsc --noEmit
 cd client && npm install && npx tsc --noEmit && npx vite build
 ```
+
+**Testes automáticos.** Com o sistema no ar, `cd server && npm run teste` roda a suíte de fumaça contra a API (login, importação, faturas, regras, agenda, divisões, conciliação, MCP e isolamento entre perfis). Ela cria um perfil financeiro próprio e o apaga no fim. Detalhes em [docs/TESTES.md](docs/TESTES.md).
 
 Para rodar fora do Docker: suba só o banco (`docker compose up -d db`), copie `server/.env.example` para `server/.env`, rode `npx prisma db push` e `npm run dev` em `server/`, e `npm run dev` em `client/`.
 

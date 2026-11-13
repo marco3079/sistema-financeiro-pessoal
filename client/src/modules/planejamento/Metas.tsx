@@ -3,33 +3,56 @@ import type { FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { useDados } from '../../lib/useDados';
 import { formatarDia, formatarReais, lerValor, mensagemErro, valorParaCampo } from '../../lib/financas';
-import type { MetaDTO } from '../../lib/financas';
-import { Aviso, Botao, Campo, Carregando, MenuAcoes, Modal, Pagina, Selo } from '../../ui';
+import type { ContaDTO, InvestimentoDTO, MetaDTO as MetaBase } from '../../lib/financas';
+import { Aviso, Botao, Campo, Carregando, MenuAcoes, Modal, Pagina, Selecao, Selo } from '../../ui';
 import type { AcaoMenu } from '../../ui';
 import { BarraProgresso, CampoCor, PontoCor, ResumoItem, Vazio } from '../../ui/financas';
 import './planejamento.css';
 
+// Meta como a API devolve: pode estar ligada a uma conta ou a um investimento.
+type MetaDTO = MetaBase & {
+  contaId: number | null;
+  investimentoId: number | null;
+  origem: { tipo: 'CONTA' | 'INVESTIMENTO'; id: number; nome: string } | null;
+};
+
 // Formulário de nova meta (meta = null) ou edição.
+// ligacao: 'nenhum' | 'conta:<id>' | 'investimento:<id>'
 interface FormMeta {
   nome: string;
   valorAlvo: string;
   valorAtual: string;
   prazo: string;
   cor: string;
+  ligacao: string;
 }
 
 function formInicial(meta: MetaDTO | null): FormMeta {
+  let ligacao = 'nenhum';
+  if (meta?.contaId) ligacao = `conta:${meta.contaId}`;
+  else if (meta?.investimentoId) ligacao = `investimento:${meta.investimentoId}`;
   return {
     nome: meta?.nome ?? '',
     valorAlvo: valorParaCampo(meta?.valorAlvo),
     valorAtual: valorParaCampo(meta?.valorAtual),
     prazo: meta?.prazo ?? '',
     cor: meta?.cor ?? '#2563eb',
+    ligacao,
   };
+}
+
+function ligacaoDe(valor: string): { contaId: number | null; investimentoId: number | null } {
+  const [tipo, id] = valor.split(':');
+  const numero = Number(id);
+  if (tipo === 'conta') return { contaId: numero, investimentoId: null };
+  if (tipo === 'investimento') return { contaId: null, investimentoId: numero };
+  return { contaId: null, investimentoId: null };
 }
 
 export function Metas() {
   const { dados, carregando, erro, recarregar } = useDados<MetaDTO[]>('/metas');
+  const contas = (useDados<ContaDTO[]>('/contas').dados ?? []).filter((c) => c.tipo !== 'CARTAO');
+  const investimentos = useDados<InvestimentoDTO[]>('/investimentos').dados ?? [];
   const [form, setForm] = useState<{ meta: MetaDTO | null } | null>(null);
   const [valorMeta, setValorMeta] = useState<MetaDTO | null>(null);
   const [valorTexto, setValorTexto] = useState('');
@@ -62,8 +85,11 @@ export function Metas() {
   }
 
   function acoesDo(m: MetaDTO): AcaoMenu[] {
-    return [
-      {
+    const ligada = m.contaId !== null || m.investimentoId !== null;
+    const acoes: AcaoMenu[] = [];
+    // Meta ligada recebe o valor da conta ou do investimento, não é preenchida à mão.
+    if (!ligada) {
+      acoes.push({
         rotulo: 'Adicionar valor',
         icone: 'somar',
         aoClicar: () => {
@@ -71,13 +97,16 @@ export function Metas() {
           setValorTexto('');
           setValorMeta(m);
         },
-      },
-      { rotulo: 'Editar', icone: 'lapis', aoClicar: () => abrirForm(m) },
+      });
+    }
+    acoes.push({ rotulo: 'Editar', icone: 'lapis', aoClicar: () => abrirForm(m) });
+    acoes.push(
       m.concluida
         ? { rotulo: 'Reabrir', icone: 'visto', aoClicar: () => alternarConcluida(m) }
-        : { rotulo: 'Marcar como concluída', icone: 'visto', aoClicar: () => alternarConcluida(m) },
-      { rotulo: 'Excluir', icone: 'lixeira', perigo: true, aoClicar: () => excluir(m) },
-    ];
+        : { rotulo: 'Marcar como concluída', icone: 'visto', aoClicar: () => alternarConcluida(m) }
+    );
+    acoes.push({ rotulo: 'Excluir', icone: 'lixeira', perigo: true, aoClicar: () => excluir(m) });
+    return acoes;
   }
 
   function abrirForm(meta: MetaDTO | null) {
@@ -87,22 +116,31 @@ export function Metas() {
 
   async function salvarForm(e: FormEvent, atual: FormMeta) {
     e.preventDefault();
+    const ligacao = ligacaoDe(atual.ligacao);
+    const ligada = ligacao.contaId !== null || ligacao.investimentoId !== null;
     const valorAlvo = lerValor(atual.valorAlvo);
     const valorAtual = atual.valorAtual.trim() === '' ? 0 : lerValor(atual.valorAtual);
     if (!atual.nome.trim()) {
       setErroForm('Informe o nome da meta.');
       return;
     }
-    if (valorAlvo === null || valorAlvo <= 0 || valorAtual === null) {
+    if (valorAlvo === null || valorAlvo <= 0) {
+      setErroForm('Informe um valor válido.');
+      return;
+    }
+    if (!ligada && valorAtual === null) {
       setErroForm('Informe um valor válido.');
       return;
     }
     const corpo = {
       nome: atual.nome.trim(),
       valorAlvo,
-      valorAtual,
+      // Ligada: o valor vem do saldo da conta/investimento, então não é enviado.
+      ...(ligada ? {} : { valorAtual: valorAtual ?? 0 }),
       prazo: atual.prazo === '' ? null : atual.prazo,
       cor: atual.cor,
+      contaId: ligacao.contaId,
+      investimentoId: ligacao.investimentoId,
     };
     setErroForm(null);
     setOcupado(true);
@@ -180,6 +218,12 @@ export function Metas() {
               </span>
               <BarraProgresso percentual={m.percentual} cor={m.cor} />
               <span>{m.percentual}%</span>
+              {m.origem && <span>Acompanha o saldo de {m.origem.nome}</span>}
+              {!m.origem && (m.contaId !== null || m.investimentoId !== null) && (
+                <span>
+                  A conta ou investimento ligado não existe mais. Mostrando o último valor guardado.
+                </span>
+              )}
               <span>{m.prazo ? `Prazo: ${formatarDia(m.prazo)}` : 'Sem prazo'}</span>
             </article>
           ))}
@@ -191,6 +235,8 @@ export function Metas() {
           <FormularioMeta
             key={form.meta?.id ?? 'nova'}
             meta={form.meta}
+            contas={contas}
+            investimentos={investimentos}
             ocupado={ocupado}
             erro={erroForm}
             aoEnviar={salvarForm}
@@ -221,11 +267,15 @@ export function Metas() {
 
 function FormularioMeta({
   meta,
+  contas,
+  investimentos,
   ocupado,
   erro,
   aoEnviar,
 }: {
   meta: MetaDTO | null;
+  contas: ContaDTO[];
+  investimentos: InvestimentoDTO[];
   ocupado: boolean;
   erro: string | null;
   aoEnviar: (e: FormEvent, atual: FormMeta) => void;
@@ -236,12 +286,32 @@ function FormularioMeta({
     setCampos((c) => ({ ...c, ...parcial }));
   }
 
+  const opcoesLigacao = [
+    { valor: 'nenhum', rotulo: 'Nenhum (eu informo o valor)' },
+    ...contas.map((c) => ({ valor: `conta:${c.id}`, rotulo: `Conta: ${c.nome}` })),
+    ...investimentos.map((i) => ({ valor: `investimento:${i.id}`, rotulo: `Investimento: ${i.nome}` })),
+  ];
+  const ligada = campos.ligacao !== 'nenhum';
+
   return (
     <form onSubmit={(e) => aoEnviar(e, campos)}>
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       <Campo rotulo="Nome" valor={campos.nome} aoMudar={(v) => mudar({ nome: v })} obrigatorio />
       <Campo rotulo="Valor alvo (R$)" valor={campos.valorAlvo} aoMudar={(v) => mudar({ valorAlvo: v })} obrigatorio />
-      <Campo rotulo="Já guardado (R$)" valor={campos.valorAtual} aoMudar={(v) => mudar({ valorAtual: v })} />
+      <Selecao
+        rotulo="Acompanhar o saldo de"
+        valor={campos.ligacao}
+        aoMudar={(v) => mudar({ ligacao: v })}
+        opcoes={opcoesLigacao}
+      />
+      {!ligada && (
+        <Campo rotulo="Já guardado (R$)" valor={campos.valorAtual} aoMudar={(v) => mudar({ valorAtual: v })} />
+      )}
+      {ligada && (
+        <p className="planejamento-sugestao-ajuda">
+          O valor guardado é o saldo atual da conta ou do investimento escolhido.
+        </p>
+      )}
       <Campo rotulo="Prazo" tipo="date" valor={campos.prazo} aoMudar={(v) => mudar({ prazo: v })} />
       <CampoCor rotulo="Cor" valor={campos.cor} aoMudar={(c) => mudar({ cor: c })} />
       <div className="pagina-acoes">

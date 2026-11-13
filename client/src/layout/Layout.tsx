@@ -14,6 +14,7 @@ import { agrupar } from './grupos';
 import { MenuUsuario } from './MenuUsuario';
 import { Notificacoes } from './Notificacoes';
 import { SeletorPerfil } from './SeletorPerfil';
+import { Selo } from '../ui';
 import './casca.css';
 
 const CONSULTA_CELULAR = '(max-width: 899px)';
@@ -55,7 +56,7 @@ export function BotaoTema() {
   );
 }
 
-export function Layout({ menu }: { menu: RotaModulo[] }) {
+export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[] }) {
   const { usuario, sair } = useAuth();
   const { plataforma, logoSrc } = usePlataforma();
   const [gavetaAberta, setGavetaAberta] = useState(false);
@@ -78,6 +79,7 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
 
   const raizPortal = caminhoDoPerfil(usuario.perfil);
   const portal = nomePortal(usuario.perfil);
+  const leitor = usuario.perfil === 'LEITOR';
   const grupos = agrupar(menu);
   const principais = menu.slice(0, 4);
 
@@ -132,8 +134,9 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
           <div className="casca-topo-celular-barra">
             <img src={logoSrc} alt="" className="casca-topo-celular-logo" width={28} height={28} />
             <span className="casca-topo-celular-nome">{portal}</span>
+            {leitor && <Selo cor="azul">Somente leitura</Selo>}
             <div className="casca-topo-celular-acoes">
-              <SeletorPerfil />
+              {!leitor && <SeletorPerfil />}
               <BotaoAtualizar />
               <Notificacoes raiz={raizPortal} />
               <BotaoTema />
@@ -148,7 +151,7 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
             </div>
           </div>
           <div className="casca-topo-celular-busca">
-            <Busca telas={menu} />
+            <Busca telas={telas} />
           </div>
         </header>
       )}
@@ -157,9 +160,10 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
         <div className="casca-area">
           {!estreita && (
             <header className="casca-topo">
-              <Busca telas={menu} />
+              <Busca telas={telas} />
+              {leitor && <Selo cor="azul">Somente leitura</Selo>}
               <div className="casca-topo-acoes">
-                <SeletorPerfil />
+                {!leitor && <SeletorPerfil />}
                 <BotaoAtualizar />
                 <BotaoCelular />
                 <Notificacoes raiz={raizPortal} />

@@ -20,17 +20,48 @@ const ROTAS: RotaModulo[] = Object.values(modulos)
   .flatMap((m) => m.rotas)
   .sort((a, b) => (a.ordem ?? 100) - (b.ordem ?? 100));
 
+// Telas que o LEITOR (somente leitura) não abre nem vê no menu. O servidor também recusa as consultas delas.
+const CAMINHOS_SO_TITULAR = [
+  "/app/usuarios",
+  "/app/configuracoes",
+  "/app/logs",
+  "/app/atividades",
+  "/app/perfis",
+  "/app/ia",
+  "/app/drive",
+  "/app/atualizacao",
+  "/app/seguranca",
+  "/app/entrada",
+  "/app/importar",
+  "/app/rapido",
+  "/app/regras",
+  "/app/cupom",
+  "/app/avisos",
+  "/app/conexoes",
+  "/app/central/configuracoes",
+];
+
+// Uma rota vale para o perfil se o módulo a libera para TITULAR e, no caso do LEITOR, ela não está na lista acima.
+function rotaLiberada(rota: RotaModulo, perfil: Perfil): boolean {
+  if (!rota.perfis.includes('TITULAR')) return rota.perfis.includes(perfil);
+  if (perfil === 'TITULAR') return true;
+  return !CAMINHOS_SO_TITULAR.some((c) => rota.caminho === c || rota.caminho.startsWith(c + '/'));
+}
+
 function LayoutDoPerfil() {
   const { usuario } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
-  const menu = ROTAS.filter((r) => r.perfis.includes(usuario.perfil) && r.menu !== false);
-  return <Layout menu={menu} />;
+  const liberadas = ROTAS.filter((r) => rotaLiberada(r, usuario.perfil));
+  const menu = liberadas.filter((r) => r.menu !== false);
+  // A busca do topo também acha as telas que saíram do menu (menos as que dependem de um item, como a ficha do ativo).
+  const telas = liberadas.filter((r) => !r.caminho.includes(':'));
+  return <Layout menu={menu} telas={telas} />;
 }
 
-function RotaProtegida({ perfis, children }: { perfis: Perfil[]; children: ReactNode }) {
+function RotaProtegida({ rota, children }: { rota: RotaModulo; children: ReactNode }) {
   const { usuario } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
-  if (!perfis.includes(usuario.perfil)) {
+  if (!rotaLiberada(rota, usuario.perfil)) {
     return <Navigate to={caminhoDoPerfil(usuario.perfil)} replace />;
   }
   return <>{children}</>;
@@ -84,7 +115,7 @@ export default function App() {
             <Route
               key={r.caminho}
               path={r.caminho}
-              element={<RotaProtegida perfis={r.perfis}>{r.elemento}</RotaProtegida>}
+              element={<RotaProtegida rota={r}>{r.elemento}</RotaProtegida>}
             />
           ))}
           <Route path="*" element={<NaoEncontrada />} />

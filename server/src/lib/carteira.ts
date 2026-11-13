@@ -15,7 +15,13 @@ import { perfilAtual } from './prisma';
 import { carregarSeries, fatorEntre, garantirIndices, hojeISO, somarDias } from './indices';
 import type { Indice, Serie } from './indices';
 
-type Ativo = Investimento & { movimentos: MovimentoInvestimento[] };
+// Desdobramento, grupamento ou bonificação do ativo (fator multiplica a quantidade a partir da data).
+interface FatorEvento {
+  data: string;
+  fator: number;
+}
+
+type Ativo = Investimento & { movimentos: MovimentoInvestimento[]; eventos: FatorEvento[] };
 type Series = Record<Indice, Serie>;
 
 const CODIGO_NEGOCIADO = /^[A-Z]{4}\d{1,2}$/;
@@ -148,6 +154,23 @@ interface SerieDiaria {
   retorno: number[]; // retorno do dia (fração)
 }
 
+// Eventos (desdobramento, grupamento, bonificação) de cada ativo, em uma consulta só. Ativo sem evento não aparece no mapa.
+async function eventosDosAtivos(ids: number[]): Promise<Map<number, FatorEvento[]>> {
+  const mapa = new Map<number, FatorEvento[]>();
+  if (ids.length === 0) return mapa;
+  const lidos = await prisma.eventoAtivo.findMany({
+    where: { investimentoId: { in: ids } },
+    select: { investimentoId: true, data: true, fator: true },
+    orderBy: { data: 'asc' },
+  });
+  for (const e of lidos) {
+    const lista = mapa.get(e.investimentoId) ?? [];
+    lista.push({ data: dataISO(e.data), fator: e.fator });
+    mapa.set(e.investimentoId, lista);
+  }
+  return mapa;
+}
+
 // Posição (no eixo de dias) do primeiro dia >= data.
 function posicaoDoDia(dias: string[], data: string): number {
   let inicio = 0;
@@ -160,14 +183,24 @@ function posicaoDoDia(dias: string[], data: string): number {
   return Math.min(inicio, dias.length - 1);
 }
 
+// Produto dos fatores dos eventos com data posterior à do movimento: leva a quantidade daquela data para "cotas de hoje".
+function fatorDepois(eventos: FatorEvento[], data: string): number {
+  let fator = 1;
+  for (const e of eventos) if (e.data > data) fator *= e.fator;
+  return fator;
+}
+
 function valoresDoAtivo(a: Ativo, dias: string[], precos: Map<string, number> | undefined): { valor: number[]; fluxo: number[]; proventos: number[] } {
   const n = dias.length;
   const valor = new Array<number>(n).fill(0);
   const fluxo = new Array<number>(n).fill(0);
   const proventos = new Array<number>(n).fill(0);
   const quantidade = new Array<number>(n).fill(0);
+  // Mesma quantidade, já em "cotas de hoje" (cada lote multiplicado pelos desdobramentos que vieram depois dele).
+  const quantidadeAjustada = new Array<number>(n).fill(0);
   const custo = new Array<number>(n).fill(0);
   const negociado = codigoDe(a) !== null;
+  const comEventos = a.eventos.length > 0;
   let primeiro = -1;
   for (const m of a.movimentos) {
     const data = dataISO(m.data);
@@ -178,11 +211,13 @@ function valoresDoAtivo(a: Ativo, dias: string[], precos: Map<string, number> | 
       fluxo[i] += v;
       custo[i] += v;
       quantidade[i] += num(m.quantidade);
+      if (comEventos) quantidadeAjustada[i] += num(m.quantidade) * fatorDepois(a.eventos, data);
       if (primeiro < 0 || i < primeiro) primeiro = i;
     } else if (m.tipo === 'RESGATE') {
       fluxo[i] -= v;
       custo[i] -= v;
       quantidade[i] -= num(m.quantidade);
+      if (comEventos) quantidadeAjustada[i] -= num(m.quantidade) * fatorDepois(a.eventos, data);
     } else if (m.tipo === 'RENDIMENTO' && negociado) {
       proventos[i] += v;
     }
@@ -190,18 +225,20 @@ function valoresDoAtivo(a: Ativo, dias: string[], precos: Map<string, number> | 
   if (primeiro < 0) return { valor, fluxo, proventos };
   for (let i = 1; i < n; i++) {
     quantidade[i] += quantidade[i - 1];
+    quantidadeAjustada[i] += quantidadeAjustada[i - 1];
     custo[i] += custo[i - 1];
   }
   const saldoHoje = num(a.saldo);
   const quantidadeHoje = num(a.quantidade);
   const comPreco = negociado && precos !== undefined && precos.size > 0 && quantidade[n - 1] > 0 && quantidadeHoje > 0;
   if (comPreco && precos) {
-    // Desdobramento ou bonificação: a quantidade dos movimentos é ajustada para bater com a de hoje.
+    // Com desdobramento, grupamento ou bonificação: cada dia usa a quantidade em "cotas de hoje" (o Yahoo ajusta os preços).
+    // Sem eventos: a quantidade dos movimentos é ajustada uniformemente para bater com a de hoje.
     const ajuste = quantidadeHoje / quantidade[n - 1];
     let preco: number | null = null;
     for (let i = 0; i < n; i++) {
       preco = precos.get(dias[i]) ?? preco;
-      const q = Math.max(0, quantidade[i]) * ajuste;
+      const q = comEventos ? Math.max(0, quantidadeAjustada[i]) : Math.max(0, quantidade[i]) * ajuste;
       // Antes do primeiro preço conhecido, vale o que foi pago.
       valor[i] = preco === null ? Math.max(0, custo[i]) : q * preco;
     }
@@ -336,7 +373,9 @@ function parte(valor: number, total: number): number {
 
 export async function montarCarteira(opcoes: { meses: number; classe: 'TODAS' | ClasseCarteira; forcar?: boolean }): Promise<CarteiraDTO> {
   const hoje = hojeISO();
-  const todos = await prisma.investimento.findMany({ where: { ativo: true }, include: { movimentos: true }, orderBy: { saldo: 'desc' } });
+  const brutos = await prisma.investimento.findMany({ where: { ativo: true }, include: { movimentos: true }, orderBy: { saldo: 'desc' } });
+  const eventos = await eventosDosAtivos(brutos.map((a) => a.id));
+  const todos: Ativo[] = brutos.map((a) => ({ ...a, eventos: eventos.get(a.id) ?? [] }));
   const ativos = todos.filter((a) => opcoes.classe === 'TODAS' || CLASSE_DO_TIPO[a.tipo] === opcoes.classe);
   const avisos: string[] = [];
 
@@ -613,12 +652,14 @@ export async function patrimonioEstimado(meses: string[]): Promise<Map<string, n
   if (guardado && Date.now() - guardado.em < 10 * 60 * 1000) return guardado.valores;
 
   const hoje = hojeISO();
-  const [ativos, contas, transacoes, faturas] = await Promise.all([
+  const [brutos, contas, transacoes, faturas] = await Promise.all([
     prisma.investimento.findMany({ where: { ativo: true }, include: { movimentos: true } }),
     prisma.conta.findMany({ where: { ativo: true, tipo: { not: 'CARTAO' } }, select: { id: true, tipo: true, saldo: true } }),
     prisma.transacao.findMany({ where: { conta: { ativo: true, tipo: { not: 'CARTAO' } } }, select: { contaId: true, data: true, tipo: true, valor: true } }),
     prisma.fatura.findMany({ where: { conta: { ativo: true } }, select: { total: true, fechamento: true, vencimento: true, pagaEm: true, status: true } }),
   ]);
+  const eventos = await eventosDosAtivos(brutos.map((a) => a.id));
+  const ativos: Ativo[] = brutos.map((a) => ({ ...a, eventos: eventos.get(a.id) ?? [] }));
 
   // Primeiro dia com algum registro: antes dele não há o que mostrar.
   let primeiro: string | null = null;

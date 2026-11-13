@@ -35,6 +35,10 @@ services:
       PASTA_DRIVE: ${PASTA_DRIVE:-}
       # Saída de emergência: "true" ignora a verificação em duas etapas no login (para quem perdeu o aparelho).
       DESATIVAR_2FA: ${DESATIVAR_2FA:-false}
+      # Endereço HTTPS do sistema (ex.: https://meu-pc.tailnet.ts.net), para o QR code e para instalar como aplicativo.
+      URL_PUBLICA: ${URL_PUBLICA:-}
+      # Leitura de cupom por foto: chave da API da Anthropic (também dá para informar na tela).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
       PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
       PLUGGY_SANDBOX: ${PLUGGY_SANDBOX:-false}

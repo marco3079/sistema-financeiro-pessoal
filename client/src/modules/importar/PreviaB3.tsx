@@ -90,6 +90,7 @@ export function PreviaB3(props: {
       })),
       movimentos: analise.movimentos.filter((m) => marcadas[m.chave]),
       encerradas: analise.encerradas,
+      eventos: (analise.eventos ?? []).filter((e) => marcadas[e.chave]),
     };
     setErro(null);
     setEnviando(true);

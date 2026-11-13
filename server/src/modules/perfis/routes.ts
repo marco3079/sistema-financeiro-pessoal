@@ -14,9 +14,11 @@ const perfilSchema = z.object({ nome: textoCurto, cor: corSchema.optional() });
 
 router.get(
   '/perfis',
-  asyncHandler(async (_req, res) => {
-    const perfis = await prisma.perfilFinanceiro.findMany({ orderBy: { id: 'asc' } });
+  asyncHandler(async (req, res) => {
     const atual = perfilAtual();
+    // LEITOR: só vê o perfil financeiro dele (o que está em uso na requisição).
+    const todos = await prisma.perfilFinanceiro.findMany({ orderBy: { id: 'asc' } });
+    const perfis = req.usuario?.perfil === 'LEITOR' ? todos.filter((p) => p.id === atual) : todos;
     const lista = await Promise.all(
       perfis.map((p) =>
         comPerfil(p.id, async () => {

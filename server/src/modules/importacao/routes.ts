@@ -546,6 +546,7 @@ router.delete(
           const movimentos = await db.movimentoInvestimento.findMany({ where: { importacaoId: id }, select: { investimentoId: true } });
           const ativos = [...new Set(movimentos.map((m) => m.investimentoId))];
           await db.movimentoInvestimento.deleteMany({ where: { importacaoId: id } });
+          await db.eventoAtivo.deleteMany({ where: { importacaoId: id } });
           // Ativo que veio só deste arquivo (ficou sem nenhum movimento) sai junto; os demais ficam como estão.
           let investimentos = 0;
           for (const investimentoId of ativos) {
@@ -629,6 +630,7 @@ router.post(
       })),
       movimentos: analise.movimentos,
       encerradas: analise.encerradas,
+      eventos: analise.eventos,
       totalProventos: arredondar(analise.movimentos.filter((m) => m.tipo === 'RENDIMENTO').reduce((s, m) => s + m.valor, 0)),
     });
   })
@@ -656,6 +658,14 @@ const movimentoSchema = z.object({
   descricao: z.string().trim().max(200),
 });
 
+const eventoSchema = z.object({
+  chave: z.string().trim().min(1).max(200),
+  data: dataSchema,
+  tipo: z.enum(['DESDOBRAMENTO', 'GRUPAMENTO', 'BONIFICACAO']),
+  fator: z.number().finite().positive(),
+  descricao: z.string().trim().max(200),
+});
+
 const b3ConfirmarSchema = z.object({
   arquivo: z.string().trim().min(1).max(200),
   tipo: z.enum(['MOVIMENTACAO', 'POSICAO']),
@@ -663,6 +673,7 @@ const b3ConfirmarSchema = z.object({
   posicoes: z.array(posicaoSchema).max(2000),
   movimentos: z.array(movimentoSchema).max(60000),
   encerradas: z.array(z.string().max(200)).max(5000),
+  eventos: z.array(eventoSchema).max(5000).default([]),
 });
 
 router.post(
@@ -788,6 +799,38 @@ router.post(
         // Os ativos que esta planilha criou ficam marcados: só eles podem sair se a importação for removida.
         if (idsCriados.length > 0) {
           await db.investimento.updateMany({ where: { id: { in: idsCriados } }, data: { importacaoId: registroB3.id } });
+        }
+        // Desdobramentos, grupamentos e bonificações só dos ativos importados; o que já foi gravado não entra de novo.
+        const linhasEventos: Prisma.EventoAtivoCreateManyInput[] = [];
+        const vistosEventos = new Set<string>();
+        for (const e of dados.eventos) {
+          const investimentoId = idPorChave.get(e.chave);
+          if (investimentoId === undefined) continue;
+          const chaveEvento = hash(`b3ev|${e.chave}|${e.data}|${e.tipo}|${e.fator}`);
+          if (vistosEventos.has(chaveEvento)) continue;
+          vistosEventos.add(chaveEvento);
+          linhasEventos.push({
+            investimentoId,
+            data: paraData(e.data),
+            tipo: e.tipo,
+            fator: e.fator,
+            descricao: e.descricao || null,
+            chaveImportacao: chaveEvento,
+            importacaoId: registroB3.id,
+          });
+        }
+        const chavesEventos = linhasEventos.map((l) => l.chaveImportacao as string);
+        const jaGravadosEventos = new Set<string>();
+        for (let i = 0; i < chavesEventos.length; i += 1000) {
+          const lote = await db.eventoAtivo.findMany({
+            where: { chaveImportacao: { in: chavesEventos.slice(i, i + 1000) } },
+            select: { chaveImportacao: true },
+          });
+          for (const ev of lote) if (ev.chaveImportacao) jaGravadosEventos.add(ev.chaveImportacao);
+        }
+        const eventosNovos = linhasEventos.filter((l) => !jaGravadosEventos.has(l.chaveImportacao as string));
+        for (let i = 0; i < eventosNovos.length; i += 1000) {
+          await db.eventoAtivo.createMany({ data: eventosNovos.slice(i, i + 1000) });
         }
         const chavesDosMovimentos = ineditas.map((l) => l.chaveImportacao as string);
         for (let i = 0; i < chavesDosMovimentos.length; i += 1000) {

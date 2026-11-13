@@ -15,6 +15,7 @@ export type PerfilMeu = UsuarioDTO;
 
 export const PERFIS: { valor: string; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
+  { valor: 'LEITOR', rotulo: 'Somente leitura' },
 ];
 
 export function rotuloPerfil(valor: string): string {

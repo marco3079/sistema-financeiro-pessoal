@@ -27,3 +27,22 @@
   flex-direction: column;
   gap: 10px;
 }
+
+.planejamento-acoes-topo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.planejamento-sugestao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.planejamento-sugestao-ajuda {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}

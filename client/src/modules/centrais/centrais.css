@@ -1,0 +1,38 @@
+.central-texto {
+  color: var(--cor-texto-suave);
+  margin: 0 0 16px;
+}
+
+.central-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+}
+
+.central-atalho {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  text-decoration: none;
+  min-width: 0;
+}
+
+.central-atalho:hover,
+.central-atalho:focus-visible {
+  border-color: var(--cor-primaria);
+}
+
+.central-atalho-titulo {
+  font-size: 1rem;
+}
+
+.central-atalho-texto {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}

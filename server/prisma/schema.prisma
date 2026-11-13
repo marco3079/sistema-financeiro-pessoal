@@ -21,6 +21,7 @@ datasource db {
 // Perfil único: o titular das finanças (e quem ele convidar) vê e altera tudo.
 enum Perfil {
   TITULAR
+  LEITOR // só consulta
 }
 
 enum Origem {
@@ -87,6 +88,8 @@ model Usuario {
   totpAtivo          Boolean  @default(false)
   totpSegredoCifrado String? // segredo base32 cifrado (lib/cripto)
   totpRecuperacao    String? // JSON com os hashes sha256 dos códigos de recuperação ainda não usados
+  // Usuário LEITOR: só enxerga este perfil financeiro (null = todos).
+  perfilFinanceiroId Int?
   perfil             Perfil   @default(TITULAR)
   ativo              Boolean  @default(true)
   cpf                String?
@@ -325,15 +328,18 @@ model Orcamento {
 }
 
 model Meta {
-  id         Int       @id @default(autoincrement())
-  perfilId   Int       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
-  nome       String
-  valorAlvo  Decimal   @db.Decimal(14, 2)
-  valorAtual Decimal   @default(0) @db.Decimal(14, 2)
-  prazo      DateTime? @db.Date
-  cor        String    @default("#2563eb")
-  concluida  Boolean   @default(false)
-  criadoEm   DateTime  @default(now())
+  id             Int       @id @default(autoincrement())
+  // Meta ligada: o valor guardado acompanha o saldo desta conta ou deste investimento.
+  contaId        Int?
+  investimentoId Int?
+  perfilId       Int       @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  nome           String
+  valorAlvo      Decimal   @db.Decimal(14, 2)
+  valorAtual     Decimal   @default(0) @db.Decimal(14, 2)
+  prazo          DateTime? @db.Date
+  cor            String    @default("#2563eb")
+  concluida      Boolean   @default(false)
+  criadoEm       DateTime  @default(now())
 
   @@index([perfilId])
 }
@@ -461,6 +467,34 @@ model Divisao {
   @@index([transacaoId])
 }
 
+// Desdobramento, grupamento ou bonificação de um ativo: a quantidade em mãos é multiplicada por `fator` na data
+// (desdobramento 1 para 10 = 10; grupamento 10 para 1 = 0.1; bonificação de 10% = 1.1). O custo total não muda.
+model EventoAtivo {
+  id              Int      @id @default(autoincrement())
+  perfilId        Int      @default(1)
+  investimentoId  Int
+  data            DateTime @db.Date
+  tipo            String // DESDOBRAMENTO, GRUPAMENTO ou BONIFICACAO
+  fator           Float
+  descricao       String?
+  chaveImportacao String?
+  importacaoId    Int?
+  criadoEm        DateTime @default(now())
+
+  @@index([perfilId])
+  @@index([investimentoId, data])
+}
+
+// Aviso já enviado por e-mail ou Telegram (para não repetir). Fica só neste computador.
+model AvisoEnviado {
+  id        Int      @id @default(autoincrement())
+  perfilId  Int      @default(1)
+  chave     String
+  enviadoEm DateTime @default(now())
+
+  @@index([perfilId, chave])
+}
+
 // Estado do Drive NESTE computador (linha única). Não viaja para a pasta.
 model EstadoDrive {
   id             Int       @id @default(1)
@@ -517,7 +551,14 @@ model ConfiguracaoPlataforma {
   pluggySandbox             Boolean @default(false) // mostra os bancos de teste da Pluggy
 
   // Cotações (brapi.dev). Se vazio, vale BRAPI_TOKEN do .env.
-  brapiTokenCifrado String? // AES-256-GCM; nunca sai pela API
+  brapiTokenCifrado     String? // AES-256-GCM; nunca sai pela API
+  // Leitura de cupom por foto (API da Claude) e avisos fora do sistema.
+  anthropicChaveCifrada String?
+  anthropicModelo       String?
+  telegramTokenCifrado  String?
+  telegramChatId        String?
+  avisosEmail           String? // e-mail que recebe os avisos
+  avisosAtivos          Boolean @default(false)
 
   atualizadoEm DateTime @updatedAt
 }

@@ -1,0 +1,10 @@
+.cupom-form {
+  display: grid;
+  gap: 12px;
+}
+
+.cupom-ajuda {
+  margin: 0 0 8px;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}

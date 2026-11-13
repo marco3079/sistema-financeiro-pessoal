@@ -1,0 +1,28 @@
+/* Ficha do ativo. Cores só por variáveis do tema. */
+
+.ativo-cabecalho {
+  margin: 0 0 12px;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.ativo-cabecalho strong {
+  color: var(--cor-texto);
+}
+
+.ativo-nota {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Seis indicadores: três por linha no computador, com o valor inteiro à mostra. */
+@media (min-width: 561px) {
+  .ativo-resumo {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .ativo-resumo .resumo-valor {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

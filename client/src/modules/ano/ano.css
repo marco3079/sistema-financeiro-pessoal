@@ -1,0 +1,73 @@
+/* Tela Visão do ano: cores só pelas variáveis do tema. */
+
+.ano-suave {
+  color: var(--cor-texto-suave);
+  margin: 0;
+}
+
+/* A tabela tem rolagem horizontal própria; a página nunca rola para o lado. */
+.ano-tabela-area {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.ano-tabela {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  min-width: 100%;
+}
+
+.ano-tabela th,
+.ano-tabela td {
+  padding: 0.4rem 0.55rem;
+  text-align: right;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+.ano-tabela thead th {
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+  background: var(--cor-superficie);
+}
+
+.ano-tabela tfoot th,
+.ano-tabela tfoot td {
+  font-weight: 600;
+  border-bottom: 0;
+}
+
+/* Primeira coluna fixa ao rolar. */
+.ano-fixa {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  background: var(--cor-superficie);
+  box-shadow: 1px 0 0 var(--cor-borda);
+}
+
+.ano-tabela thead .ano-fixa {
+  z-index: 2;
+}
+
+.ano-nome {
+  font-weight: 500;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ano-destaque {
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .ano-tabela {
+    font-size: 0.8rem;
+  }
+}

@@ -112,6 +112,16 @@ A fotografia diária do patrimônio (`PosicaoPatrimonio`) só existe a partir da
 
 O servidor não executa comandos no computador. `atualizar.ps1` (no computador) e o módulo `atualizacao` (no contêiner) conversam por três arquivos na pasta `atualizacao/`: `versao.json` (commit instalado, ramo e repositório, gravado pelo script), `estado.json` (situação e o batimento do vigia) e `pedido.json` (gravado pela API quando a pessoa clica em Atualizar). O vigia, uma tarefa do Windows, apaga o pedido e roda sempre a mesma sequência: cópia do banco, `git pull --ff-only` do repositório de origem e `docker compose up -d --build`. A API compara a versão instalada com o GitHub (`/repos/.../compare`), valida o conteúdo de `versao.json` antes de montar a URL e guarda a resposta por 5 minutos.
 
+## Lote 4
+
+- **Usuário somente leitura**: `enum Perfil { TITULAR LEITOR }` e `Usuario.perfilFinanceiroId`. `autenticar` (`lib/auth.ts`) normaliza o caminho (minúsculas, barras repetidas) e recusa escrita e áreas de administração; `escolherPerfil` usa o perfil do cadastro. No cliente, `App.tsx` tira as telas do leitor do menu, da busca e das rotas.
+- **Eventos do ativo** (`EventoAtivo`): desdobramento, grupamento e bonificação com data e fator. `lib/carteira.ts` multiplica a quantidade de cada movimento pelos fatores dos eventos posteriores a ele; sem eventos, vale o ajuste por aproximação antigo.
+- **Imposto estimado** (`modules/ir`): mês a mês, por classe, com prejuízo acumulado e a isenção das vendas de ações até R$ 20 mil.
+- **Cupom** (`modules/cupom`): SDK oficial `@anthropic-ai/sdk`, saída estruturada validada com zod; a rota só devolve a sugestão.
+- **Avisos** (`lib/avisos.ts`): agendador diário (8h) por perfil; `AvisoEnviado` guarda a chave de cada aviso para não repetir e fica fora do arquivo do Drive (cada computador controla os próprios envios).
+- **Menu** (`client/src/layout/grupos.ts`): grupos definidos por caminho; rotas com `menu: false` saem do menu e aparecem nas centrais (`modules/centrais`) e na busca.
+- **Aplicativo instalável**: `manifest.webmanifest` e `sw.js` em `client/public`; `URL_PUBLICA` entra em `GET /rede`.
+
 ## Importação de arquivos
 
 O navegador abre o arquivo (`client/src/modules/importar/lerArquivo.ts`): CSV e OFX viram texto; o PDF vira texto com uma linha por linha da página (pdf.js); o XLSX vira uma matriz por aba. Só esse conteúdo vai para a API, em dois passos:

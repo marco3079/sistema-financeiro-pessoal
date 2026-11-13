@@ -1,7 +1,7 @@
 {
   "name": "Finanças Pessoais",
   "short_name": "Finanças",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1d4ed8",

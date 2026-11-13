@@ -41,12 +41,22 @@ export interface MovimentoLido {
   descricao: string;
 }
 
+// Desdobramento, grupamento ou bonificação: muda a quantidade sem dinheiro envolvido.
+export interface EventoLido {
+  chave: string; // a mesma da posição
+  data: string;
+  tipo: 'DESDOBRAMENTO' | 'GRUPAMENTO' | 'BONIFICACAO';
+  fator: number; // quantidade depois / quantidade antes (desdobro 1→10 = 10; bonificação de 10% = 1.1)
+  descricao: string;
+}
+
 export interface AnaliseB3 {
   tipo: 'MOVIMENTACAO' | 'POSICAO' | 'DESCONHECIDA';
   periodo: { de: string; ate: string } | null;
   posicoes: PosicaoLida[];
   movimentos: MovimentoLido[];
   encerradas: string[]; // chaves que aparecem no arquivo e terminaram zeradas
+  eventos: EventoLido[];
   avisos: string[];
 }
 
@@ -171,6 +181,14 @@ function efeitoDe(movimentacao: string, credito: boolean): Efeito {
   return 'IGNORAR';
 }
 
+function tipoDeEvento(movimentacao: string): EventoLido['tipo'] | null {
+  const m = chaveTexto(movimentacao);
+  if (m === 'desdobro') return 'DESDOBRAMENTO';
+  if (m === 'grupamento') return 'GRUPAMENTO';
+  if (m.startsWith('bonificacao')) return 'BONIFICACAO';
+  return null;
+}
+
 function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 {
   const titulo = linhas[cabecalho].map(chaveTexto);
   const col = (nomes: string[]) => titulo.findIndex((t) => nomes.includes(t));
@@ -213,6 +231,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
 
   const carteira = new Map<string, { produto: Produto; instituicao: string | null; quantidade: number; custo: number; comprou: boolean; ultimo: string; quantidadeNoProvento: number | null }>();
   const movimentos: MovimentoLido[] = [];
+  const eventos: EventoLido[] = [];
   const naoReconhecidas = new Map<string, number>();
 
   for (const l of lidas) {
@@ -232,6 +251,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
     }
     posicao.produto = l.produto; // fica o nome mais recente
     posicao.ultimo = l.data;
+    const antes = posicao.quantidade;
     if (efeito === 'PROVENTO') {
       // O provento informa quantas cotas a pessoa tinha naquele dia: serve para conferir a conta.
       if (l.quantidade >= 1) posicao.quantidadeNoProvento = l.quantidade;
@@ -272,6 +292,14 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
       if (posicao.quantidade > 0) posicao.custo -= (posicao.custo / posicao.quantidade) * Math.min(l.quantidade, posicao.quantidade);
       posicao.quantidade -= l.quantidade;
       posicao.quantidadeNoProvento = null;
+    }
+    // Evento societário: o fator é a quantidade depois sobre a antes (só quando havia quantidade e o fator muda algo).
+    const tipoEvento = tipoDeEvento(l.movimentacao);
+    if (tipoEvento !== null && (efeito === 'ENTRADA' || efeito === 'SAIDA') && antes > 0) {
+      const fator = arredondar(posicao.quantidade / antes, 6);
+      if (Number.isFinite(fator) && fator > 0 && fator !== 1) {
+        eventos.push({ chave: l.produto.chave, data: l.data, tipo: tipoEvento, fator, descricao: l.movimentacao.trim() });
+      }
     }
     if (posicao.quantidade < 0.000001) {
       posicao.quantidade = Math.max(0, posicao.quantidade);
@@ -325,6 +353,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
     posicoes,
     movimentos,
     encerradas,
+    eventos,
     avisos,
   };
 }
@@ -411,6 +440,7 @@ function analisarPosicao(planilhas: Planilha[]): AnaliseB3 {
     posicoes: [...juntas.values()].sort((a, b) => a.tipo.localeCompare(b.tipo) || a.chave.localeCompare(b.chave)),
     movimentos: [],
     encerradas: [],
+    eventos: [],
     avisos:
       juntas.size === 0
         ? ['Não encontrei posições nesta planilha.']
@@ -436,6 +466,7 @@ export function analisarPlanilhaB3(planilhas: Planilha[]): AnaliseB3 {
     posicoes: [],
     movimentos: [],
     encerradas: [],
+    eventos: [],
     avisos: [
       'Não reconheci esta planilha. Envie a de "Movimentação" (Extratos > Movimentação) ou a de "Posição" baixada na Área do Investidor da B3.',
     ],

@@ -26,6 +26,19 @@ interface RespostaIR {
   }[];
   proventos: { id: number; codigo: string; nome: string; total: number }[];
   totais: { vendas: number; resultado: number; proventos: number };
+  imposto: {
+    meses: {
+      mes: string;
+      classe: Classe;
+      resultado: number;
+      prejuizoCompensado: number;
+      base: number;
+      aliquota: number;
+      imposto: number;
+    }[];
+    totalNoAno: number;
+    prejuizoAcumulado: Record<Classe, number>;
+  };
   incompletos: { codigo: string; motivo: string }[];
   anos: number[];
 }
@@ -43,7 +56,7 @@ interface LinhaVenda {
 const ROTULO_CLASSE: Record<Classe, string> = { ACOES: 'Ações', FII: 'FII', ETF: 'ETF' };
 
 const AVISO_APOIO =
-  'Apoio à declaração: os valores são calculados pelos movimentos importados e podem ter diferença em relação à nota de corretagem (taxas, desdobramentos, operações no mesmo dia). Confira com os informes da corretora. O sistema não calcula o imposto a pagar.';
+  'Apoio à declaração: os valores são calculados pelos movimentos importados e podem ter diferença em relação à nota de corretagem (taxas, desdobramentos, operações no mesmo dia). Confira com os informes da corretora. O imposto mostrado é uma estimativa para operações comuns: não considera day trade, taxas, IRRF ("dedo-duro") nem prejuízos anteriores ao período importado. Confira antes de gerar o DARF.';
 
 const quantidadeBR = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 8 });
 
@@ -111,7 +124,30 @@ export function ImpostoRenda() {
               rotulo="Resultado das vendas"
             />
             <ResumoItem icone="investimentos" cor="roxo" valor={formatarReais(dados.totais.proventos)} rotulo="Proventos recebidos" />
+            <ResumoItem icone="grafico" cor="vermelho" valor={formatarReais(dados.imposto.totalNoAno)} rotulo="Imposto estimado no ano" />
           </div>
+
+          <Cartao titulo="Imposto estimado por mês">
+            <p className="ir-ajuda">
+              Total do ano: <strong>{formatarReais(dados.imposto.totalNoAno)}</strong>. Prejuízo acumulado em 31/12: ações{' '}
+              {formatarReais(dados.imposto.prejuizoAcumulado.ACOES)}, FII {formatarReais(dados.imposto.prejuizoAcumulado.FII)}, ETF{' '}
+              {formatarReais(dados.imposto.prejuizoAcumulado.ETF)}.
+            </p>
+            <Tabela<RespostaIR['imposto']['meses'][number]>
+              chave={(m) => `${m.mes}-${m.classe}`}
+              dados={dados.imposto.meses}
+              vazio="Nenhuma venda neste ano, então não há imposto a estimar."
+              colunas={[
+                { titulo: 'Mês', celula: (m) => rotuloMes(m.mes) },
+                { titulo: 'Classe', celula: (m) => ROTULO_CLASSE[m.classe] },
+                { titulo: 'Resultado', celula: (m) => <Valor valor={m.resultado} sentido="auto" />, alinhar: 'direita' },
+                { titulo: 'Prejuízo compensado', celula: (m) => formatarReais(m.prejuizoCompensado), alinhar: 'direita' },
+                { titulo: 'Base', celula: (m) => formatarReais(m.base), alinhar: 'direita' },
+                { titulo: 'Alíquota', celula: (m) => `${Math.round(m.aliquota * 100)}%`, alinhar: 'direita' },
+                { titulo: 'Imposto', celula: (m) => formatarReais(m.imposto), alinhar: 'direita' },
+              ]}
+            />
+          </Cartao>
 
           <Cartao titulo="Vendas por mês">
             <Tabela<LinhaVenda>

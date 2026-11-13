@@ -10,6 +10,7 @@ export const rotas: RotaModulo[] = [
     perfis: ['TITULAR'],
     elemento: <Usuarios />,
     ordem: 70,
+    menu: false,
   },
   {
     caminho: '/app/perfil',
@@ -17,6 +18,6 @@ export const rotas: RotaModulo[] = [
     icone: 'perfil',
     perfis: ['TITULAR'],
     elemento: <MeuPerfil />,
-    ordem: 90,
+    ordem: 61,
   },
 ];

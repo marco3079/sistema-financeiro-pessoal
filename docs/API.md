@@ -189,6 +189,26 @@ Métodos atendidos em `/mcp`: `initialize`, `ping`, `tools/list` e `tools/call`;
 
 `POST /auth/login` aceita `codigo` opcional; com a verificação em duas etapas ativa e sem código (ou com código errado) responde 401 com `precisaCodigo: true`.
 
+## Lote 4: cupom, avisos, ano, ativo e acesso só de leitura
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/ano?ano=` | receitas, despesas e saldo dos 12 meses, por categoria, com média e variação sobre o ano anterior |
+| GET | `/ativo/:id` | ficha do ativo: posição, preço médio, histórico de preço, movimentos, proventos e eventos |
+| GET | `/orcamentos/sugestao` | limites sugeridos por categoria a partir dos gastos recentes (só leitura) |
+| GET | `/ir?ano=` | além das vendas e da posição, `imposto`: estimativa mês a mês por classe |
+| GET | `/cupom/estado` | `{ configurada, origem, modelo }`; nunca devolve a chave |
+| PUT, DELETE | `/cupom/chave` | grava (cifrada) ou apaga a chave da API e o modelo; só titular |
+| POST | `/cupom/ler` | `{ imagem (base64), tipo }` → valor, data, estabelecimento e categoria sugeridos; não grava lançamento |
+| GET, PUT | `/avisos/config` | canais de aviso (e-mail e Telegram); o token do Telegram nunca é devolvido |
+| POST | `/avisos/testar` | envia uma mensagem de teste |
+| POST | `/avisos/enviar` | envia agora os avisos pendentes do perfil |
+| GET | `/rede` | endereços para abrir em outro aparelho; `URL_PUBLICA` (HTTPS) vem primeiro |
+
+Metas aceitam `contaId` ou `investimentoId` (um dos dois): o valor guardado acompanha o saldo. A confirmação da planilha da B3 aceita `eventos` (desdobramentos, grupamentos e bonificações).
+
+**Usuário somente leitura (`LEITOR`)**: todo método que não seja GET responde 403, exceto sair e trocar a própria senha; as áreas de usuários, MCP, Drive, atualização, segurança, logs, configurações, pasta de entrada, avisos e cupom ficam fechadas também para consulta; o perfil financeiro é o do cadastro do usuário, e o cabeçalho `X-Perfil` é ignorado.
+
 ## Open Finance
 
 | Método | Rota | O que faz |

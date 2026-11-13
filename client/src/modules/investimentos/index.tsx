@@ -8,6 +8,6 @@ export const rotas: RotaModulo[] = [
     icone: 'investimentos',
     perfis: ['TITULAR'],
     elemento: <Investimentos />,
-    ordem: 40,
+    ordem: 31,
   },
 ];

@@ -10,5 +10,6 @@ export const rotas: RotaModulo[] = [
     perfis: ['TITULAR'],
     elemento: <Configuracoes />,
     ordem: 97,
+    menu: false,
   },
 ];

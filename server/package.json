@@ -7,11 +7,13 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
+    "teste": "node tests/fumaca.mjs",
     "seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push --skip-generate",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@prisma/client": "5.22.0",
     "@types/bcryptjs": "2.4.6",
     "@types/cors": "2.8.17",

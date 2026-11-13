@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { permitir } from '../../lib/auth';
+import { esquecerVinculosLeitor } from '../../lib/perfil';
 import { emailHabilitado, enderecoDoSite, enfileirarEmail, lerConfiguracao } from '../../lib/email';
 import { criarTokenSenha } from '../../lib/tokens-senha';
 import { validarImagem } from '../../lib/imagem';
@@ -64,13 +65,14 @@ async function garantirEmailLivre(email: string, ignorarUsuarioId?: number): Pro
 
 const senhaSchema = z.string().min(6, 'A senha deve ter pelo menos 6 caracteres');
 const textoOpcional = z.string().nullable().optional();
-const perfilSchema = z.enum(['TITULAR']);
+const perfilSchema = z.enum(['TITULAR', 'LEITOR']);
 
 const usuarioCriarSchema = z.object({
   nome: z.string().trim().min(1, 'Nome obrigatório'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
   senha: senhaSchema,
   perfil: perfilSchema,
+  perfilFinanceiroId: z.number().int().positive().nullable().optional(),
 });
 
 const usuarioAtualizarSchema = z.object({
@@ -78,7 +80,22 @@ const usuarioAtualizarSchema = z.object({
   email: z.string().trim().toLowerCase().email('E-mail inválido').optional(),
   telefone: textoOpcional,
   ativo: z.boolean().optional(),
+  perfil: perfilSchema.optional(),
+  perfilFinanceiroId: z.number().int().positive().nullable().optional(),
 });
+
+// Para LEITOR, o perfil financeiro é obrigatório e precisa existir. Para TITULAR, não há vínculo.
+async function garantirVinculoDoLeitor(perfil: 'TITULAR' | 'LEITOR', perfilFinanceiroId: number | null | undefined): Promise<number | null> {
+  if (perfil !== 'LEITOR') return null;
+  if (perfilFinanceiroId === null || perfilFinanceiroId === undefined) {
+    throw new HttpError(400, 'Escolha o perfil financeiro que o leitor pode ver');
+  }
+  const existe = await prisma.perfilFinanceiro.findUnique({ where: { id: perfilFinanceiroId }, select: { id: true } });
+  if (!existe) {
+    throw new HttpError(400, 'Perfil financeiro não encontrado');
+  }
+  return perfilFinanceiroId;
+}
 
 const usuarioFiltroSchema = z.object({
   perfil: perfilSchema.optional(),
@@ -123,6 +140,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const dados = validar(usuarioCriarSchema, req.body);
     await garantirEmailLivre(dados.email);
+    const vinculo = await garantirVinculoDoLeitor(dados.perfil, dados.perfilFinanceiroId);
     const senhaHash = await bcrypt.hash(dados.senha, 10);
     const usuario = await prisma.usuario.create({
       data: {
@@ -130,6 +148,7 @@ router.post(
         email: dados.email,
         senhaHash,
         perfil: dados.perfil,
+        perfilFinanceiroId: vinculo,
       },
     });
     avisarBoasVindas(usuario);
@@ -145,7 +164,7 @@ router.put(
     const dados = validar(usuarioAtualizarSchema, req.body);
     const existente = await prisma.usuario.findUnique({
       where: { id },
-      select: { id: true, perfil: true, ativo: true },
+      select: { id: true, perfil: true, ativo: true, perfilFinanceiroId: true },
     });
     if (!existente) {
       throw new HttpError(404, 'Usuário não encontrado');
@@ -153,6 +172,23 @@ router.put(
     if (dados.email !== undefined) {
       await garantirEmailLivre(dados.email, id);
     }
+    // Rebaixar um titular para leitor: não pode ser a própria conta nem o último titular ativo.
+    const novoPerfil = dados.perfil ?? existente.perfil;
+    if (novoPerfil === 'LEITOR' && existente.perfil === 'TITULAR' && existente.ativo) {
+      if (id === req.usuario.id) {
+        throw new HttpError(400, 'Você não pode rebaixar a própria conta');
+      }
+      const outros = await prisma.usuario.count({
+        where: { perfil: 'TITULAR', ativo: true, id: { not: id } },
+      });
+      if (outros === 0) {
+        throw new HttpError(400, 'É preciso manter pelo menos um titular ativo');
+      }
+    }
+    const vinculo = await garantirVinculoDoLeitor(
+      novoPerfil,
+      dados.perfilFinanceiroId !== undefined ? dados.perfilFinanceiroId : existente.perfilFinanceiroId
+    );
     if (dados.ativo === false && existente.ativo) {
       if (id === req.usuario.id) {
         throw new HttpError(400, 'Você não pode desativar a própria conta');
@@ -174,8 +210,11 @@ router.put(
         email: dados.email,
         telefone: dados.telefone,
         ativo: dados.ativo,
+        perfil: dados.perfil,
+        perfilFinanceiroId: vinculo,
       },
     });
+    esquecerVinculosLeitor();
     res.json(semSenha(usuario));
   })
 );

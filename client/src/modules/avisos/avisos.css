@@ -1,0 +1,45 @@
+.avisos-subtitulo {
+  margin: 20px 0 8px;
+  font-size: 1rem;
+  color: var(--cor-texto);
+}
+
+.avisos-texto,
+.avisos-dica {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.avisos-passos,
+.avisos-lista,
+.avisos-lista-canais {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  color: var(--cor-texto);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.avisos-passos code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.avisos-resultado {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.avisos-resultado-titulo {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.avisos-erro-canal {
+  color: var(--cor-perigo);
+}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { CategoriaDTO, ContaDTO, TipoTransacao, TransacaoDTO } from '../../lib/financas';
-import { formatarReais, hojeISO, lerValor, mensagemErro } from '../../lib/financas';
+import { formatarReais, hojeISO, lerValor, mensagemErro, valorParaCampo } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
 import { Aviso, Botao, Carregando, Cartao, Pagina } from '../../ui';
 import './rapido.css';
@@ -11,6 +12,40 @@ const CHAVE_CONTA = 'financas.rapido.conta';
 const MAX_CHIPS = 8;
 const SEGUNDOS_DESFAZER = 8;
 const MAX_RECENTES = 5;
+const LADO_MAXIMO_FOTO = 1280;
+const QUALIDADE_FOTO = 0.7;
+
+interface LeituraCupom {
+  valor: number | null;
+  data: string | null;
+  estabelecimento: string | null;
+  categoriaSugerida: string | null;
+  itens: number;
+}
+
+// Reduz a foto no navegador (até 1280 px no maior lado, JPEG qualidade 0.7) e devolve só o base64, sem prefixo.
+async function reduzirFoto(arquivo: File): Promise<string> {
+  const url = URL.createObjectURL(arquivo);
+  try {
+    const imagem = await new Promise<HTMLImageElement>((ok, falha) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => falha(new Error('Não consegui abrir a foto. Tente outra.'));
+      img.src = url;
+    });
+    const escala = Math.min(1, LADO_MAXIMO_FOTO / Math.max(imagem.naturalWidth, imagem.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(imagem.naturalWidth * escala));
+    canvas.height = Math.max(1, Math.round(imagem.naturalHeight * escala));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Este navegador não consegue reduzir a foto.');
+    ctx.drawImage(imagem, 0, 0, canvas.width, canvas.height);
+    const jpeg = canvas.toDataURL('image/jpeg', QUALIDADE_FOTO);
+    return jpeg.slice(jpeg.indexOf(',') + 1);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 // Lê a última conta usada; qualquer falha (armazenamento bloqueado, valor inválido) vira null.
 function lerContaSalva(): number | null {
@@ -57,6 +92,11 @@ export function Rapido() {
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [ultimo, setUltimo] = useState<TransacaoDTO | null>(null);
   const [sessao, setSessao] = useState<TransacaoDTO[]>([]);
+  const [lendoCupom, setLendoCupom] = useState(false);
+  const [avisoCupom, setAvisoCupom] = useState<string | null>(null);
+  const estadoCupom = useDados<{ configurada: boolean }>('/cupom/estado');
+  const fotoRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
 
   const enviandoRef = useRef(false);
   const timerRef = useRef<number | null>(null);
@@ -161,6 +201,37 @@ export function Rapido() {
     }
   }
 
+  // Lê a foto do cupom e preenche os campos. Nada é lançado: a pessoa confere e clica em Lançar.
+  async function lerCupom(arquivo: File) {
+    setAvisoCupom(null);
+    setErroEnvio(null);
+    setLendoCupom(true);
+    try {
+      const imagem = await reduzirFoto(arquivo);
+      const lido = await api.post<LeituraCupom>('/cupom/ler', { imagem, tipo: 'image/jpeg' });
+      if (lido.valor !== null) setValorTexto(valorParaCampo(lido.valor));
+      if (lido.data) setData(lido.data);
+      if (lido.estabelecimento) setDescricao(lido.estabelecimento);
+      if (lido.categoriaSugerida) {
+        const sugerida = (categorias.dados ?? []).find(
+          (c) => c.tipo === 'DESPESA' && c.nome === lido.categoriaSugerida
+        );
+        if (sugerida) {
+          setTipo('DESPESA');
+          setCategoriaId(sugerida.id);
+        }
+      }
+      setAvisoCupom(
+        lido.valor === null ? 'Não achei o total do cupom. Confira os campos.' : 'Cupom lido. Confira os dados antes de lançar.'
+      );
+    } catch (e) {
+      setErroEnvio(mensagemErro(e));
+    } finally {
+      setLendoCupom(false);
+      if (fotoRef.current) fotoRef.current.value = '';
+    }
+  }
+
   async function desfazer() {
     if (!ultimo || enviandoRef.current) return;
     const alvo = ultimo;
@@ -231,6 +302,37 @@ export function Rapido() {
             onChange={(e) => setValorTexto(e.target.value)}
           />
         </label>
+
+        <div className="rapido-cupom">
+          {estadoCupom.dados?.configurada === false ? (
+            <button type="button" className="rapido-chip" onClick={() => navigate('/app/cupom')}>
+              Foto do cupom (configurar chave)
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="rapido-chip"
+                disabled={lendoCupom}
+                onClick={() => fotoRef.current?.click()}
+              >
+                {lendoCupom ? 'Lendo cupom...' : 'Foto do cupom'}
+              </button>
+              <input
+                ref={fotoRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) void lerCupom(arquivo);
+                }}
+              />
+            </>
+          )}
+          {avisoCupom && <Aviso tipo="info">{avisoCupom}</Aviso>}
+        </div>
 
         <Cartao titulo="Categoria">
           {categoriasDoTipo.length === 0 ? (

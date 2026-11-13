@@ -29,12 +29,42 @@ export async function idsDosPerfis(): Promise<number[]> {
   return conhecidos;
 }
 
+// Perfil financeiro vinculado ao usuário LEITOR (cache de 30 s por usuário).
+const CACHE_VINCULO_MS = 30_000;
+const vinculosLeitor = new Map<number, { perfilFinanceiroId: number | null; expira: number }>();
+
+// Esquece os vínculos guardados (chame depois de alterar o perfil de um usuário).
+export function esquecerVinculosLeitor(): void {
+  vinculosLeitor.clear();
+}
+
+async function perfilFinanceiroDoLeitor(usuarioId: number): Promise<number | null> {
+  const agora = Date.now();
+  const guardado = vinculosLeitor.get(usuarioId);
+  if (guardado && guardado.expira > agora) return guardado.perfilFinanceiroId;
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: usuarioId },
+    select: { perfilFinanceiroId: true },
+  });
+  const perfilFinanceiroId = usuario?.perfilFinanceiroId ?? null;
+  vinculosLeitor.set(usuarioId, { perfilFinanceiroId, expira: agora + CACHE_VINCULO_MS });
+  return perfilFinanceiroId;
+}
+
 // Middleware das rotas autenticadas: põe o perfil da requisição no contexto.
+// LEITOR: o cabeçalho X-Perfil é ignorado; vale o perfil vinculado ao usuário. Sem vínculo (ou com um
+// vínculo que não existe mais), vale o primeiro perfil.
 export function escolherPerfil(req: Request, _res: Response, next: NextFunction): void {
   idsDosPerfis()
-    .then((ids) => {
-      const pedido = Number(req.header('x-perfil'));
-      const perfilId = Number.isInteger(pedido) && ids.includes(pedido) ? pedido : ids[0];
+    .then(async (ids) => {
+      let perfilId: number;
+      if (req.usuario?.perfil === 'LEITOR') {
+        const vinculado = await perfilFinanceiroDoLeitor(req.usuario.id);
+        perfilId = vinculado !== null && ids.includes(vinculado) ? vinculado : ids[0];
+      } else {
+        const pedido = Number(req.header('x-perfil'));
+        perfilId = Number.isInteger(pedido) && ids.includes(pedido) ? pedido : ids[0];
+      }
       comPerfil(perfilId, next);
     })
     .catch(next);
@@ -63,6 +93,8 @@ export async function apagarPerfil(perfilId: number): Promise<void> {
     await prisma.$transaction(
       async (db) => {
         await db.divisao.deleteMany({});
+        await db.eventoAtivo.deleteMany({});
+        await db.avisoEnviado.deleteMany({});
         await db.pagamentoContaFixa.deleteMany({});
         await db.contaFixa.deleteMany({});
         await db.regraCategoria.deleteMany({});

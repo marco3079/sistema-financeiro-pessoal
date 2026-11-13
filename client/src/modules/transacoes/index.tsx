@@ -9,7 +9,7 @@ export const rotas: RotaModulo[] = [
     icone: 'transacoes',
     perfis: ['TITULAR'],
     elemento: <Lancamentos />,
-    ordem: 20,
+    ordem: 11,
   },
   {
     caminho: '/app/categorias',
@@ -18,5 +18,6 @@ export const rotas: RotaModulo[] = [
     perfis: ['TITULAR'],
     elemento: <Categorias />,
     ordem: 54,
+    menu: false,
   },
 ];

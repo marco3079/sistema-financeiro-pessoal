@@ -666,8 +666,28 @@
 .casca-topo-celular-acoes {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* O seletor de perfil encolhe (nome com reticências) para os botões caberem na tela estreita. */
+.casca-topo-celular-acoes .seletor-perfil {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.casca-topo-celular-acoes .seletor-perfil-botao {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.casca-topo-celular-acoes .seletor-perfil-nome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .casca-topo-celular-acoes .casca-botao-redondo {

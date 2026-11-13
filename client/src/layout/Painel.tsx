@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { formatarDia, formatarReais, hojeISO, mesAtual } from '../lib/financas';
 import { useDados } from '../lib/useDados';
 import { Aviso, Carregando } from '../ui';
 import { Icone } from '../ui/icones';
@@ -50,7 +52,45 @@ interface LancamentoRecente {
   criadoEm: string;
 }
 
-// ---------- Atalhos por perfil ----------
+// ---------- Contratos de GET /api/agenda, /api/fluxo e /api/alertas ----------
+
+interface ItemAgendaPainel {
+  chave: string;
+  descricao: string;
+  tipo: 'DESPESA' | 'RECEITA';
+  valor: number;
+  data: string;
+  situacao: 'PAGA' | 'ABERTA' | 'ATRASADA';
+}
+
+interface RespostaAgenda {
+  mes: string;
+  itens: ItemAgendaPainel[];
+}
+
+interface MesFluxo {
+  mes: string;
+  saldoFinal: number;
+}
+
+interface RespostaFluxo {
+  saldoInicial: number;
+  meses: MesFluxo[];
+}
+
+interface AlertaPainel {
+  tipo: string;
+  gravidade: 'alta' | 'media';
+  titulo: string;
+  texto: string;
+}
+
+interface RespostaAlertas {
+  alertas: AlertaPainel[];
+  analisados: number;
+}
+
+// ---------- Atalhos ----------
 
 interface Atalho {
   rotulo: string;
@@ -59,16 +99,16 @@ interface Atalho {
 }
 
 const ATALHOS: Atalho[] = [
-  { rotulo: 'Novo lançamento', icone: 'transacoes', caminho: '/app/transacoes' },
-  { rotulo: 'Contas', icone: 'contas', caminho: '/app/contas' },
-  { rotulo: 'Cartões e faturas', icone: 'cartao', caminho: '/app/cartoes' },
-  { rotulo: 'Investimentos', icone: 'investimentos', caminho: '/app/investimentos' },
-  { rotulo: 'Orçamento', icone: 'orcamento', caminho: '/app/orcamento' },
-  { rotulo: 'Metas', icone: 'metas', caminho: '/app/metas' },
-  { rotulo: 'Importar arquivo', icone: 'importar', caminho: '/app/importar' },
-  { rotulo: 'Categorias', icone: 'categorias', caminho: '/app/categorias' },
-  { rotulo: 'Configurações', icone: 'engrenagem', caminho: '/app/configuracoes' },
+  { rotulo: 'Lançar rápido', icone: 'raio', caminho: '/app/rapido' },
+  { rotulo: 'Importar', icone: 'importar', caminho: '/app/importar' },
+  { rotulo: 'Contas a pagar', icone: 'calendario', caminho: '/app/agenda' },
+  { rotulo: 'Carteira', icone: 'investimentos', caminho: '/app/carteira' },
+  { rotulo: 'Análise', icone: 'transacoes', caminho: '/app/analise' },
+  { rotulo: 'Relatório do mês', icone: 'documento', caminho: '/app/relatorio-mensal' },
 ];
+
+// Telas de escrita: o LEITOR (somente leitura) não vê o atalho nem o link.
+const CAMINHOS_DE_ESCRITA = ['/app/rapido', '/app/importar', '/app/agenda'];
 
 // ---------- Formatação ----------
 
@@ -102,11 +142,69 @@ function primeiroNomeDe(nome: string | undefined): string {
   return nome?.trim().split(/\s+/)[0] ?? '';
 }
 
+// Dias de calendário entre duas datas AAAA-MM-DD (negativo se a data já passou).
+function diasEntre(data: string, hoje: string): number {
+  const [a1, m1, d1] = data.slice(0, 10).split('-').map(Number);
+  const [a2, m2, d2] = hoje.slice(0, 10).split('-').map(Number);
+  return Math.round((Date.UTC(a1, m1 - 1, d1) - Date.UTC(a2, m2 - 1, d2)) / 86400000);
+}
+
+type TomTexto = 'perigo' | 'aviso' | 'verde' | 'suave';
+
+function textoPrazo(dias: number): { texto: string; tom: TomTexto } {
+  if (dias < 0) {
+    const atraso = -dias;
+    return { texto: `Atrasada há ${atraso} ${atraso === 1 ? 'dia' : 'dias'}`, tom: 'perigo' };
+  }
+  if (dias === 0) return { texto: 'Vence hoje', tom: 'aviso' };
+  return { texto: dias === 1 ? 'Falta 1 dia' : `Faltam ${dias} dias`, tom: 'suave' };
+}
+
+function rotuloCurtoMes(mes: string): string {
+  return `${MESES[Number(mes.slice(5, 7)) - 1] ?? mes} ${mes.slice(0, 4)}`;
+}
+
+// ---------- Bloco genérico (carrega e falha sozinho) ----------
+
+interface CartaoBlocoProps {
+  titulo: string;
+  icone: NomeIcone;
+  carregando: boolean;
+  erro: string | null;
+  verTodos?: string;
+  children?: ReactNode;
+}
+
+function CartaoBloco({ titulo, icone, carregando, erro, verTodos, children }: CartaoBlocoProps) {
+  return (
+    <section className="painel-cartao painel-bloco">
+      <header className="painel-cartao-cabecalho">
+        <Icone nome={icone} tamanho={20} className="painel-cartao-icone" />
+        <h2 className="painel-cartao-titulo">{titulo}</h2>
+        {verTodos && (
+          <Link className="painel-ver-todos" to={verTodos}>
+            Ver todos
+            <Icone nome="seta-direita" tamanho={14} />
+          </Link>
+        )}
+      </header>
+      {carregando && <Carregando />}
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      {children}
+    </section>
+  );
+}
+
 // ---------- Tela inicial ----------
 
 export function Painel() {
   const { usuario } = useAuth();
+  const leitor = usuario?.perfil === 'LEITOR';
   const resumo = useDados<RespostaResumo>('/painel/resumo');
+  const [mesCorrente] = useState<string>(() => mesAtual());
+  const agenda = useDados<RespostaAgenda>(`/agenda?mes=${mesCorrente}`);
+  const fluxo = useDados<RespostaFluxo>('/fluxo?meses=3');
+  const alertas = useDados<RespostaAlertas>('/alertas');
   const [agora, setAgora] = useState<Date>(() => new Date());
   const [periodo, setPeriodo] = useState<number>(6);
 
@@ -123,12 +221,17 @@ export function Painel() {
   const dados = resumo.dados;
   const primeiroNome = dados?.primeiroNome || primeiroNomeDe(usuario?.nome);
   const saudacao = primeiroNome ? `Olá, ${primeiroNome}!` : 'Olá!';
-  const atalhos = ATALHOS;
+  const atalhos = leitor ? ATALHOS.filter((a) => !CAMINHOS_DE_ESCRITA.includes(a.caminho)) : ATALHOS;
 
   const pontos = dados ? dados.desempenho.slice(-periodo) : [];
   const temValor = pontos.some((p) => p.valor !== null);
 
   const avisos = dados?.recentes ?? [];
+
+  const hoje = hojeISO();
+  const proximos = agenda.dados?.itens.filter((i) => i.situacao !== 'PAGA').slice(0, 5) ?? [];
+  const listaAlertas = alertas.dados?.alertas ?? [];
+  const semAlertas = alertas.dados !== null && listaAlertas.length === 0;
 
   return (
     <section className="painel">
@@ -174,6 +277,91 @@ export function Painel() {
           ))}
         </div>
       )}
+
+      <div className="painel-faixa">
+        <CartaoBloco
+          titulo="Próximos vencimentos"
+          icone="calendario"
+          carregando={agenda.carregando && !agenda.dados}
+          erro={agenda.erro}
+          verTodos={leitor ? undefined : '/app/agenda'}
+        >
+          {agenda.dados &&
+            (proximos.length === 0 ? (
+              <p className="painel-vazio">Nenhuma conta em aberto neste mês.</p>
+            ) : (
+              <ul className="painel-lista">
+                {proximos.map((item) => {
+                  const prazo = textoPrazo(diasEntre(item.data, hoje));
+                  return (
+                    <li key={item.chave} className="painel-item">
+                      <div className="painel-item-texto">
+                        <span className="painel-item-titulo">{item.descricao}</span>
+                        <span className="painel-item-corpo">
+                          {formatarDia(item.data)} · {formatarReais(item.valor)}
+                        </span>
+                      </div>
+                      <span className={`painel-item-prazo painel-tom-${prazo.tom}`}>{prazo.texto}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ))}
+        </CartaoBloco>
+
+        <CartaoBloco
+          titulo="Saldo projetado"
+          icone="grafico"
+          carregando={fluxo.carregando && !fluxo.dados}
+          erro={fluxo.erro}
+        >
+          {fluxo.dados && (
+            <ul className="painel-lista">
+              {fluxo.dados.meses.map((m) => (
+                <li key={m.mes} className="painel-item">
+                  <span className="painel-item-titulo">{rotuloCurtoMes(m.mes)}</span>
+                  <span
+                    className={`painel-saldo-valor painel-tom-${m.saldoFinal >= 0 ? 'verde' : 'perigo'}`}
+                  >
+                    {formatarReais(m.saldoFinal)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CartaoBloco>
+
+        {!semAlertas && (
+          <CartaoBloco
+            titulo="Atenção"
+            icone="sino"
+            carregando={alertas.carregando && !alertas.dados}
+            erro={alertas.erro}
+            verTodos="/app/alertas"
+          >
+            {alertas.dados && (
+              <>
+                <p className="painel-bloco-resumo">
+                  {listaAlertas.length} {listaAlertas.length === 1 ? 'alerta para conferir' : 'alertas para conferir'}
+                </p>
+                <ul className="painel-avisos-lista">
+                  {listaAlertas.slice(0, 2).map((a, i) => (
+                    <li key={`${a.tipo}-${i}`} className="painel-aviso">
+                      <span className={`painel-aviso-marca painel-cor-${a.gravidade === 'alta' ? 'laranja' : 'roxo'}`}>
+                        <span className="painel-aviso-bolinha" />
+                      </span>
+                      <div className="painel-aviso-texto">
+                        <span className="painel-aviso-titulo">{a.titulo}</span>
+                        <span className="painel-aviso-corpo">{a.texto}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </CartaoBloco>
+        )}
+      </div>
 
       <div
         className="painel-linha"
@@ -243,6 +431,13 @@ export function Painel() {
         )}
 
         <div className="painel-coluna">
+          {!leitor && (
+            <Link className="painel-lancar" to="/app/rapido">
+              <Icone nome="raio" tamanho={26} />
+              <span>Lançar gasto</span>
+            </Link>
+          )}
+
           {dados?.destaque && (
             <section className="painel-cartao painel-destaque">
               <div className="painel-destaque-texto">

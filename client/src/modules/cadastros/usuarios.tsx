@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useDados } from '../../lib/useDados';
+import type { PerfilDTO } from '../../lib/perfilFinanceiro';
 import {
   Aviso,
   Avatar,
@@ -27,11 +28,13 @@ import { FichaUsuario, SeloPerfilUsuario } from './FichaUsuario';
 // Filtro de perfil da tela (rótulos em português; TI é perfil próprio).
 const PERFIS_FILTRO: { valor: string; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
+  { valor: 'LEITOR', rotulo: 'Somente leitura' },
 ];
 
-// Perfis que se criam por esta tela.
-const PERFIS_ADMINISTRATIVOS: { valor: string; rotulo: string }[] = [
+// Tipos de acesso que se criam por esta tela.
+const TIPOS_DE_ACESSO: { valor: string; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
+  { valor: 'LEITOR', rotulo: 'Somente leitura' },
 ];
 
 // ---------- Criar usuário ----------
@@ -40,13 +43,19 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [perfil, setPerfil] = useState('');
+  const [perfil, setPerfil] = useState('TITULAR');
+  const [perfilFinanceiro, setPerfilFinanceiro] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const { dados: perfisFinanceiros } = useDados<PerfilDTO[]>('/perfis');
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
     setErro(null);
+    if (perfil === 'LEITOR' && perfilFinanceiro === '') {
+      setErro('Escolha o perfil financeiro que o leitor pode ver');
+      return;
+    }
     setOcupado(true);
     try {
       await api.post('/usuarios', {
@@ -54,6 +63,7 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
         email: email.trim(),
         senha,
         perfil,
+        perfilFinanceiroId: perfil === 'LEITOR' ? Number(perfilFinanceiro) : null,
       });
       aoConcluir();
     } catch (err) {
@@ -75,15 +85,28 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
         obrigatorio
       />
       <Selecao
-        rotulo="Perfil"
+        rotulo="Tipo de acesso"
         valor={perfil}
         aoMudar={setPerfil}
-        opcoes={PERFIS_ADMINISTRATIVOS}
+        opcoes={TIPOS_DE_ACESSO}
         obrigatorio
       />
+      {perfil === 'LEITOR' && (
+        <Selecao
+          rotulo="Perfil financeiro que pode ver"
+          valor={perfilFinanceiro}
+          aoMudar={setPerfilFinanceiro}
+          opcoes={(perfisFinanceiros ?? []).map((p) => ({ valor: String(p.id), rotulo: p.nome }))}
+          vazio="Escolha um perfil"
+          obrigatorio
+        />
+      )}
       <p className="usuarios-ajuda">
         Professores e alunos são criados nas telas Professores e Alunos.
       </p>
+      {perfil === 'LEITOR' && (
+        <p className="usuarios-ajuda">Quem tem acesso somente leitura vê os dados do perfil escolhido e não altera nada.</p>
+      )}
       <div className="pagina-acoes">
         <Botao tipo="submit" desabilitado={ocupado}>
           Criar usuário

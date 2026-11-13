@@ -558,7 +558,7 @@
 .painel-atalhos-grade {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: minmax(84px, 1fr);
   gap: 10px;
 }
@@ -605,6 +605,130 @@
   font-weight: 600;
   line-height: 1.2;
   color: var(--cor-texto);
+}
+
+/* ---------- Faixa de blocos novos (vencimentos, saldo projetado, atenção) ---------- */
+
+.painel-faixa {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.painel-bloco {
+  min-height: 0;
+}
+
+.painel-bloco-resumo {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Listas simples: vencimentos, saldo por mês e fila de textos curtos. */
+.painel-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.painel-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.painel-item-texto {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.painel-item-titulo {
+  display: block;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.painel-item-corpo {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.painel-item-prazo {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.painel-saldo-valor {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Cores de texto pelo significado (sinal, prazo). */
+.painel-tom-perigo {
+  color: var(--cor-perigo);
+}
+
+.painel-tom-aviso {
+  color: var(--cor-aviso);
+}
+
+.painel-tom-verde {
+  color: var(--cor-verde);
+}
+
+.painel-tom-suave {
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- Botão grande: Lançar gasto ---------- */
+
+.painel-lancar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 16px 20px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--cor-superficie);
+  background: var(--cor-primaria);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  text-align: center;
+  text-decoration: none;
+}
+
+.painel-lancar:hover {
+  text-decoration: underline;
+}
+
+.painel-lancar:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
 }
 
 /* ---------- Telas largas: a linha de baixo ocupa a altura da tela ---------- */

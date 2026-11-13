@@ -11,6 +11,7 @@ export const rotas: RotaModulo[] = [
     perfis: ['TITULAR'],
     elemento: <Atividades />,
     ordem: 95,
+    menu: false,
   },
   {
     caminho: '/app/logs',
@@ -19,5 +20,6 @@ export const rotas: RotaModulo[] = [
     perfis: ['TITULAR'],
     elemento: <LogSistema />,
     ordem: 96,
+    menu: false,
   },
 ];

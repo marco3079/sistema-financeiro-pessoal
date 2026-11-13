@@ -51,6 +51,7 @@ const TABELAS = [
   'pagamentoContaFixa',
   'alocacaoAlvo',
   'divisao',
+  'eventoAtivo',
 ] as const;
 type Tabela = (typeof TABELAS)[number];
 
@@ -74,6 +75,7 @@ const NOME_NO_BANCO: Record<Tabela, string> = {
   pagamentoContaFixa: 'PagamentoContaFixa',
   alocacaoAlvo: 'AlocacaoAlvo',
   divisao: 'Divisao',
+  eventoAtivo: 'EventoAtivo',
 };
 
 type Linhas = Record<string, unknown>[];

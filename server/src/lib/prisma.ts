@@ -23,6 +23,8 @@ const MODELOS_DO_PERFIL = new Set([
   'PagamentoContaFixa',
   'AlocacaoAlvo',
   'Divisao',
+  'EventoAtivo',
+  'AvisoEnviado',
 ]);
 
 const contexto = new AsyncLocalStorage<{ perfilId: number }>();

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../lib/api';
 import { Aviso, Botao, Campo, Modal } from '../ui';
+import { InstalarApp } from './InstalarApp';
 import './botao-celular.css';
 
 interface RedeDTO {
@@ -73,6 +74,7 @@ export function BotaoCelular() {
     escolhidoLista ??
     escolherEndereco(salvo, window.location.origin, window.location.hostname, urlsApi);
   const semEndereco = endereco === null && rede !== null;
+  const temHttps = urlsApi.some((u) => u.startsWith('https://'));
 
   // Busca os endereços da rede só quando o popup abre.
   useEffect(() => {
@@ -217,6 +219,13 @@ export function BotaoCelular() {
             <Aviso tipo="info">
               Não consegui descobrir o endereço deste computador na rede. Digite abaixo o IP dele.
             </Aviso>
+          )}
+
+          {temHttps && (
+            <div className="botao-celular-acoes">
+              <p className="botao-celular-texto">Com HTTPS dá para instalar como aplicativo</p>
+              <InstalarApp />
+            </div>
           )}
 
           {rede && rede.enderecos.length > 1 && (
