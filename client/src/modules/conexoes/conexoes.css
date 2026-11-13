@@ -46,3 +46,8 @@
     flex-wrap: wrap;
   }
 }
+
+/* Cada informação da conexão em sua linha. */
+.conexoes-item-linha {
+  display: block;
+}

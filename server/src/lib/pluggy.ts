@@ -245,10 +245,16 @@ async function listarPaginado<T>(caminho: string): Promise<T[]> {
 
 // Token de curta duração (30 min) para abrir o widget Pluggy Connect no navegador.
 // Com itemId, o token serve para atualizar (reconectar) aquele item.
+// Sem itemId é uma conexão nova: cada uma leva um clientUserId próprio e avoidDuplicates desligado,
+// para dar para ligar mais de uma conta na mesma instituição (ex.: duas contas do MeuPluggy).
+// Com avoidDuplicates ligado a Pluggy recusa a segunda com ITEM_USER_ALREADY_EXISTS.
 export async function criarConnectToken(itemId?: string): Promise<string> {
   const corpo = {
     ...(itemId ? { itemId } : {}),
-    options: { clientUserId: 'sistema-financeiro-pessoal', avoidDuplicates: true },
+    options: {
+      clientUserId: itemId ? 'sistema-financeiro-pessoal' : `sistema-financeiro-pessoal-${Date.now().toString(36)}`,
+      avoidDuplicates: false,
+    },
   };
   const resposta = await chamar<{ accessToken?: string }>('POST', '/connect_token', corpo);
   if (!resposta.accessToken) {

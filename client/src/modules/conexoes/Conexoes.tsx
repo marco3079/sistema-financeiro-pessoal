@@ -73,7 +73,12 @@ export function Conexoes() {
           void aoConectar(item.id, conexao);
         },
         onError: (erroWidget) => {
-          setErro(erroWidget.message || 'Não foi possível conectar à instituição.');
+          const texto = erroWidget.message || '';
+          setErro(
+            /ITEM_USER_ALREADY_EXISTS/i.test(texto)
+              ? 'A Pluggy diz que esta conta já está conectada. Para ligar outra conta da mesma instituição, feche esta janela, clique em Conectar instituição de novo e entre com o login da outra conta.'
+              : texto || 'Não foi possível conectar à instituição.',
+          );
         },
       });
       await widget.init();
@@ -248,10 +253,10 @@ export function Conexoes() {
                     <Selo cor={STATUS_CONEXAO[c.status].cor}>{STATUS_CONEXAO[c.status].rotulo}</Selo>
                     <MenuAcoes rotulo={'Ações de ' + c.instituicao} acoes={acoesDaConexao(c)} />
                   </div>
-                  <span className="fin-suave">
+                  <span className="fin-suave conexoes-item-linha">
                     {c.contas} contas e cartões · {c.investimentos} investimentos
                   </span>
-                  <span className="fin-suave">
+                  <span className="fin-suave conexoes-item-linha">
                     {c.ultimaSincronizacao
                       ? `Atualizada em ${formatarDataHora(c.ultimaSincronizacao)}`
                       : 'Ainda não sincronizada'}
