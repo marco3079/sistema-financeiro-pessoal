@@ -30,3 +30,35 @@
 .historico-acoes-topo .campo {
   flex: 1 1 200px;
 }
+
+/* Histórico separado por mês de referência. */
+.historico-mes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.historico-mes + .historico-mes {
+  margin-top: 1.25rem;
+}
+
+.historico-mes-cabecalho {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.historico-mes-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.historico-mes-contagem {
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
