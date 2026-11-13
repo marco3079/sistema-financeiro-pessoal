@@ -215,6 +215,24 @@ router.get(
           where.faturaId = aberta.id;
         }
       }
+    } else if (mes === new Date().toISOString().slice(0, 7) && faturaId === undefined && where.data !== undefined) {
+      // Todas as contas no mês atual: cada cartão entra com os itens da fatura em aberto dele (os mesmos que aparecem
+      // filtrando pelo cartão) e as demais contas entram pelas datas do mês. Assim o total é a soma das partes.
+      const faturas = await prisma.fatura.findMany({
+        where: { status: { in: ['ABERTA', 'FECHADA'] }, conta: { tipo: 'CARTAO' } },
+        orderBy: { vencimento: 'desc' },
+        select: { id: true, contaId: true },
+      });
+      const abertaPorCartao = new Map<number, number>();
+      for (const f of faturas) if (!abertaPorCartao.has(f.contaId)) abertaPorCartao.set(f.contaId, f.id);
+      if (abertaPorCartao.size > 0) {
+        const periodo = where.data;
+        delete where.data;
+        where.OR = [
+          { faturaId: { in: [...abertaPorCartao.values()] } },
+          { data: periodo, contaId: { notIn: [...abertaPorCartao.keys()] } },
+        ];
+      }
     }
 
     const pagina = Math.max(1, inteiroQuery(req.query.pagina) ?? 1);
