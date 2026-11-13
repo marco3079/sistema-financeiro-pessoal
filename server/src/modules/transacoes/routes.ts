@@ -37,10 +37,13 @@ const valorPositivo = dinheiroSchema.refine((v) => v > 0, 'O valor deve ser maio
 const CAMPOS_LIBERADOS_OPEN_FINANCE = new Set(['categoriaId', 'observacao', 'transferencia']);
 const MSG_OPEN_FINANCE = 'Este registro vem do Open Finance e é atualizado automaticamente.';
 
+// Extratos trazem descrições longas (nome completo, CNPJ, agência e conta): o mesmo limite da importação.
+const descricaoDoLancamento = z.string().trim().min(1).max(200);
+
 const criarTransacaoSchema = z.object({
   contaId: z.number().int().positive(),
   data: dataSchema,
-  descricao: textoCurto,
+  descricao: descricaoDoLancamento,
   valor: valorPositivo,
   tipo: tipoSchema,
   categoriaId: z.number().int().positive().nullable().optional(),
@@ -51,7 +54,7 @@ const criarTransacaoSchema = z.object({
 
 const atualizarTransacaoSchema = z.object({
   data: dataSchema.optional(),
-  descricao: textoCurto.optional(),
+  descricao: descricaoDoLancamento.optional(),
   valor: valorPositivo.optional(),
   tipo: tipoSchema.optional(),
   categoriaId: z.number().int().positive().nullable().optional(),

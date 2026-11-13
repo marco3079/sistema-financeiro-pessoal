@@ -182,6 +182,7 @@ model Transacao {
   pluggyTransactionId String?  @unique
   // Lançamento que veio de um arquivo (CSV, OFX, PDF): impede importar o mesmo duas vezes. O registro continua MANUAL.
   chaveImportacao     String?
+  importacaoId        Int? // Importacao.id do arquivo que trouxe este registro (histórico: ver, editar e remover)
   criadoEm            DateTime @default(now())
 
   @@index([contaId, data])
@@ -190,6 +191,7 @@ model Transacao {
   @@index([faturaId])
   @@index([chaveImportacao])
   @@index([perfilId])
+  @@index([importacaoId])
 }
 
 // Fatura de um cartão de crédito (Conta do tipo CARTAO). Uma por vencimento.
@@ -239,6 +241,7 @@ model Investimento {
   conexaoId          Int?
   conexao            ConexaoBancaria? @relation(fields: [conexaoId], references: [id], onDelete: SetNull)
   pluggyInvestmentId String?          @unique
+  importacaoId       Int? // Importacao.id da planilha que CRIOU este ativo (null: cadastrado à mão ou só atualizado)
   cotadoEm           DateTime? // última vez em que o saldo foi atualizado pela cotação
   estimadoEm         DateTime? // última vez em que o saldo foi estimado pela taxa (renda fixa)
   criadoEm           DateTime         @default(now())
@@ -261,11 +264,13 @@ model MovimentoInvestimento {
   descricao       String?
   pluggyId        String?                   @unique
   chaveImportacao String? // movimento que veio da planilha da B3
+  importacaoId    Int? // Importacao.id do arquivo que trouxe este registro (histórico: ver, editar e remover)
   criadoEm        DateTime                  @default(now())
 
   @@index([investimentoId, data])
   @@index([chaveImportacao])
   @@index([perfilId])
+  @@index([importacaoId])
 }
 
 // Fotografia diária do patrimônio (uma por dia), para o gráfico de evolução.

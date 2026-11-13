@@ -1,5 +1,11 @@
 // Formatos trocados com a API de importação (server/src/modules/importacao/routes.ts).
-import type { ContaDTO, TipoInvestimento, TipoMovimentoInvestimento, TipoTransacao } from '../../lib/financas';
+import type {
+  ContaDTO,
+  TipoInvestimento,
+  TipoMovimentoInvestimento,
+  TipoTransacao,
+  TransacaoDTO,
+} from '../../lib/financas';
 
 export type FormatoArquivo = 'csv' | 'ofx' | 'pdf';
 export type TipoDocumento = 'FATURA' | 'EXTRATO';
@@ -144,7 +150,35 @@ export interface ImportacaoDTO {
   banco: string | null;
   referencia: string | null; // FATURA: vencimento 'AAAA-MM-DD'; demais: período
   contaNome: string | null;
+  contaId?: number | null;
   novos: number;
   repetidos: number;
   total: number | null;
+}
+
+// Um movimento da planilha da B3 trazido por uma importação (GET /importacao/:id).
+export interface MovimentoImportadoDTO {
+  id: number;
+  data: string; // 'AAAA-MM-DD'
+  tipo: 'APLICACAO' | 'RESGATE' | 'RENDIMENTO' | 'IMPOSTO';
+  valor: number;
+  quantidade: number | null;
+  descricao: string | null;
+  investimentoId: number;
+  investimento: string; // código ou nome do ativo
+}
+
+// Resposta de GET /importacao/:id.
+export interface DetalheImportacaoDTO {
+  importacao: ImportacaoDTO;
+  lancamentos: TransacaoDTO[]; // fatura e extrato
+  movimentos: MovimentoImportadoDTO[]; // planilha da B3 (até 3000)
+}
+
+// Resposta de DELETE /importacao/:id.
+export interface RemocaoDTO {
+  lancamentos: number;
+  movimentos: number;
+  investimentos: number;
+  faturas: number;
 }

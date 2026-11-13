@@ -77,6 +77,7 @@ function registrarAtividade(req: Request, res: Response, next: NextFunction): vo
       res.statusCode < 400 &&
       caminho.startsWith('/api/') &&
       !caminho.startsWith('/api/drive/') &&
+      !caminho.startsWith('/api/atualizacao') &&
       // As chamadas de IA chegam em /api/mcp e gravam pelas rotas normais, que já avisam o Drive.
       !caminho.startsWith('/api/mcp') &&
       // Trocar ou redefinir a senha altera dados e precisa viajar; entrar, sair e pedir o e-mail de recuperação, não.

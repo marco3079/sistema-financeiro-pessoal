@@ -103,6 +103,8 @@ O cartão é uma conta de tipo `CARTAO`: criar, alterar e excluir é pelas rotas
 | POST | `/importacao/analisar` | `{ nome, formato, texto, documento?, contaId? }` (`formato`: `csv`, `ofx` ou `pdf`) → prévia com banco, vencimento, total, itens e conta sugerida |
 | POST | `/importacao/confirmar` | `{ arquivo, documento, banco, contaId ou novaConta, vencimento?, saldoFinal?, itens }` → `{ novos, repetidos, contaId, faturaId }` |
 | GET | `/importacao/historico` | últimos 50 arquivos importados |
+| GET | `/importacao/:id` | o registro do histórico e os lançamentos (ou movimentos da B3) que o arquivo trouxe e ainda existem |
+| DELETE | `/importacao/:id` | apaga o que o arquivo trouxe, acerta saldos e faturas e tira a linha do histórico; devolve `{ lancamentos, movimentos, investimentos, faturas }` |
 | POST | `/importacao/b3/analisar` | `{ nome, planilhas: [{ nome, linhas }] }` → posições, movimentos e avisos |
 | POST | `/importacao/b3/confirmar` | `{ arquivo, tipo, periodo, posicoes, movimentos, encerradas }` → quantos criados, atualizados e movimentos novos |
 | GET | `/cotacoes/estado` | `{ configurado, origemToken, ativosComCodigo, ultimaAtualizacao }` |
@@ -154,6 +156,13 @@ Todas as rotas autenticadas respondem dentro de um perfil financeiro. O cliente 
 | DELETE | `/mcp/chaves/:id` | apaga a chave |
 
 Métodos atendidos em `/mcp`: `initialize`, `ping`, `tools/list` e `tools/call`; notificações recebem 202. `GET` e `DELETE` devolvem 405 (não há fluxo de eventos nem sessão).
+
+## Atualização
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/atualizacao` | versão instalada, último commit do GitHub, commits que faltam, se o atualizador está ligado e a situação da última atualização (`?conferir=1` consulta o GitHub na hora) |
+| POST | `/atualizacao/pedir` | grava o pedido para o atualizador do computador; 400 se ele não está ligado, 409 se já há uma atualização em andamento |
 
 ## Open Finance
 

@@ -46,6 +46,7 @@ const ROTULOS_MODULO: Record<string, string> = {
   cotacoes: 'Cotações',
   rendimento: 'Rendimento',
   drive: 'Drive',
+  atualizacao: 'Atualização',
   mcp: 'Conectar IA',
   carteira: 'Carteira',
   notificacoes: 'Avisos',

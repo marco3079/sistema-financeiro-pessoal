@@ -255,7 +255,7 @@ const FERRAMENTAS: Ferramenta[] = [
     entrada: z.object({
       contaId: z.number().int().positive(),
       data,
-      descricao: z.string().trim().min(1).max(120),
+      descricao: z.string().trim().min(1).max(200),
       valor: z.number().positive().max(999999999),
       tipo: z.enum(['RECEITA', 'DESPESA']),
       categoriaId: z.number().int().positive().optional(),
@@ -266,7 +266,7 @@ const FERRAMENTAS: Ferramenta[] = [
       {
         contaId: { type: 'integer', description: 'Id da conta ou do cartão' },
         data: P_DATA('Data do lançamento'),
-        descricao: { type: 'string', maxLength: 120 },
+        descricao: { type: 'string', maxLength: 200 },
         valor: { type: 'number', exclusiveMinimum: 0, description: 'Sempre positivo, em reais' },
         tipo: { type: 'string', enum: ['RECEITA', 'DESPESA'] },
         categoriaId: { type: 'integer' },

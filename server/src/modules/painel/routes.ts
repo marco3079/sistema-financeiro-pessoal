@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../lib/erros';
+import { patrimonioEstimado } from '../../lib/carteira';
 import {
   INCLUIR_NA_TRANSACAO,
   arredondar,
@@ -105,10 +106,12 @@ router.get(
     for (const p of posicoes) {
       porMes.set(mesDe(p.data), arredondar(num(p.contas) + num(p.investimentos) - num(p.cartoes)));
     }
+    // Meses anteriores à instalação não têm fotografia: são reconstruídos pelos movimentos, preços e faturas.
+    const estimado = meses.some((m) => m !== mes && !porMes.has(m)) ? await patrimonioEstimado(meses) : new Map<string, number>();
     const desempenho: Ponto[] = meses.map((m) => ({
       mes: m,
       rotulo: rotuloMesCurto(m),
-      valor: m === mes ? t.patrimonio : (porMes.get(m) ?? null),
+      valor: m === mes ? t.patrimonio : (porMes.get(m) ?? estimado.get(m) ?? null),
     }));
 
     const anterior = somarMeses(mes, -1);

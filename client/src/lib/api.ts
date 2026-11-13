@@ -51,7 +51,8 @@ export const api = {
   put<T>(caminho: string, corpo?: unknown): Promise<T> {
     return requisitar<T>('PUT', caminho, corpo);
   },
-  async del(caminho: string): Promise<void> {
-    await requisitar<void>('DELETE', caminho);
+  // A maioria das exclusões responde 204 (sem corpo); as que respondem com um resumo usam del<Tipo>().
+  del<T = void>(caminho: string): Promise<T> {
+    return requisitar<T>('DELETE', caminho);
   },
 };

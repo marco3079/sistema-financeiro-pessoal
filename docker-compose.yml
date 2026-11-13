@@ -39,6 +39,8 @@ services:
       TZ: ${TZ:-America/Sao_Paulo}
     volumes:
       - ${PASTA_DRIVE:-./drive}:/drive
+      # Conversa com o atualizar.ps1 (versão instalada, pedido e situação da atualização).
+      - ./atualizacao:/atualizacao
     ports:
       - "127.0.0.1:${API_PORT:-3092}:3000"
     healthcheck:

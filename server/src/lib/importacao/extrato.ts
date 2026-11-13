@@ -192,6 +192,10 @@ const TRECHOS_MOVIMENTO_PROPRIO = [
   'resgate de fundo',
   'dinheiro guardado',
   'dinheiro resgatado',
+  // Pix pago com o cartão: o banco credita o valor na conta e o Pix sai em seguida. O gasto de verdade está na
+  // fatura ("Pix no Crédito - Fulano"); este crédito é só o dinheiro passando do cartão para a conta.
+  'valor adicionado na conta por cartao de credito',
+  'valor adicionado para pix no credito',
 ];
 
 function ehPagamentoDeFatura(descricao: string): boolean {
@@ -513,6 +517,36 @@ function analisarPdf(texto: string, documentoPedido: TipoDocumento | null, venci
 // Em fatura, a compra parcelada pode vir com a data da compra original (XP: "06/06/2026 ... 5 de 6").
 // Para o gasto cair no mês certo, a data avança mês a mês (no máximo parcela - 1 vezes) até entrar no ciclo
 // desta fatura, que começa cerca de 40 dias antes do vencimento.
+// Pix pago com o cartão de crédito, visto pelo extrato da conta: o banco credita o valor ("Valor adicionado na
+// conta por cartão de crédito") e, em seguida, o Pix sai da conta. O gasto de verdade está na fatura do cartão
+// ("Pix no Crédito - Fulano", com os juros). Para não contar duas vezes, a saída por Pix que casa com o crédito
+// (mesmo valor, no mesmo dia ou até dois dias depois) também vira transferência. Devolve quantas saídas marcou.
+function marcarPixNoCredito(itens: ItemLido[]): number {
+  const dias = (data: string) => Math.round(new Date(data + 'T00:00:00Z').getTime() / 86400000);
+  const ehCredito = (i: ItemLido) => i.tipo === 'RECEITA' && chave(i.descricao).includes('valor adicionado') && chave(i.descricao).includes('credito') && /cartao|pix/.test(chave(i.descricao));
+  const ehSaidaPorPix = (i: ItemLido) => i.tipo === 'DESPESA' && !i.transferencia && /\bpix\b/.test(chave(i.descricao));
+  const usados = new Set<number>();
+  let marcados = 0;
+  for (const credito of itens.filter(ehCredito)) {
+    let escolhido = -1;
+    let distancia = 99;
+    itens.forEach((saida, k) => {
+      if (usados.has(k) || !ehSaidaPorPix(saida) || Math.abs(saida.valor - credito.valor) > 0.005) return;
+      const d = dias(saida.data) - dias(credito.data);
+      if (d >= 0 && d <= 2 && d < distancia) {
+        escolhido = k;
+        distancia = d;
+      }
+    });
+    if (escolhido >= 0) {
+      usados.add(escolhido);
+      itens[escolhido].transferencia = true;
+      marcados++;
+    }
+  }
+  return marcados;
+}
+
 function ajustarDatasDasParcelas(itens: ItemLido[], vencimento: string | null): void {
   if (!vencimento) return;
   const inicioDoCiclo = new Date(new Date(vencimento + 'T00:00:00Z').getTime() - 40 * 86400000).toISOString().slice(0, 10);
@@ -572,6 +606,12 @@ export function analisarArquivo(entrada: {
     ajustarDatasDasParcelas(parcial.itens, vencimento);
   } else {
     vencimento = null;
+    const pares = marcarPixNoCredito(parcial.itens);
+    if (pares > 0) {
+      avisos.push(
+        `${pares} ${pares === 1 ? 'Pix pago no crédito foi marcado' : 'Pix pagos no crédito foram marcados'} como transferência: o gasto conta na fatura do cartão.`
+      );
+    }
   }
   if (banco === null && parcial.itens.length > 0) {
     avisos.push('Não identifiquei o banco pelo arquivo: escolha a conta de destino.');

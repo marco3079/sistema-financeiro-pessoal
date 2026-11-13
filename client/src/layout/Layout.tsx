@@ -7,6 +7,7 @@ import { useTema } from '../lib/tema';
 import { NOME_DO_PERFIL, RAIZ_DO_PERFIL } from '../lib/tipos';
 import type { Perfil } from '../lib/tipos';
 import { Icone } from '../ui/icones';
+import { BotaoAtualizar } from './BotaoAtualizar';
 import { BotaoCelular } from './BotaoCelular';
 import { Busca } from './Busca';
 import { agrupar } from './grupos';
@@ -133,6 +134,7 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
             <span className="casca-topo-celular-nome">{portal}</span>
             <div className="casca-topo-celular-acoes">
               <SeletorPerfil />
+              <BotaoAtualizar />
               <Notificacoes raiz={raizPortal} />
               <BotaoTema />
               <button
@@ -158,6 +160,7 @@ export function Layout({ menu }: { menu: RotaModulo[] }) {
               <Busca telas={menu} />
               <div className="casca-topo-acoes">
                 <SeletorPerfil />
+                <BotaoAtualizar />
                 <BotaoCelular />
                 <Notificacoes raiz={raizPortal} />
                 <BotaoTema />

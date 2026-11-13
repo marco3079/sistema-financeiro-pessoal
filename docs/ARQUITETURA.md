@@ -30,6 +30,7 @@ Na subida, a API aplica o modelo de dados (`prisma db push`), e, se o banco esti
 | `carteira` | resumo, análises, relatório e proventos da carteira |
 | `drive` | sincronização dos dados por pasta do Drive |
 | `mcp` | ponto de acesso MCP e cadastro das chaves |
+| `atualizacao` | versão instalada, novidades do GitHub e pedido de atualização |
 | `analise` | dashboard de gastos e ganhos com sugestões |
 | `rendimento` | comparação com os índices, renda fixa pela taxa e projeção |
 | `rede` | endereço para abrir no celular |
@@ -91,6 +92,10 @@ O filtro fica em um lugar só, `server/src/lib/prisma.ts`: o middleware `escolhe
 
 `lib/indices.ts` grava em `IndicePonto` o nível acumulado de cada índice por dia (Selic e IPCA do Banco Central, Ibovespa e IFIX da B3), de modo que o retorno entre duas datas é a razão entre dois níveis. `lib/rendimento.ts` monta os fluxos de caixa de cada investimento a partir dos movimentos (aplicação entra, resgate e provento saem) e calcula: o valor que esses fluxos teriam hoje seguindo cada índice; a taxa interna de retorno da carteira e de cada índice; o saldo da renda fixa pela taxa escrita no cadastro; e a projeção de 12 meses.
 
+## Patrimônio dos meses passados
+
+A fotografia diária do patrimônio (`PosicaoPatrimonio`) só existe a partir da instalação. Para o gráfico do painel, os meses anteriores são reconstruídos em `patrimonioEstimado` (`lib/carteira.ts`): investimentos pela quantidade e pelo preço da época, saldo das contas voltando os lançamentos posteriores e dívida do cartão pelas faturas fechadas e ainda não pagas naquele dia.
+
 ## Carteira
 
 `lib/carteira.ts` monta, sobre os dias úteis (os mesmos da série da Selic), o valor da carteira em cada dia: quantidade reconstruída pelos movimentos × fechamento do ativo (`PrecoAtivo`, buscado do Yahoo Finance por código, uma vez a cada 6 horas). O retorno do dia é `(valor de hoje − aplicações + resgates + proventos) / valor de ontem − 1`; variações acima de 40% em um dia são tratadas como falha de dado. Meses, anos, extremos e estatísticas saem do encadeamento desses retornos. Ativo sem preço histórico cresce de forma uniforme do valor aplicado até o saldo. A agenda de proventos é uma estimativa: quem pagou em nove ou mais dos últimos doze meses repete a média dos três últimos pagamentos; os demais repetem o calendário do último ano.
@@ -102,6 +107,10 @@ O filtro fica em um lugar só, `server/src/lib/prisma.ts`: o middleware `escolhe
 ## MCP
 
 `lib/mcp.ts` implementa o lado servidor do Model Context Protocol sobre HTTP, sem biblioteca: cada POST em `/api/mcp` traz uma mensagem JSON-RPC e recebe a resposta em JSON. A credencial é uma chave (`ChaveMcp`: só o sha256 fica gravado) ligada a um perfil financeiro e a uma permissão. Cada ferramenta valida os argumentos com zod e chama a própria API REST do sistema em `127.0.0.1`, com um token interno de dois minutos e o cabeçalho `X-Perfil` da chave: a IA passa pelas mesmas regras de validação, de saldo e de perfil que a tela. As ferramentas de escrita só aparecem em `tools/list` e só são aceitas em `tools/call` para chaves `ESCRITA`. As chaves não viajam pelo Drive: cada computador tem as suas.
+
+## Atualização
+
+O servidor não executa comandos no computador. `atualizar.ps1` (no computador) e o módulo `atualizacao` (no contêiner) conversam por três arquivos na pasta `atualizacao/`: `versao.json` (commit instalado, ramo e repositório, gravado pelo script), `estado.json` (situação e o batimento do vigia) e `pedido.json` (gravado pela API quando a pessoa clica em Atualizar). O vigia, uma tarefa do Windows, apaga o pedido e roda sempre a mesma sequência: cópia do banco, `git pull --ff-only` do repositório de origem e `docker compose up -d --build`. A API compara a versão instalada com o GitHub (`/repos/.../compare`), valida o conteúdo de `versao.json` antes de montar a URL e guarda a resposta por 5 minutos.
 
 ## Importação de arquivos
 
@@ -120,6 +129,8 @@ Fatura e extrato (`server/src/lib/importacao/extrato.ts`):
 - Cada lançamento recebe uma chave (`Transacao.chaveImportacao`, um hash de conta, data, descrição, valor e ordem): o que já existe é ignorado.
 - Todos os lançamentos do arquivo vão para a fatura daquele vencimento; a dívida do cartão passa a ser a soma das faturas não pagas.
 - O registro gravado é `MANUAL`: pode ser editado e recategorizado.
+- Cada lançamento, movimento e ativo criado guarda o `importacaoId` do arquivo de origem. Remover uma importação apaga só esses registros: desfaz o efeito no saldo da conta, recalcula as faturas (apaga a que ficar vazia) e recoloca a dívida do cartão como a soma das faturas não pagas. Na B3, sai só o ativo que a planilha criou; quantidade e saldo dos ativos que ela apenas atualizou não são desfeitos. Importações anteriores a esse campo são ligadas pelo instante da gravação.
+- No extrato, o Pix pago no crédito vira transferência nos dois lados: o crédito "Valor adicionado na conta por cartão de crédito" e a saída por Pix de mesmo valor em até dois dias.
 
 Planilha da B3 (`server/src/lib/importacao/b3.ts`):
 

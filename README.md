@@ -25,6 +25,7 @@
 - [Importar arquivos](#importar-arquivos)
 - [Drive: os mesmos dados em mais de um computador](#drive-os-mesmos-dados-em-mais-de-um-computador)
 - [Conectar IA (MCP)](#conectar-ia-mcp)
+- [Atualizar o sistema](#atualizar-o-sistema)
 - [Abrir no celular](#abrir-no-celular)
 - [Rendimento e índices](#rendimento-e-índices)
 - [Open Finance (opcional)](#open-finance-opcional)
@@ -48,7 +49,9 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 - Fatura do cartão e extrato da conta em **CSV, OFX ou PDF**: o sistema detecta o banco, o mês da fatura, as parcelas e o pagamento da fatura anterior, e mostra uma prévia antes de gravar.
 - Formatos conferidos com arquivos reais: CSV de fatura do Nubank e da XP. Os demais bancos passam pelo leitor genérico (colunas de data, descrição e valor; OFX; PDF por aproximação).
 - Reenviar o mesmo arquivo não duplica lançamentos.
+- Histórico dos arquivos importados: ver o que cada arquivo trouxe, editar ou excluir lançamentos dali mesmo e remover a importação inteira (os lançamentos saem e o saldo e a fatura são acertados).
 - Categoria automática pela descrição e pelo que você já classificou antes.
+- Movimentos entre contas próprias entram como transferência e ficam fora dos gastos: pagamento de fatura, aplicação e resgate, e o Pix pago no crédito (o crédito que o cartão põe na conta e a saída por Pix de mesmo valor; o gasto conta na fatura).
 - **Planilha da B3** (movimentação ou posição, em XLSX): monta a carteira com quantidade e custo médio, importa compras, vendas e proventos, e traz desmarcados os ativos que parecem ter saído da carteira.
 - **Cotações automáticas** de ações, fundos imobiliários e ETFs pela brapi.dev, a cada 8 horas.
 - O arquivo é lido no navegador; o servidor recebe só o conteúdo e não guarda o arquivo.
@@ -82,6 +85,10 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 
 - Servidor MCP embutido: assistentes como Claude, ChatGPT, Cursor e VS Code consultam seus dados para responder perguntas ("quanto gastei com mercado este ano?").
 - Cada chave de acesso é "só consulta" ou "consulta e lança", vale para um perfil financeiro e pode ser apagada a qualquer momento.
+
+**Atualização**
+
+- A tela **Atualização** compara a versão instalada com o último commit do repositório no GitHub, mostra o que há de novo e atualiza com um clique, guardando antes uma cópia do banco de dados.
 
 **Abrir no celular**
 
@@ -248,6 +255,17 @@ O que você precisa saber:
 - **Aplicativos de navegador (ChatGPT, Claude na web) não alcançam o localhost.** Para usá-los, o sistema precisa estar publicado na internet com HTTPS; nesse caso a chave pode ir no fim do endereço (`https://seu-endereco/api/mcp/SUA_CHAVE`), e esse endereço passa a valer como senha.
 - A chave aparece uma vez, ao ser criada; o banco guarda só o hash. Há limite de 120 chamadas por minuto por chave.
 - Testado no nível do protocolo (inicialização, lista e chamada de todas as ferramentas). Ainda não foi conferido dentro de cada aplicativo de IA.
+
+## Atualizar o sistema
+
+O sistema roda dentro do Docker e não consegue trocar o próprio programa; quem atualiza é um script no computador. Há dois jeitos:
+
+- **Pelo botão da tela (Windows)**: rode uma vez `powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Instalar`. Isso cria uma tarefa do Windows (`FinancasPessoais-Atualizador`) que fica esperando. Depois, quando houver versão nova, aparece um botão no topo; em **Atualização**, clique em **Atualizar agora**.
+- **Pelo script**: dê dois cliques em `atualizar.ps1` (Windows) ou rode `sh atualizar.sh` (Linux e Mac). No Linux e no Mac a tela só avisa que há versão nova.
+
+O que a atualização faz, nesta ordem: guarda uma cópia do banco em `backups/` (ficam as 5 mais recentes), roda `git pull --ff-only` e reconstrói os contêineres. Seus dados não são apagados. Se você alterou arquivos do sistema e eles conflitarem com a versão nova, a atualização para sem apagar nada e mostra o erro na tela.
+
+A tarefa só sabe fazer isso: o servidor grava um arquivo de pedido em `atualizacao/` e a tarefa responde atualizando a partir do repositório de origem; nenhum comando vem da tela. Para remover: `atualizar.ps1 -Desinstalar`. Para a tela saber qual versão está instalada, o repositório precisa ser público no GitHub.
 
 ## Abrir no celular
 

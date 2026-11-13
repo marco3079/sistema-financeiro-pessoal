@@ -10,7 +10,8 @@
 
 import type { Investimento, MovimentoInvestimento, TipoInvestimento } from '@prisma/client';
 import { prisma } from './prisma';
-import { arredondar, dataISO, num } from './financas';
+import { arredondar, dataISO, efeitoNoSaldo, num } from './financas';
+import { perfilAtual } from './prisma';
 import { carregarSeries, fatorEntre, garantirIndices, hojeISO, somarDias } from './indices';
 import type { Indice, Serie } from './indices';
 
@@ -596,6 +597,72 @@ export async function montarCarteira(opcoes: { meses: number; classe: 'TODAS' | 
     instituicoes,
     ativos: linhasDeAtivos,
   };
+}
+
+// ---------- Patrimônio dos meses passados ----------
+
+const estimativas = new Map<string, { em: number; valores: Map<string, number> }>();
+
+// Patrimônio no último dia de cada mês pedido ('AAAA-MM'), reconstruído para os meses em que o sistema ainda não
+// guardava a fotografia diária: investimentos pelo preço da época (quantidade do dia × fechamento), mais o saldo
+// das contas voltando os lançamentos posteriores, menos as faturas que estavam fechadas e ainda não pagas.
+// Só devolve os meses a partir do primeiro registro. Usa apenas o que já está gravado (não consulta a internet).
+export async function patrimonioEstimado(meses: string[]): Promise<Map<string, number>> {
+  const chaveDoCache = `${perfilAtual() ?? 0}|${meses.join(',')}`;
+  const guardado = estimativas.get(chaveDoCache);
+  if (guardado && Date.now() - guardado.em < 10 * 60 * 1000) return guardado.valores;
+
+  const hoje = hojeISO();
+  const [ativos, contas, transacoes, faturas] = await Promise.all([
+    prisma.investimento.findMany({ where: { ativo: true }, include: { movimentos: true } }),
+    prisma.conta.findMany({ where: { ativo: true, tipo: { not: 'CARTAO' } }, select: { id: true, tipo: true, saldo: true } }),
+    prisma.transacao.findMany({ where: { conta: { ativo: true, tipo: { not: 'CARTAO' } } }, select: { contaId: true, data: true, tipo: true, valor: true } }),
+    prisma.fatura.findMany({ where: { conta: { ativo: true } }, select: { total: true, fechamento: true, vencimento: true, pagaEm: true, status: true } }),
+  ]);
+
+  // Primeiro dia com algum registro: antes dele não há o que mostrar.
+  let primeiro: string | null = null;
+  const considerar = (data: string) => {
+    if (primeiro === null || data < primeiro) primeiro = data;
+  };
+  for (const a of ativos) for (const m of a.movimentos) if (m.tipo === 'APLICACAO') considerar(dataISO(m.data));
+  for (const t of transacoes) considerar(dataISO(t.data));
+  for (const f of faturas) considerar(dataISO(f.fechamento ?? f.vencimento));
+  const valores = new Map<string, number>();
+  if (primeiro === null) return valores;
+  const inicio: string = primeiro;
+
+  // Eixo com todos os dias corridos (o preço do fim de semana é o da sexta).
+  const dias: string[] = [];
+  for (let d = inicio; d <= hoje; d = somarDias(d, 1)) dias.push(d);
+  const codigos = [...new Set(ativos.map(codigoDe).filter((c): c is string => c !== null))];
+  const serie = serieDe(ativos, dias, await carregarPrecos(codigos));
+  const tipoDaConta = new Map(contas.map((c) => [c.id, c.tipo]));
+  const saldoDasContas = contas.reduce((s, c) => s + num(c.saldo), 0);
+
+  for (const mes of meses) {
+    const ano = Number(mes.slice(0, 4));
+    const numeroDoMes = Number(mes.slice(5, 7));
+    const fimDoMes = new Date(Date.UTC(ano, numeroDoMes, 0)).toISOString().slice(0, 10);
+    if (fimDoMes < inicio || fimDoMes >= hoje) continue;
+    const investido = serie.valor[posicaoDoDia(dias, fimDoMes)] ?? 0;
+    // Saldo das contas naquele dia = saldo de hoje menos o efeito do que aconteceu depois.
+    let depois = 0;
+    for (const t of transacoes) {
+      if (dataISO(t.data) <= fimDoMes) continue;
+      const tipo = tipoDaConta.get(t.contaId);
+      if (tipo) depois += efeitoNoSaldo(tipo, t.tipo, num(t.valor));
+    }
+    // Dívida do cartão naquele dia: faturas já fechadas e ainda não pagas.
+    let divida = 0;
+    for (const f of faturas) {
+      const quitada = f.pagaEm ? dataISO(f.pagaEm) : f.status === 'PAGA' ? dataISO(f.vencimento) : '9999-12-31';
+      if (dataISO(f.fechamento ?? f.vencimento) <= fimDoMes && quitada > fimDoMes) divida += num(f.total);
+    }
+    valores.set(mes, arredondar(investido + saldoDasContas - depois - divida));
+  }
+  estimativas.set(chaveDoCache, { em: Date.now(), valores });
+  return valores;
 }
 
 // ---------- Proventos ----------

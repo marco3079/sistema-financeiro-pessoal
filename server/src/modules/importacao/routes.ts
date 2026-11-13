@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Conta, Prisma } from '@prisma/client';
-import { prisma } from '../../lib/prisma';
-import { asyncHandler, HttpError, validar } from '../../lib/erros';
+import { perfilAtual, prisma } from '../../lib/prisma';
+import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { cifrar } from '../../lib/cripto';
 import {
   arredondar,
@@ -13,6 +13,8 @@ import {
   dinheiroComSinalSchema,
   efeitoNoSaldo,
   hoje,
+  INCLUIR_NA_TRANSACAO,
+  transacaoDTO,
   num,
   paraData,
   recalcularFatura,
@@ -346,6 +348,13 @@ router.post(
             total: totalDaReferencia,
           },
         });
+        const chavesNovas = novos.map((t) => t.chaveImportacao as string);
+        for (let i = 0; i < chavesNovas.length; i += 1000) {
+          await db.transacao.updateMany({
+            where: { contaId: conta.id, importacaoId: null, chaveImportacao: { in: chavesNovas.slice(i, i + 1000) } },
+            data: { importacaoId: registro.id },
+          });
+        }
         return { importacaoId: registro.id, faturaId, novos: novos.length, repetidos: dados.itens.length - novos.length };
       },
       { timeout: 60000 }
@@ -359,6 +368,7 @@ router.post(
 router.get(
   '/importacao/historico',
   asyncHandler(async (_req, res) => {
+    await vincularImportacoesAntigas();
     const lista = await prisma.importacao.findMany({ orderBy: { criadoEm: 'desc' }, take: 50 });
     res.json(
       lista.map((i) => ({
@@ -405,6 +415,187 @@ async function investimentosPorChave(chaves: string[]): Promise<Map<string, { id
   }
   return mapa;
 }
+
+// ---------- Histórico: ver, editar e remover uma importação ----------
+
+// Importações feitas antes de os registros guardarem a origem: liga pelo momento da gravação (os lançamentos de um
+// arquivo são criados na mesma transação do registro do histórico). Roda uma vez por perfil a cada subida do servidor.
+const vinculacoes = new Map<number, Promise<void>>();
+function vincularImportacoesAntigas(): Promise<void> {
+  const perfil = perfilAtual() ?? 0;
+  let emCurso = vinculacoes.get(perfil);
+  if (!emCurso) {
+    // Quem chegar enquanto a vinculação roda espera por ela; se falhar, a próxima chamada tenta de novo.
+    emCurso = vincular().catch((erro: unknown) => {
+      vinculacoes.delete(perfil);
+      throw erro;
+    });
+    vinculacoes.set(perfil, emCurso);
+  }
+  return emCurso;
+}
+
+async function vincular(): Promise<void> {
+  const importacoes = await prisma.importacao.findMany({ where: { novos: { gt: 0 } }, orderBy: { id: 'asc' } });
+  for (const imp of importacoes) {
+    const janela = { gte: new Date(imp.criadoEm.getTime() - 5 * 60 * 1000), lte: new Date(imp.criadoEm.getTime() + 10 * 1000) };
+    if (imp.tipo === 'B3') {
+      // Ativos criados pela planilha: gravados no mesmo instante do registro do histórico.
+      if ((await prisma.investimento.count({ where: { importacaoId: imp.id } })) === 0) {
+        await prisma.investimento.updateMany({
+          where: {
+            importacaoId: null,
+            origem: 'MANUAL',
+            criadoEm: { gte: new Date(imp.criadoEm.getTime() - 60 * 1000), lte: new Date(imp.criadoEm.getTime() + 10 * 1000) },
+          },
+          data: { importacaoId: imp.id },
+        });
+      }
+      if ((await prisma.movimentoInvestimento.count({ where: { importacaoId: imp.id } })) > 0) continue;
+      await prisma.movimentoInvestimento.updateMany({
+        where: { importacaoId: null, chaveImportacao: { not: null }, criadoEm: janela },
+        data: { importacaoId: imp.id },
+      });
+    } else if (imp.contaId !== null) {
+      if ((await prisma.transacao.count({ where: { importacaoId: imp.id } })) > 0) continue;
+      await prisma.transacao.updateMany({
+        where: { importacaoId: null, chaveImportacao: { not: null }, contaId: imp.contaId, criadoEm: janela },
+        data: { importacaoId: imp.id },
+      });
+    }
+  }
+}
+
+function importacaoDTO(i: { id: number; criadoEm: Date; arquivo: string; tipo: string; banco: string | null; referencia: string | null; contaId: number | null; contaNome: string | null; novos: number; repetidos: number; total: Prisma.Decimal | null }) {
+  return {
+    id: i.id,
+    criadoEm: i.criadoEm.toISOString(),
+    arquivo: i.arquivo,
+    tipo: i.tipo,
+    banco: i.banco,
+    referencia: i.referencia,
+    contaId: i.contaId,
+    contaNome: i.contaNome,
+    novos: i.novos,
+    repetidos: i.repetidos,
+    total: i.total === null ? null : num(i.total),
+  };
+}
+
+// Detalhes: o registro do histórico e tudo o que aquele arquivo trouxe e ainda existe.
+router.get(
+  '/importacao/:id(\\d+)',
+  asyncHandler(async (req, res) => {
+    await vincularImportacoesAntigas();
+    const id = idParam(req);
+    const imp = await prisma.importacao.findUnique({ where: { id } });
+    if (!imp) throw new HttpError(404, 'Importação não encontrada');
+    if (imp.tipo === 'B3') {
+      const movimentos = await prisma.movimentoInvestimento.findMany({
+        where: { importacaoId: id },
+        include: { investimento: { select: { id: true, nome: true, codigo: true } } },
+        orderBy: [{ data: 'desc' }, { id: 'desc' }],
+        take: 3000,
+      });
+      res.json({
+        importacao: importacaoDTO(imp),
+        lancamentos: [],
+        movimentos: movimentos.map((m) => ({
+          id: m.id,
+          data: dataISO(m.data),
+          tipo: m.tipo,
+          valor: num(m.valor),
+          quantidade: m.quantidade === null ? null : num(m.quantidade),
+          descricao: m.descricao,
+          investimentoId: m.investimento.id,
+          investimento: m.investimento.codigo ?? m.investimento.nome,
+        })),
+      });
+      return;
+    }
+    const lancamentos = await prisma.transacao.findMany({
+      where: { importacaoId: id },
+      include: INCLUIR_NA_TRANSACAO,
+      orderBy: [{ data: 'desc' }, { id: 'desc' }],
+    });
+    res.json({ importacao: importacaoDTO(imp), lancamentos: lancamentos.map(transacaoDTO), movimentos: [] });
+  })
+);
+
+// Remove a importação: apaga os lançamentos (ou movimentos) que ela trouxe e ainda existem, acerta saldos e faturas
+// e tira o registro do histórico. O que foi editado depois também sai; o que já existia antes do arquivo fica.
+router.delete(
+  '/importacao/:id(\\d+)',
+  asyncHandler(async (req, res) => {
+    await vincularImportacoesAntigas();
+    const id = idParam(req);
+    const imp = await prisma.importacao.findUnique({ where: { id } });
+    if (!imp) throw new HttpError(404, 'Importação não encontrada');
+
+    const resultado = await prisma.$transaction(
+      async (db) => {
+        if (imp.tipo === 'B3') {
+          const movimentos = await db.movimentoInvestimento.findMany({ where: { importacaoId: id }, select: { investimentoId: true } });
+          const ativos = [...new Set(movimentos.map((m) => m.investimentoId))];
+          await db.movimentoInvestimento.deleteMany({ where: { importacaoId: id } });
+          // Ativo que veio só deste arquivo (ficou sem nenhum movimento) sai junto; os demais ficam como estão.
+          let investimentos = 0;
+          for (const investimentoId of ativos) {
+            const restam = await db.movimentoInvestimento.count({ where: { investimentoId } });
+            if (restam > 0) continue;
+            // Só o ativo que esta planilha criou. O que foi cadastrado à mão (ou veio de outra planilha) fica.
+            const apagados = await db.investimento.deleteMany({ where: { id: investimentoId, origem: 'MANUAL', importacaoId: id } });
+            investimentos += apagados.count;
+          }
+          await db.importacao.delete({ where: { id } });
+          return { lancamentos: 0, movimentos: movimentos.length, investimentos, faturas: 0 };
+        }
+
+        const lancamentos = await db.transacao.findMany({ where: { importacaoId: id }, include: { conta: true } });
+        const efeitoPorConta = new Map<number, number>();
+        const faturasAfetadas = new Set<number>();
+        const cartoes = new Set<number>();
+        for (const t of lancamentos) {
+          if (t.faturaId !== null) faturasAfetadas.add(t.faturaId);
+          if (t.conta.tipo === 'CARTAO') cartoes.add(t.contaId);
+          else efeitoPorConta.set(t.contaId, (efeitoPorConta.get(t.contaId) ?? 0) + efeitoNoSaldo(t.conta.tipo, t.tipo, num(t.valor)));
+        }
+        await db.transacao.deleteMany({ where: { importacaoId: id } });
+        // Conta corrente: desfaz o efeito dos lançamentos no saldo.
+        for (const [contaId, efeito] of efeitoPorConta) {
+          if (efeito !== 0) await db.conta.update({ where: { id: contaId }, data: { saldo: { decrement: arredondar(efeito) } } });
+        }
+        // Faturas: recalcula; a que ficou vazia (veio só deste arquivo) é apagada.
+        let faturas = 0;
+        for (const faturaId of faturasAfetadas) {
+          const restam = await db.transacao.count({ where: { faturaId } });
+          if (restam === 0) {
+            faturas += (await db.fatura.deleteMany({ where: { id: faturaId, origem: 'MANUAL' } })).count;
+          } else {
+            await recalcularFatura(db, faturaId);
+          }
+        }
+        // Cartão: a dívida volta a ser a soma das faturas não pagas.
+        for (const contaId of cartoes) {
+          const aberto = await db.fatura.aggregate({ where: { contaId, status: { not: 'PAGA' } }, _sum: { total: true } });
+          const conta = await db.conta.findUnique({ where: { id: contaId } });
+          if (!conta) continue;
+          const saldo = Math.max(0, num(aberto._sum.total));
+          await db.conta.update({
+            where: { id: contaId },
+            data: { saldo, ...(conta.limite !== null ? { limiteDisponivel: Math.max(0, arredondar(num(conta.limite) - saldo)) } : {}) },
+          });
+        }
+        await db.importacao.delete({ where: { id } });
+        return { lancamentos: lancamentos.length, movimentos: 0, investimentos: 0, faturas };
+      },
+      { timeout: 120000 }
+    );
+
+    await registrarPosicaoPatrimonio();
+    res.json(resultado);
+  })
+);
 
 router.post(
   '/importacao/b3/analisar',
@@ -481,6 +672,7 @@ router.post(
         const idPorChave = new Map<string, number>();
         let criados = 0;
         let atualizados = 0;
+        const idsCriados: number[] = [];
         for (const p of dados.posicoes) {
           const atual = existentes.get(p.chave);
           // Saldo: o da planilha de posição; senão mantém o preço que já havia; senão o valor aplicado (a cotação corrige depois).
@@ -505,6 +697,7 @@ router.post(
           } else {
             const criado = await db.investimento.create({ data: { ...campos, nome: p.nome.slice(0, 120), codigo: p.codigo } });
             idPorChave.set(p.chave, criado.id);
+            idsCriados.push(criado.id);
             criados++;
           }
         }
@@ -574,7 +767,7 @@ router.post(
           await db.movimentoInvestimento.createMany({ data: ineditas.slice(i, i + 1000) });
         }
         const movimentosNovos = ineditas.length;
-        await db.importacao.create({
+        const registroB3 = await db.importacao.create({
           data: {
             arquivo: dados.arquivo,
             tipo: 'B3',
@@ -584,6 +777,17 @@ router.post(
             repetidos: linhas.length - movimentosNovos,
           },
         });
+        // Os ativos que esta planilha criou ficam marcados: só eles podem sair se a importação for removida.
+        if (idsCriados.length > 0) {
+          await db.investimento.updateMany({ where: { id: { in: idsCriados } }, data: { importacaoId: registroB3.id } });
+        }
+        const chavesDosMovimentos = ineditas.map((l) => l.chaveImportacao as string);
+        for (let i = 0; i < chavesDosMovimentos.length; i += 1000) {
+          await db.movimentoInvestimento.updateMany({
+            where: { importacaoId: null, chaveImportacao: { in: chavesDosMovimentos.slice(i, i + 1000) } },
+            data: { importacaoId: registroB3.id },
+          });
+        }
         return { criados, atualizados, encerrados, movimentosNovos, movimentosRepetidos: linhas.length - movimentosNovos };
       },
       { timeout: 120000 }
