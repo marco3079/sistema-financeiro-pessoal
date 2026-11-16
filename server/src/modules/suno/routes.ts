@@ -28,9 +28,20 @@ const carteiraSchema = z.object({
   outras: z.array(tabelaSchema.extend({ titulo: z.string().max(120).nullable() })).max(10),
 });
 
+const dataSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable();
+
 const envioSchema = z.object({
   carteiras: z.array(carteiraSchema).min(1).max(30),
+  // Plano da pessoa na Suno, lido em "Meu plano" (null quando o script não achou).
+  assinatura: z
+    .object({ plano: z.string().trim().min(1).max(80), inicio: dataSchema, fim: dataSchema })
+    .nullable()
+    .optional(),
 });
+
+function paraData(iso: string | null): Date | null {
+  return iso ? new Date(`${iso}T00:00:00Z`) : null;
+}
 
 // ---------- Leitura das tabelas ----------
 
@@ -52,7 +63,8 @@ function dataBr(texto: string | undefined): string | null {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
-const TICKER = /\b([A-Z]{4}\d{1,2})\b/;
+// Código de negociação: começa com letra, 4 caracteres (letras ou dígitos, como em B3SA3 e B5P211) e 1 ou 2 dígitos.
+const TICKER = /\b([A-Z][A-Z0-9]{3}\d{1,2})\b/;
 
 function tickerDaLinha(colunas: string[], linha: string[]): string | null {
   const i = colunas.findIndex((c) => semAcento(c).includes('ticker'));
@@ -95,6 +107,24 @@ interface EncerradaSuno {
 }
 
 type Tabela = z.infer<typeof tabelaSchema>;
+
+// Linhas da recomendada sem ativo de bolsa, só com alocação: "renda_fixa", "tesouro_selic"...
+function lerOutrasAlocacoes(t: Tabela | null): { nome: string; alocacao: number }[] {
+  if (!t) return [];
+  const c = t.colunas;
+  const iAloc = coluna(c, 'alocacao');
+  if (iAloc < 0) return [];
+  const lista: { nome: string; alocacao: number }[] = [];
+  for (const l of t.linhas) {
+    if (tickerDaLinha(c, l)) continue;
+    const alocacao = numeroBr(l[iAloc]);
+    const nome = l.find((v, i) => i !== iAloc && /[a-z]/i.test(v ?? '') && !/%/.test(v ?? ''));
+    if (alocacao === null || alocacao <= 0 || !nome) continue;
+    const legivel = nome.replace(/_/g, ' ').trim();
+    lista.push({ nome: legivel.charAt(0).toUpperCase() + legivel.slice(1), alocacao });
+  }
+  return lista;
+}
 
 function lerRecomendada(t: Tabela | null): AtivoSuno[] {
   if (!t) return [];
@@ -194,6 +224,15 @@ publico.post(
         }
         nomes.push(c.nome);
       }
+      // O envio traz todas as carteiras assinadas: as que não vieram (deixaram de ser assinadas) saem.
+      await prisma.carteiraSuno.deleteMany({ where: { slug: { notIn: dados.carteiras.map((c) => c.slug) } } });
+      if (dados.assinatura) {
+        const a = dados.assinatura;
+        const campos = { plano: a.plano, inicio: paraData(a.inicio), fim: paraData(a.fim), atualizadoEm: new Date() };
+        const existente = await prisma.assinaturaSuno.findFirst({});
+        if (existente) await prisma.assinaturaSuno.update({ where: { id: existente.id }, data: campos });
+        else await prisma.assinaturaSuno.create({ data: campos });
+      }
       return nomes;
     });
     res.status(201).json({ carteiras: gravadas.length, nomes: gravadas });
@@ -220,10 +259,41 @@ router.get(
       select: { id: true, codigo: true, nome: true, tipo: true, quantidade: true, saldo: true, valorAplicado: true },
     });
     const minhas = new Map(investimentos.map((i) => [(i.codigo ?? '').toUpperCase(), i]));
+    // Proventos recebidos de cada ativo (todo o histórico), para o retorno com proventos.
+    const proventos = new Map<number, number>();
+    if (investimentos.length > 0) {
+      const somas = await prisma.movimentoInvestimento.groupBy({
+        by: ['investimentoId'],
+        where: { investimentoId: { in: investimentos.map((i) => i.id) }, tipo: 'RENDIMENTO' },
+        _sum: { valor: true },
+      });
+      for (const s of somas) proventos.set(s.investimentoId, num(s._sum.valor));
+    }
+
+    // A posição da pessoa num ativo: preço médio, preço de hoje, retorno com e sem proventos.
+    function posicao(i: (typeof investimentos)[number]) {
+      const quantidade = num(i.quantidade);
+      const aplicado = num(i.valorAplicado);
+      const saldo = num(i.saldo);
+      const recebidos = proventos.get(i.id) ?? 0;
+      return {
+        quantidade,
+        saldo: arredondar(saldo),
+        valorAplicado: arredondar(aplicado),
+        precoMedio: quantidade > 0 && aplicado > 0 ? Math.round((aplicado / quantidade) * 100) / 100 : null,
+        precoAtual: quantidade > 0 && saldo > 0 ? Math.round((saldo / quantidade) * 100) / 100 : null,
+        retorno: aplicado > 0 ? arredondar(saldo - aplicado) : null,
+        retornoPct: aplicado > 0 ? arredondar(((saldo - aplicado) / aplicado) * 100) : null,
+        proventos: arredondar(recebidos),
+        retornoComProventosPct: aplicado > 0 ? arredondar(((saldo + recebidos - aplicado) / aplicado) * 100) : null,
+        investimentoId: i.id,
+      };
+    }
 
     const resultado = carteiras.map((c) => {
       const dados = c.dados as unknown as { recomendada: Tabela | null; encerradas: Tabela | null; outras: (Tabela & { titulo: string | null })[] };
       const recomendada = lerRecomendada(dados.recomendada);
+      const outrasAlocacoes = lerOutrasAlocacoes(dados.recomendada);
       const encerradas = lerEncerradas(dados.encerradas);
       const tipos = tiposDaCarteira(c.slug);
       const naCarteira = new Set(recomendada.map((a) => a.ticker));
@@ -253,9 +323,24 @@ router.get(
       const encerradasQueTenho = encerradas
         .filter((e) => minhas.has(e.ticker) && !naCarteira.has(e.ticker))
         .map((e) => {
-          const meu = minhas.get(e.ticker);
-          return { ...e, situacao: 'ENCERRADA' as Situacao, quantidade: num(meu?.quantidade), saldo: arredondar(num(meu?.saldo)), investimentoId: meu?.id ?? null };
-        });
+          const minha = posicao(minhas.get(e.ticker)!);
+          const { retorno: retornoSuno, ...daSuno } = e;
+          return {
+            ...daSuno,
+            retornoSuno, // retorno da recomendação na Suno, em %
+            situacao: 'ENCERRADA' as Situacao,
+            ...minha,
+            // Quanto o preço andou desde a saída da Suno (positivo: subiu depois que ela saiu).
+            // Diferença de mais de 4 vezes: quase sempre desdobramento ou grupamento depois da saída (os preços não
+            // são comparáveis), então fica sem o número.
+            desdeASaidaPct:
+              minha.precoAtual !== null && e.precoSaida !== null && e.precoSaida > 0 &&
+              minha.precoAtual / e.precoSaida > 0.25 && minha.precoAtual / e.precoSaida < 4
+                ? arredondar((minha.precoAtual / e.precoSaida - 1) * 100)
+                : null,
+          };
+        })
+        .sort((a, b) => b.saldo - a.saldo);
       const encerrou = new Set(encerradas.map((e) => e.ticker));
       const fora = doTipo
         .filter((i) => !naCarteira.has((i.codigo ?? '').toUpperCase()) && !encerrou.has((i.codigo ?? '').toUpperCase()))
@@ -263,9 +348,7 @@ router.get(
           ticker: (i.codigo ?? '').toUpperCase(),
           nome: i.nome,
           situacao: 'FORA' as Situacao,
-          quantidade: num(i.quantidade),
-          saldo: arredondar(num(i.saldo)),
-          investimentoId: i.id,
+          ...posicao(i),
         }))
         .sort((a, b) => b.saldo - a.saldo);
 
@@ -279,6 +362,7 @@ router.get(
         tiposComparados: tipos,
         base: arredondar(base),
         linhas,
+        outrasAlocacoes,
         encerradasQueTenho,
         fora,
         resumo: {
@@ -296,7 +380,24 @@ router.get(
         ],
       };
     });
-    res.json({ carteiras: resultado });
+    const assinatura = await prisma.assinaturaSuno.findFirst({});
+    const ultima = carteiras.reduce<Date | null>((m, c) => (m === null || c.atualizadoEm > m ? c.atualizadoEm : m), null);
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const fim = assinatura?.fim ? dataISO(assinatura.fim) : null;
+    res.json({
+      carteiras: resultado,
+      ultimaAtualizacao: ultima ? ultima.toISOString() : null,
+      assinatura: assinatura
+        ? {
+            plano: assinatura.plano,
+            inicio: assinatura.inicio ? dataISO(assinatura.inicio) : null,
+            fim,
+            // Dias até o fim da vigência (negativo: já venceu).
+            diasParaVencer: fim ? Math.round((Date.parse(`${fim}T00:00:00Z`) - Date.parse(`${hojeIso}T00:00:00Z`)) / 86400000) : null,
+            atualizadoEm: assinatura.atualizadoEm.toISOString(),
+          }
+        : null,
+    });
   })
 );
 
@@ -304,6 +405,7 @@ router.delete(
   '/suno',
   asyncHandler(async (_req, res) => {
     const { count } = await prisma.carteiraSuno.deleteMany({});
+    await prisma.assinaturaSuno.deleteMany({});
     res.json({ removidas: count });
   })
 );

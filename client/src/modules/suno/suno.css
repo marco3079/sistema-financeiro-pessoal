@@ -70,3 +70,41 @@
   color: var(--cor-texto-suave);
   font-weight: 600;
 }
+
+.suno-ganho {
+  color: var(--cor-sucesso, #16a34a);
+  font-variant-numeric: tabular-nums;
+}
+
+.suno-perda {
+  color: var(--cor-perigo, #dc2626);
+  font-variant-numeric: tabular-nums;
+}
+
+.suno-pequeno {
+  font-size: 0.78rem;
+}
+
+/* Sua conta Suno: plano, vigência e data dos dados */
+.suno-conta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.suno-conta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+}
+
+.suno-conta strong {
+  font-size: 1rem;
+}
+
+.suno-conta-acao {
+  align-items: flex-end;
+}

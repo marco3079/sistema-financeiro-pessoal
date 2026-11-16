@@ -495,6 +495,18 @@ model CarteiraSuno {
   @@index([perfilId])
 }
 
+// Plano da pessoa na Suno (lido pelo script junto com as carteiras): uma linha por perfil.
+model AssinaturaSuno {
+  id           Int       @id @default(autoincrement())
+  perfilId     Int       @default(1)
+  plano        String // "Suno Premium"
+  inicio       DateTime? @db.Date // início da vigência
+  fim          DateTime? @db.Date // fim da vigência (vencimento)
+  atualizadoEm DateTime  @default(now())
+
+  @@index([perfilId])
+}
+
 // Parte de um lançamento que outra pessoa deve a você.
 model Divisao {
   id          Int       @id @default(autoincrement())

@@ -31,22 +31,47 @@ interface LinhaSuno {
   diferenca: number | null;
 }
 
-interface Encerrada {
+// Sua posição num ativo (calculada no servidor a partir dos seus investimentos e proventos).
+interface MinhaPosicao {
+  quantidade: number;
+  saldo: number;
+  valorAplicado: number;
+  precoMedio: number | null;
+  precoAtual: number | null;
+  retorno: number | null;
+  retornoPct: number | null;
+  proventos: number;
+  retornoComProventosPct: number | null;
+  investimentoId: number;
+}
+
+interface Encerrada extends MinhaPosicao {
   ticker: string;
   inicio: string | null;
   encerramento: string | null;
   precoEntrada: number | null;
   precoSaida: number | null;
-  retorno: number | null;
-  quantidade: number;
-  saldo: number;
+  retornoSuno: number | null; // retorno da recomendação na Suno, em %
+  desdeASaidaPct: number | null; // quanto o preço andou desde a saída da Suno
 }
 
-interface Fora {
+interface Fora extends MinhaPosicao {
   ticker: string;
   nome: string;
-  quantidade: number;
-  saldo: number;
+}
+
+interface AssinaturaSuno {
+  plano: string;
+  inicio: string | null;
+  fim: string | null;
+  diasParaVencer: number | null;
+  atualizadoEm: string;
+}
+
+interface RespostaSuno {
+  carteiras: CarteiraSuno[];
+  ultimaAtualizacao: string | null;
+  assinatura: AssinaturaSuno | null;
 }
 
 interface TabelaBruta {
@@ -65,6 +90,7 @@ interface CarteiraSuno {
   tiposComparados: string[];
   base: number;
   linhas: LinhaSuno[];
+  outrasAlocacoes?: { nome: string; alocacao: number }[]; // renda fixa, Tesouro Selic...
   encerradasQueTenho: Encerrada[];
   fora: Fora[];
   resumo: { ativos: number; comprarQueNaoTenho: number; tenho: number; encerradasQueTenho: number; fora: number };
@@ -83,28 +109,121 @@ function pct(valor: number | null): string {
 
 const ROTULO_TIPO: Record<string, string> = { FII: 'fundos imobiliários', ACAO: 'ações', ETF: 'ETFs' };
 
+// Percentual com sinal e cor (verde ganho, vermelho perda).
+function Percentual({ valor }: { valor: number | null }) {
+  if (valor === null) return <span>—</span>;
+  const classe = valor > 0 ? 'suno-ganho' : valor < 0 ? 'suno-perda' : undefined;
+  return <span className={classe}>{`${valor > 0 ? '+' : ''}${numero(valor)}%`}</span>;
+}
+
+// Colunas da sua posição: retorno sem e com proventos, proventos recebidos e saldo.
+function colunasDeRetorno<T extends MinhaPosicao>(): ColunaTabela<T>[] {
+  return [
+    {
+      titulo: 'Seu retorno',
+      alinhar: 'direita',
+      celula: (p) =>
+        p.retorno === null ? (
+          '—'
+        ) : (
+          <span className="suno-ativo suno-direita">
+            <span className={p.retorno >= 0 ? 'suno-ganho' : 'suno-perda'}>{formatarReais(p.retorno)}</span>
+            <Percentual valor={p.retornoPct} />
+          </span>
+        ),
+    },
+    { titulo: 'Proventos recebidos', alinhar: 'direita', celula: (p) => (p.proventos > 0 ? formatarReais(p.proventos) : '—') },
+    { titulo: 'Retorno c/ proventos', alinhar: 'direita', celula: (p) => <Percentual valor={p.retornoComProventosPct} /> },
+    {
+      titulo: 'Seu saldo',
+      alinhar: 'direita',
+      celula: (p) => (
+        <span className="suno-ativo suno-direita">
+          <span>{formatarReais(p.saldo)}</span>
+          <span className="fin-suave suno-pequeno">aplicado {formatarReais(p.valorAplicado)}</span>
+        </span>
+      ),
+    },
+  ];
+}
+
 function SeloSituacao({ l }: { l: LinhaSuno }) {
   if (l.situacao === 'TEM') return <Selo cor="verde">Você tem</Selo>;
   if (l.situacao === 'COMPRAR') return <Selo cor="azul">Comprar · você não tem</Selo>;
   return <Selo cor="cinza">Aguardar · você não tem</Selo>;
 }
 
+function dataHora(iso: string): string {
+  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// Passo a passo para atualizar com a conta da Suno da pessoa (o login é pedido a cada atualização).
+function ComoAtualizar({ primeiraVez }: { primeiraVez: boolean }) {
+  return (
+    <ol className="suno-passos">
+      {primeiraVez && (
+        <li>
+          Em <strong>Conectar IA</strong>, crie uma chave com permissão <strong>consulta e lança</strong> e copie-a. O
+          script pede a chave só na primeira vez.
+        </li>
+      )}
+      <li>
+        Na pasta do sistema, rode no PowerShell:
+        <code className="suno-codigo">{COMANDO}</code>
+      </li>
+      <li>
+        Abre uma janela do Chrome na página de login da Suno: entre com a <strong>sua</strong> conta. A cada atualização
+        o login é pedido de novo; nada fica salvo.
+      </li>
+      <li>O script lê as carteiras que você assina e o seu plano, manda para cá e fecha a janela.</li>
+    </ol>
+  );
+}
+
+// Plano da Suno, vencimento e a data dos dados.
+function SuaContaSuno({ dados }: { dados: RespostaSuno }) {
+  const [mostrarComo, setMostrarComo] = useState(false);
+  const a = dados.assinatura;
+  const dias = a?.diasParaVencer ?? null;
+  const vencimento =
+    dias === null ? null : dias < 0 ? (
+      <Selo cor="vermelho">Venceu há {Math.abs(dias)} dias</Selo>
+    ) : dias <= 30 ? (
+      <Selo cor="amarelo">Vence em {dias} dias</Selo>
+    ) : (
+      <Selo cor="verde">Vence em {dias} dias</Selo>
+    );
+  return (
+    <Cartao titulo="Sua conta Suno">
+      <div className="suno-conta">
+        <div>
+          <span className="fin-suave">Plano</span>
+          <strong>{a?.plano ?? 'Não informado'}</strong>
+        </div>
+        <div>
+          <span className="fin-suave">Vigência</span>
+          <strong>{a?.fim ? `${formatarDia(a.inicio)} a ${formatarDia(a.fim)}` : '—'}</strong>
+          {vencimento}
+        </div>
+        <div>
+          <span className="fin-suave">Dados da Suno atualizados em</span>
+          <strong>{dados.ultimaAtualizacao ? dataHora(dados.ultimaAtualizacao) : 'Nunca'}</strong>
+        </div>
+        <div className="suno-conta-acao">
+          <Botao variante="secundario" aoClicar={() => setMostrarComo(!mostrarComo)}>
+            {mostrarComo ? 'Fechar' : 'Atualizar com a minha conta Suno'}
+          </Botao>
+        </div>
+      </div>
+      {mostrarComo && <ComoAtualizar primeiraVez={false} />}
+    </Cartao>
+  );
+}
+
 function Instrucoes() {
   return (
     <Cartao titulo="Como trazer as carteiras da Suno">
-      <ol className="suno-passos">
-        <li>
-          Em <strong>Conectar IA</strong>, crie uma chave com permissão <strong>consulta e lança</strong> e copie-a.
-        </li>
-        <li>
-          Na pasta do sistema, rode no PowerShell:
-          <code className="suno-codigo">{COMANDO}</code>
-        </li>
-        <li>
-          Na primeira vez o script pede a chave e abre uma janela do Chrome: entre na sua conta da Suno nela. Ele lê as
-          carteiras que você assina e manda para cá. Nas próximas vezes a janela já abre logada.
-        </li>
-      </ol>
+      <ComoAtualizar primeiraVez />
       <p className="fin-suave">
         A senha da Suno fica só no navegador: o sistema não a recebe. Rode de novo sempre que quiser atualizar.
       </p>
@@ -113,7 +232,7 @@ function Instrucoes() {
 }
 
 export function Suno() {
-  const { dados, carregando, erro, recarregar } = useDados<{ carteiras: CarteiraSuno[] }>('/suno');
+  const { dados, carregando, erro, recarregar } = useDados<RespostaSuno>('/suno');
   const [ativa, setAtiva] = useState<string | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const carteiras = dados?.carteiras ?? [];
@@ -145,13 +264,14 @@ export function Suno() {
       {erroAcao && <Aviso tipo="erro">{erroAcao}</Aviso>}
       {carregando && !dados && <Carregando />}
       {dados && carteiras.length === 0 && <Instrucoes />}
+      {dados && carteiras.length > 0 && <SuaContaSuno dados={dados} />}
       {carteira && (
         <>
           <Abas abas={carteiras.map((c) => ({ id: c.slug, rotulo: c.nome }))} ativa={carteira.slug} aoMudar={setAtiva} />
           <DetalheCarteira carteira={carteira} />
           <p className="fin-suave suno-rodape">
-            Atualizada em {formatarDia(carteira.atualizadoNoDia)}. Para atualizar, rode <code>{COMANDO}</code>. O sistema
-            só cruza o que a Suno publica com o que você tem: não é recomendação de compra ou venda.
+            Carteira {carteira.nome} atualizada em {dataHora(carteira.atualizadoEm)}. O sistema só cruza o que a Suno
+            publica com o que você tem: não é recomendação de compra ou venda.
           </p>
         </>
       )}
@@ -267,21 +387,60 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
           </p>
         )}
         <Tabela<LinhaSuno> chave={(l) => l.ticker} dados={ordenadas} vazio="Nenhum ativo." colunas={colunas} />
+        {(c.outrasAlocacoes ?? []).length > 0 && (
+          <p className="fin-suave">
+            Além dos ativos, a carteira tem{' '}
+            {(c.outrasAlocacoes ?? []).map((o) => `${pct(o.alocacao)} em ${o.nome.toLowerCase()}`).join(', ')}.
+          </p>
+        )}
       </Cartao>
 
       {c.encerradasQueTenho.length > 0 && (
         <Cartao titulo="Encerradas pela Suno que você ainda tem">
-          <p className="fin-suave">A Suno tirou estes ativos da carteira; você ainda tem posição neles.</p>
+          <p className="fin-suave">
+            A Suno tirou estes ativos da carteira; você ainda tem posição neles. "Desde a saída" é quanto o preço andou
+            depois que a Suno saiu; o seu retorno compara o saldo de hoje com o que você aplicou.
+          </p>
           <Tabela<Encerrada>
             chave={(e) => e.ticker}
             dados={c.encerradasQueTenho}
             colunas={[
-              { titulo: 'Ativo', celula: (e) => <strong>{e.ticker}</strong> },
-              { titulo: 'Encerrada em', celula: (e) => formatarDia(e.encerramento) },
-              { titulo: 'Preço de saída', alinhar: 'direita', celula: (e) => numero(e.precoSaida) },
-              { titulo: 'Retorno Suno', alinhar: 'direita', celula: (e) => (e.retorno === null ? '—' : `${numero(e.retorno)}%`) },
+              {
+                titulo: 'Ativo',
+                celula: (e) => (
+                  <span className="suno-ativo">
+                    <strong>{e.ticker}</strong>
+                    <span className="fin-suave">encerrada em {formatarDia(e.encerramento)}</span>
+                  </span>
+                ),
+              },
+              {
+                titulo: 'Suno: saída / retorno',
+                alinhar: 'direita',
+                celula: (e) => (
+                  <span className="suno-ativo suno-direita">
+                    <span>{numero(e.precoSaida)}</span>
+                    <Percentual valor={e.retornoSuno} />
+                  </span>
+                ),
+              },
               { titulo: 'Suas cotas', alinhar: 'direita', celula: (e) => numero(e.quantidade, 0) },
-              { titulo: 'Seu saldo', alinhar: 'direita', celula: (e) => formatarReais(e.saldo) },
+              { titulo: 'Seu preço médio', alinhar: 'direita', celula: (e) => numero(e.precoMedio) },
+              {
+                titulo: 'Preço hoje',
+                alinhar: 'direita',
+                celula: (e) => (
+                  <span className="suno-ativo suno-direita">
+                    <span>{numero(e.precoAtual)}</span>
+                    {e.desdeASaidaPct !== null && (
+                      <span className="fin-suave suno-pequeno">
+                        <Percentual valor={e.desdeASaidaPct} /> desde a saída
+                      </span>
+                    )}
+                  </span>
+                ),
+              },
+              ...colunasDeRetorno<Encerrada>(),
             ]}
           />
         </Cartao>
@@ -303,7 +462,9 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
                 ),
               },
               { titulo: 'Suas cotas', alinhar: 'direita', celula: (f) => numero(f.quantidade, 0) },
-              { titulo: 'Seu saldo', alinhar: 'direita', celula: (f) => formatarReais(f.saldo) },
+              { titulo: 'Seu preço médio', alinhar: 'direita', celula: (f) => numero(f.precoMedio) },
+              { titulo: 'Preço hoje', alinhar: 'direita', celula: (f) => numero(f.precoAtual) },
+              ...colunasDeRetorno<Fora>(),
             ]}
           />
         </Cartao>
