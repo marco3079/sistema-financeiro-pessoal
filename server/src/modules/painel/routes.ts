@@ -33,6 +33,9 @@ interface Ponto {
   mes: string;
   rotulo: string;
   valor: number | null;
+  // Composição do patrimônio no mês (do registro guardado no fim do mês); null quando o mês foi estimado.
+  detalhe: { contas: number; investimentos: number; cartoes: number } | null;
+  estimado: boolean; // true: mês anterior à instalação, reconstruído pelos movimentos e preços
 }
 interface Destaque {
   etiqueta: string;
@@ -103,8 +106,10 @@ router.get(
     });
     // Como vem em ordem crescente, a última posição de cada mês sobrescreve as anteriores.
     const porMes = new Map<string, number>();
+    const detalhePorMes = new Map<string, Ponto['detalhe']>();
     for (const p of posicoes) {
       porMes.set(mesDe(p.data), arredondar(num(p.contas) + num(p.investimentos) - num(p.cartoes)));
+      detalhePorMes.set(mesDe(p.data), { contas: arredondar(num(p.contas)), investimentos: arredondar(num(p.investimentos)), cartoes: arredondar(num(p.cartoes)) });
     }
     // Meses anteriores à instalação não têm fotografia: são reconstruídos pelos movimentos, preços e faturas.
     const estimado = meses.some((m) => m !== mes && !porMes.has(m)) ? await patrimonioEstimado(meses) : new Map<string, number>();
@@ -112,6 +117,8 @@ router.get(
       mes: m,
       rotulo: rotuloMesCurto(m),
       valor: m === mes ? t.patrimonio : (porMes.get(m) ?? estimado.get(m) ?? null),
+      detalhe: m === mes ? { contas: t.contas, investimentos: t.investimentos, cartoes: t.cartoes } : (detalhePorMes.get(m) ?? null),
+      estimado: m !== mes && !porMes.has(m) && estimado.has(m),
     }));
 
     const anterior = somarMeses(mes, -1);

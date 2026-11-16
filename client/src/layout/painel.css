@@ -778,3 +778,83 @@
     max-width: 100%;
   }
 }
+
+/* ---------- Quadro do mês sob o mouse (gráfico de patrimônio) ---------- */
+.painel-grafico-faixa {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.painel-grafico-guia {
+  stroke: var(--cor-borda);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.painel-grafico-ponto-ativo {
+  fill: var(--cor-primaria);
+}
+
+.painel-grafico-ponto:focus-visible {
+  outline: none;
+  stroke-width: 5;
+}
+
+.painel-grafico-dica {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--cor-texto);
+  color: var(--cor-superficie);
+  font-size: 0.82rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+}
+
+.painel-grafico-dica-valor {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.painel-grafico-dica-sobe,
+.painel-grafico-dica-desce {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.painel-grafico-dica-sobe {
+  color: color-mix(in srgb, var(--cor-sucesso) 70%, var(--cor-superficie));
+}
+
+.painel-grafico-dica-desce {
+  color: color-mix(in srgb, var(--cor-perigo) 70%, var(--cor-superficie));
+}
+
+.painel-grafico-dica dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.1rem 0.75rem;
+  margin: 0.25rem 0 0;
+  padding-top: 0.3rem;
+  border-top: 1px solid color-mix(in srgb, var(--cor-superficie) 25%, transparent);
+}
+
+.painel-grafico-dica dt {
+  opacity: 0.8;
+}
+
+.painel-grafico-dica dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.painel-grafico-dica-nota {
+  opacity: 0.75;
+  font-size: 0.75rem;
+}

@@ -7,6 +7,23 @@ import { useEffect, useId, useRef, useState } from 'react';
 export interface PontoGrafico {
   rotulo: string;
   valor: number | null;
+  mes?: string; // 'AAAA-MM': no balão, o mês por extenso
+  detalhe?: { contas: number; investimentos: number; cartoes: number } | null;
+  estimado?: boolean;
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+function mesPorExtenso(p: { rotulo: string; mes?: string }): string {
+  if (!p.mes) return p.rotulo;
+  const nome = MESES[Number(p.mes.slice(5, 7)) - 1] ?? p.rotulo;
+  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${p.mes.slice(0, 4)}`;
+}
+
+function formatarVariacao(diferenca: number, anterior: number): string {
+  const sinal = diferenca > 0 ? '+' : diferenca < 0 ? '−' : '';
+  const pct = anterior !== 0 ? ` (${sinal}${Math.abs((diferenca / Math.abs(anterior)) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)` : '';
+  return `${sinal}${formatarValor(Math.abs(diferenca))}${pct}`;
 }
 
 const LIMITE_ROTULOS_TODOS = 6; // acima disso, só um rótulo sim e outro não (o último sempre aparece)
@@ -38,6 +55,7 @@ export function GraficoLinha({ pontos }: { pontos: PontoGrafico[] }) {
   const id = 'painel-degrade-' + useId().replace(/:/g, '');
   const ref = useRef<HTMLDivElement>(null);
   const [tam, setTam] = useState<{ l: number; a: number }>(TAM_PADRAO);
+  const [sobre, setSobre] = useState<number | null>(null); // ponto sob o mouse (índice em `marcados`)
 
   useEffect(() => {
     const elemento = ref.current;
@@ -77,7 +95,7 @@ export function GraficoLinha({ pontos }: { pontos: PontoGrafico[] }) {
 
   // Só os pontos com valor; buracos (null) são pulados e a linha segue para o próximo valor.
   const marcados = pontos.flatMap((p, i) =>
-    p.valor === null ? [] : [{ x: xDe(i), y: yDe(p.valor), valor: p.valor, rotulo: p.rotulo }],
+    p.valor === null ? [] : [{ x: xDe(i), y: yDe(p.valor), valor: p.valor, rotulo: p.rotulo, ponto: p }],
   );
 
   const caminho = marcados.map((m, k) => `${k === 0 ? 'M' : 'L'}${m.x} ${m.y}`).join(' ');
@@ -87,7 +105,8 @@ export function GraficoLinha({ pontos }: { pontos: PontoGrafico[] }) {
     primeiro && ultimo ? `${caminho} L${ultimo.x} ${Y_BASE} L${primeiro.x} ${Y_BASE} Z` : '';
 
   let balao = null;
-  if (ultimo) {
+  // Com o mouse sobre um mês, o balão do último mês sai e entra o quadro do mês apontado (fora do SVG).
+  if (ultimo && sobre === null) {
     const texto = formatarValor(ultimo.valor);
     const largura = Math.max(48, texto.length * 8 + 16);
     const altura = 24;
@@ -114,15 +133,62 @@ export function GraficoLinha({ pontos }: { pontos: PontoGrafico[] }) {
 
   const niveis = [0, 0.25, 0.5, 0.75, 1].map((fracao) => fracao * teto);
 
+  // Quadro do mês apontado: mês por extenso, patrimônio, variação sobre o mês anterior e a composição.
+  const apontado = sobre !== null ? marcados[sobre] : null;
+  const anterior = sobre !== null && sobre > 0 ? marcados[sobre - 1] : null;
+  const LARGURA_DICA = 230;
+  const dica = apontado ? (
+    <div
+      className="painel-grafico-dica"
+      role="status"
+      style={{
+        left: Math.min(Math.max(apontado.x - LARGURA_DICA / 2, 4), larguraDesenho - LARGURA_DICA - 4),
+        top: apontado.y > alturaDesenho / 2 ? Math.max(4, apontado.y - 150) : apontado.y + 16,
+        width: LARGURA_DICA,
+      }}
+    >
+      <strong>{mesPorExtenso(apontado.ponto)}</strong>
+      <span className="painel-grafico-dica-valor">{formatarValor(apontado.valor)}</span>
+      {anterior && (
+        <span className={apontado.valor - anterior.valor >= 0 ? 'painel-grafico-dica-sobe' : 'painel-grafico-dica-desce'}>
+          {formatarVariacao(apontado.valor - anterior.valor, anterior.valor)} sobre {mesPorExtenso(anterior.ponto).split(' de ')[0].toLowerCase()}
+        </span>
+      )}
+      {apontado.ponto.detalhe && (
+        <dl>
+          <dt>Contas</dt>
+          <dd>{formatarValor(apontado.ponto.detalhe.contas)}</dd>
+          <dt>Investimentos</dt>
+          <dd>{formatarValor(apontado.ponto.detalhe.investimentos)}</dd>
+          {apontado.ponto.detalhe.cartoes > 0 && (
+            <>
+              <dt>Cartões a pagar</dt>
+              <dd>−{formatarValor(apontado.ponto.detalhe.cartoes)}</dd>
+            </>
+          )}
+        </dl>
+      )}
+      {apontado.ponto.estimado && <span className="painel-grafico-dica-nota">Estimado pelos movimentos e preços (antes da instalação).</span>}
+    </div>
+  ) : null;
+
+  // Área de cada mês para o mouse: do meio entre ele e o anterior até o meio entre ele e o próximo.
+  const faixas = marcados.map((m, k) => {
+    const esquerda = k === 0 ? X_ESQ - 10 : (marcados[k - 1].x + m.x) / 2;
+    const direita = k === marcados.length - 1 ? X_DIR + 10 : (m.x + marcados[k + 1].x) / 2;
+    return { k, x: esquerda, largura: Math.max(1, direita - esquerda) };
+  });
+
   return (
-    <div ref={ref} className="painel-grafico-area-medida">
+    <div ref={ref} className="painel-grafico-area-medida" onMouseLeave={() => setSobre(null)}>
+      {dica}
       <svg
         className="painel-grafico"
         viewBox={`0 0 ${larguraDesenho} ${alturaDesenho}`}
         width={larguraDesenho}
         height={alturaDesenho}
         role="img"
-        aria-label="Gráfico de vendas por mês"
+        aria-label="Gráfico do patrimônio por mês"
       >
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -161,10 +227,35 @@ export function GraficoLinha({ pontos }: { pontos: PontoGrafico[] }) {
         {caminhoArea && <path className="painel-grafico-area" d={caminhoArea} fill={`url(#${id})`} />}
         {caminho && <path className="painel-grafico-linha" d={caminho} />}
 
+        {apontado && <line className="painel-grafico-guia" x1={apontado.x} x2={apontado.x} y1={Y_TOPO} y2={Y_BASE} />}
+
         {marcados.map((m, k) => (
-          <circle key={k} className="painel-grafico-ponto" cx={m.x} cy={m.y} r={5} strokeWidth={3}>
-            <title>{`${m.rotulo}: ${formatarValor(m.valor)}`}</title>
-          </circle>
+          <circle
+            key={k}
+            className={sobre === k ? 'painel-grafico-ponto painel-grafico-ponto-ativo' : 'painel-grafico-ponto'}
+            cx={m.x}
+            cy={m.y}
+            r={sobre === k ? 7 : 5}
+            strokeWidth={3}
+            tabIndex={0}
+            aria-label={`${mesPorExtenso(m.ponto)}: ${formatarValor(m.valor)}`}
+            onFocus={() => setSobre(k)}
+            onBlur={() => setSobre(null)}
+          />
+        ))}
+
+        {/* Por cima de tudo: faixas transparentes que acham o mês sob o mouse (ou o toque). */}
+        {faixas.map((f) => (
+          <rect
+            key={f.k}
+            className="painel-grafico-faixa"
+            x={f.x}
+            y={Y_TOPO - 10}
+            width={f.largura}
+            height={Y_BASE - Y_TOPO + 20}
+            onMouseEnter={() => setSobre(f.k)}
+            onClick={() => setSobre((atual) => (atual === f.k ? null : f.k))}
+          />
         ))}
 
         {balao}

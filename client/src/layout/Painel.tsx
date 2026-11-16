@@ -27,6 +27,8 @@ interface PontoDesempenho {
   mes: string;
   rotulo: string;
   valor: number | null;
+  detalhe?: { contas: number; investimentos: number; cartoes: number } | null;
+  estimado?: boolean;
 }
 
 interface Destaque {
