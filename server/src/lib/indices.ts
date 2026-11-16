@@ -90,8 +90,9 @@ async function variacoesBCB(serie: number, de: string, ate: string): Promise<Pon
     try {
       corpo = await buscarJSON(url);
     } catch (erro) {
-      // O Banco Central responde 404 quando não há valores na janela.
-      if (erro instanceof Error && erro.message === 'resposta 404') corpo = [];
+      // O Banco Central responde 404 (ou 304) quando não há valores na janela, por exemplo o IPCA do mês que
+      // ainda não foi divulgado.
+      if (erro instanceof Error && (erro.message === 'resposta 404' || erro.message === 'resposta 304')) corpo = [];
       else throw erro;
     }
     if (Array.isArray(corpo)) {
@@ -170,6 +171,9 @@ async function fechamentosYahoo(simbolo: string, de: string, ate: string): Promi
 }
 
 async function fechamentosDaBolsa(indice: 'IBOV' | 'IFIX', de: string, ate: string): Promise<Ponto[]> {
+  // Período vazio (começo depois do fim): nada a buscar. Sem isto, o Yahoo recebia um intervalo invertido e
+  // respondia 400, e o índice aparecia como "não atualizado" justamente quando já estava em dia.
+  if (de > ate) return [];
   try {
     const pontos: Ponto[] = [];
     for (let ano = Number(de.slice(0, 4)); ano <= Number(ate.slice(0, 4)); ano++) {
@@ -209,6 +213,8 @@ async function atualizarUm(indice: Indice, desde: string): Promise<void> {
   ]);
   // Se o que está gravado começa depois do necessário, recomeça do zero para o nível acumulado ficar contínuo.
   const faltaPassado = !primeiro || iso(primeiro.data) > somarDias(inicioDesejado, 45);
+  // Já tem o valor de hoje: não há o que buscar.
+  if (!faltaPassado && ultimo && somarDias(iso(ultimo.data), 1) > hoje) return;
 
   if (indice === 'SELIC' || indice === 'IPCA') {
     const serie = indice === 'SELIC' ? 11 : 433;
