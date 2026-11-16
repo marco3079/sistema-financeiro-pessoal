@@ -129,10 +129,37 @@ function gravarJson(arquivo, objeto) {
   fs.renameSync(temporario, arquivo);
 }
 
-function gravarEstado(situacao, mensagem) {
-  estadoAtual = { situacao, mensagem, em: agora() };
+// progresso: 0 a 100 enquanto atualiza (a tela mostra a barra); null fora disso.
+function gravarEstado(situacao, mensagem, progresso = null) {
+  estadoAtual = { situacao, mensagem, em: agora(), progresso, inicio: situacao === 'ATUALIZANDO' ? estadoAtual.inicio ?? agora() : null };
   gravarJson(ARQUIVO_ESTADO, { ...estadoAtual, vigiaVistoEm: agora() });
-  registrar(`${situacao}${mensagem ? ': ' + mensagem : ''}`);
+  registrar(`${situacao}${mensagem ? ': ' + mensagem : ''}${progresso !== null ? ` (${progresso}%)` : ''}`);
+}
+
+// Quanto a última reconstrução levou (atualizacao/medidas.json): estima o andamento da próxima.
+const ARQUIVO_MEDIDAS = path.join(PASTA, 'medidas.json');
+const RECONSTRUCAO_PADRAO_MS = 4 * 60 * 1000;
+
+function duracaoEstimada() {
+  try {
+    const m = JSON.parse(fs.readFileSync(ARQUIVO_MEDIDAS, 'utf8'));
+    return Number(m.reconstrucaoMs) > 10000 ? Number(m.reconstrucaoMs) : RECONSTRUCAO_PADRAO_MS;
+  } catch {
+    return RECONSTRUCAO_PADRAO_MS;
+  }
+}
+
+// Avança a barra de `de` até perto de `ate` conforme o tempo passa, sem passar de 97% do trecho antes de terminar.
+function andarComOTempo(de, ate, estimadoMs) {
+  const inicio = Date.now();
+  const relogio = setInterval(() => {
+    const fracao = Math.min(0.97, (Date.now() - inicio) / estimadoMs);
+    estadoAtual = { ...estadoAtual, progresso: Math.round(de + (ate - de) * fracao) };
+  }, 2000);
+  return () => {
+    clearInterval(relogio);
+    return Date.now() - inicio;
+  };
 }
 
 // Batimento: a tela sabe que o atualizador está ligado (também durante uma atualização demorada).
@@ -186,10 +213,24 @@ async function copiarBanco(podar) {
 }
 
 // Reconstrói a API, o site e o serviço da Suno; o banco e o próprio atualizador não são recriados aqui.
+// A barra vai de 15% a 75% durante a montagem (pelo tempo, comparado ao da última vez) e daí até 95% ao religar.
 async function reconstruir() {
-  await compose(['build', 'api', 'web', 'suno']);
+  const parar = andarComOTempo(15, 75, duracaoEstimada());
+  try {
+    await compose(['build', 'api', 'web', 'suno']);
+  } finally {
+    const levou = parar();
+    try {
+      gravarJson(ARQUIVO_MEDIDAS, { reconstrucaoMs: levou, medidoEm: agora() });
+    } catch {
+      // sem a medida, a próxima usa o tempo padrão
+    }
+  }
+  gravarEstado('ATUALIZANDO', 'Ligando o serviço da Suno...', 78);
   await compose(['up', '-d', '--no-deps', 'suno']);
+  gravarEstado('ATUALIZANDO', 'Ligando a API (espera ela responder)...', 82);
   await compose(['up', '-d', '--no-deps', '--wait', 'api']);
+  gravarEstado('ATUALIZANDO', 'Ligando o site...', 95);
   await compose(['up', '-d', '--no-deps', 'web']);
 }
 
@@ -210,22 +251,23 @@ async function recriarAtualizadorSePreciso(antes, depois) {
 }
 
 async function atualizar() {
-  gravarEstado('ATUALIZANDO', 'Guardando uma cópia do banco de dados...');
+  estadoAtual = { ...estadoAtual, inicio: null };
+  gravarEstado('ATUALIZANDO', 'Guardando uma cópia do banco de dados...', 3);
   const copia = await copiarBanco(true);
-  gravarEstado('ATUALIZANDO', 'Baixando a versão nova do GitHub...');
+  gravarEstado('ATUALIZANDO', 'Baixando a versão nova do GitHub...', 10);
   const ramo = await git(['rev-parse', '--abbrev-ref', 'HEAD']);
   const antes = await git(['rev-parse', 'HEAD']);
   // --ff-only: só avança. Se houver alteração local que conflite, para sem apagar nada.
   await git(['pull', '--ff-only', 'origin', ramo]);
   await acertarDono();
   const depois = await git(['rev-parse', 'HEAD']);
-  gravarEstado('ATUALIZANDO', 'Reconstruindo o sistema (pode levar alguns minutos)...');
+  gravarEstado('ATUALIZANDO', 'Reconstruindo o sistema (pode levar alguns minutos)...', 15);
   await reconstruir();
   await gravarVersao();
   if (antes === depois) {
-    gravarEstado('OK', `O sistema já estava na última versão. Cópia do banco: ${copia}`);
+    gravarEstado('OK', `O sistema já estava na última versão. Cópia do banco: ${copia}`, 100);
   } else {
-    gravarEstado('OK', `Atualizado de ${antes.slice(0, 7)} para ${depois.slice(0, 7)}. Cópia do banco: ${copia}`);
+    gravarEstado('OK', `Atualizado de ${antes.slice(0, 7)} para ${depois.slice(0, 7)}. Cópia do banco: ${copia}`, 100);
     await recriarAtualizadorSePreciso(antes, depois);
   }
 }
@@ -234,9 +276,10 @@ async function restaurar(nome) {
   if (!COPIA_VALIDA.test(nome) || !fs.statSync(path.join(PASTA_BACKUPS, nome), { throwIfNoEntry: false })?.isFile()) {
     throw new Error('Pedido de restauração com cópia inválida.');
   }
-  gravarEstado('ATUALIZANDO', 'Guardando uma cópia do banco como está agora...');
+  estadoAtual = { ...estadoAtual, inicio: null };
+  gravarEstado('ATUALIZANDO', 'Guardando uma cópia do banco como está agora...', 10);
   const anterior = await copiarBanco(false);
-  gravarEstado('ATUALIZANDO', `Restaurando a cópia ${nome}...`);
+  gravarEstado('ATUALIZANDO', `Restaurando a cópia ${nome}...`, 40);
   await compose(['stop', 'web', 'api']);
   await compose(['cp', path.join(PASTA_BACKUPS, nome), 'db:/tmp/restaurar.sql']);
   // Tudo em uma transação só: se a cópia falhar no meio, nada muda e o banco continua como estava.
@@ -251,9 +294,9 @@ async function restaurar(nome) {
     'INSERT INTO "EstadoDrive" (id, sujo, "alteradoEm") VALUES (1, true, now()) ON CONFLICT (id) DO UPDATE SET sujo = true, "alteradoEm" = now()',
   ], { env: ambienteDoCompose() });
   await compose(['exec', '-T', 'db', 'rm', '-f', '/tmp/restaurar.sql']);
-  gravarEstado('ATUALIZANDO', 'Ligando o sistema de novo...');
+  gravarEstado('ATUALIZANDO', 'Ligando o sistema de novo...', 85);
   await compose(['up', '-d', '--no-deps', 'api', 'web']);
-  gravarEstado('OK', `Banco restaurado da cópia ${nome}. O banco de antes ficou em ${anterior}.`);
+  gravarEstado('OK', `Banco restaurado da cópia ${nome}. O banco de antes ficou em ${anterior}.`, 100);
 }
 
 async function atenderPedido() {

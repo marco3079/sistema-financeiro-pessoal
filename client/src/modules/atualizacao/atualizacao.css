@@ -71,3 +71,66 @@
   background: var(--cor-aviso);
   border: 2px solid var(--cor-superficie);
 }
+
+/* Barra de progresso da atualização */
+.atu-progresso {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.atu-progresso-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.atu-progresso-topo span {
+  font-variant-numeric: tabular-nums;
+}
+
+.atu-barra {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--cor-borda);
+  overflow: hidden;
+}
+
+.atu-barra-preenchida {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cor-primaria);
+  transition: width 0.8s ease;
+}
+
+/* Sem percentual: um trecho que corre de um lado ao outro */
+.atu-barra-indeterminada .atu-barra-preenchida {
+  position: absolute;
+  width: 35%;
+  animation: atu-correr 1.4s ease-in-out infinite;
+}
+
+@keyframes atu-correr {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atu-barra-preenchida {
+    transition: none;
+  }
+
+  .atu-barra-indeterminada .atu-barra-preenchida {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.4;
+  }
+}

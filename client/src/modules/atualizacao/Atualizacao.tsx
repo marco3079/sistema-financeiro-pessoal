@@ -6,6 +6,41 @@ import { ResumoItem } from '../../ui/financas';
 import { CopiasDoBanco } from './CopiasDoBanco';
 import './atualizacao.css';
 
+// Barra da atualização em andamento: o percentual que o atualizador informa (sem ele, a barra só corre),
+// a etapa e o tempo desde o começo.
+function BarraDeAtualizacao({ progresso, inicio, mensagem }: { progresso: number | null; inicio: string | null; mensagem: string }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const relogio = window.setInterval(() => setAgora(Date.now()), 1000);
+    return () => window.clearInterval(relogio);
+  }, []);
+  const segundos = inicio ? Math.max(0, Math.floor((agora - new Date(inicio).getTime()) / 1000)) : null;
+  const tempo = segundos === null ? null : `${Math.floor(segundos / 60)} min ${String(segundos % 60).padStart(2, '0')} s`;
+  const valor = progresso === null ? null : Math.round(progresso);
+  return (
+    <div className="atu-progresso">
+      <div className="atu-progresso-topo">
+        <strong>{mensagem}</strong>
+        <span className="atu-suave">
+          {valor !== null && `${valor}%`}
+          {valor !== null && tempo && ' · '}
+          {tempo && `${tempo}`}
+        </span>
+      </div>
+      <div
+        className={valor === null ? 'atu-barra atu-barra-indeterminada' : 'atu-barra'}
+        role="progressbar"
+        aria-label="Andamento da atualização"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={valor ?? undefined}
+      >
+        <div className="atu-barra-preenchida" style={valor === null ? undefined : { width: `${valor}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export interface CommitDTO {
   commit: string;
   data: string | null;
@@ -21,7 +56,13 @@ export interface AtualizacaoDTO {
   erroDoGitHub: string | null;
   vigiaAtivo: boolean; // o atualizador está ligado neste computador
   pedidoPendente: boolean;
-  ultimaAtualizacao: { situacao: 'ATUALIZANDO' | 'OK' | 'ERRO'; mensagem: string; em: string | null } | null;
+  ultimaAtualizacao: {
+    situacao: 'ATUALIZANDO' | 'OK' | 'ERRO';
+    mensagem: string;
+    em: string | null;
+    progresso?: number | null; // 0 a 100 enquanto atualiza
+    inicio?: string | null; // quando a atualização começou
+  } | null;
 }
 
 type InstaladaDTO = NonNullable<AtualizacaoDTO['instalada']>;
@@ -202,12 +243,13 @@ export function Atualizacao() {
 
               {emAndamento ? (
                 <div className="atu-andamento">
-                  <Carregando />
-                  <p>
-                    {ultimaAtualizacao?.situacao === 'ATUALIZANDO'
-                      ? ultimaAtualizacao.mensagem
-                      : 'Pedido enviado. Aguardando o atualizador…'}
-                  </p>
+                  <BarraDeAtualizacao
+                    progresso={ultimaAtualizacao?.situacao === 'ATUALIZANDO' ? ultimaAtualizacao.progresso ?? null : 0}
+                    inicio={ultimaAtualizacao?.situacao === 'ATUALIZANDO' ? ultimaAtualizacao.inicio ?? null : null}
+                    mensagem={
+                      ultimaAtualizacao?.situacao === 'ATUALIZANDO' ? ultimaAtualizacao.mensagem : 'Pedido enviado. Aguardando o atualizador…'
+                    }
+                  />
                   <p className="atu-suave">
                     Pode levar alguns minutos. Não feche o Docker. A tela pode ficar sem resposta enquanto o sistema
                     reinicia.

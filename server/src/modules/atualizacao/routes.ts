@@ -133,7 +133,14 @@ async function montarEstado(forcar: boolean) {
     pedidoPendente: pedido !== null,
     ultimaAtualizacao:
       situacao === 'ATUALIZANDO' || situacao === 'OK' || situacao === 'ERRO'
-        ? { situacao, mensagem: texto(estado?.mensagem) ?? '', em: texto(estado?.em) }
+        ? {
+            situacao,
+            mensagem: texto(estado?.mensagem) ?? '',
+            em: texto(estado?.em),
+            // 0 a 100 enquanto atualiza (o atualizador grava a cada etapa); null em versões antigas do atualizador.
+            progresso: typeof estado?.progresso === 'number' && Number.isFinite(estado.progresso) ? Math.max(0, Math.min(100, estado.progresso)) : null,
+            inicio: texto(estado?.inicio),
+          }
         : null,
   };
 }
