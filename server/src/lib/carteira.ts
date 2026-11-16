@@ -12,6 +12,7 @@ import type { Investimento, MovimentoInvestimento, TipoInvestimento } from '@pri
 import { prisma } from './prisma';
 import { arredondar, dataISO, efeitoNoSaldo, num } from './financas';
 import { perfilAtual } from './prisma';
+import { proventosAnunciados } from './proventosAnunciados';
 import { carregarSeries, fatorEntre, garantirIndices, hojeISO, somarDias } from './indices';
 import type { Indice, Serie } from './indices';
 
@@ -716,7 +717,13 @@ export interface ProventosDTO {
   ultimosDozeMeses: number;
   rendimentoSobreOCusto: number | null; // proventos de 12 meses sobre o valor aplicado, em %
   historico: { mes: string; total: number }[];
-  mapa: { meses: string[]; linhas: { id: number; rotulo: string; valores: number[]; total: number }[] };
+  mapa: {
+    meses: string[];
+    // Meses depois do atual que já têm provento anunciado (vêm depois de `meses` em `anunciados`).
+    mesesFuturos: string[];
+    // valores: recebido por mês. anunciados: anunciado pela B3 e ainda não recebido, alinhado a [...meses, ...mesesFuturos].
+    linhas: { id: number; rotulo: string; valores: number[]; total: number; anunciados: number[] }[];
+  };
   porAtivo: {
     id: number;
     rotulo: string;
@@ -733,7 +740,8 @@ export interface ProventosDTO {
     esteMes: { recebido: number; previsto: number };
     proximosTresMeses: number;
     proximosDozeMeses: number;
-    itens: { data: string; id: number; rotulo: string; valor: number; situacao: 'RECEBIDO' | 'PREVISTO' }[];
+    // PREVISTO com anunciado = true: valor e data anunciados pela B3; sem ele, estimativa pelo histórico.
+    itens: { data: string; id: number; rotulo: string; valor: number; situacao: 'RECEBIDO' | 'PREVISTO'; anunciado?: boolean }[];
   };
 }
 
@@ -764,7 +772,11 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
   const mesesDoMapa = Array.from({ length: 12 }, (_, i) => mesesAtras(mesAtual, 11 - i));
   const itens: ProventosDTO['agenda']['itens'] = [];
   const porAtivo: ProventosDTO['porAtivo'] = [];
-  const linhasDoMapa: ProventosDTO['mapa']['linhas'] = [];
+  const linhasDoMapa: (Omit<ProventosDTO['mapa']['linhas'][number], 'anunciados'> & { porMesAnunciado: Map<string, number> })[] = [];
+  // Proventos anunciados (B3) dos ativos que ainda estão na carteira.
+  const anunciados = await proventosAnunciados(
+    pagadores.filter((a) => num(a.quantidade) > 0).map((a) => codigoDe(a) ?? '')
+  );
   let total = 0;
   let dozeMeses = 0;
   let aplicado = 0;
@@ -793,6 +805,21 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
       totalDoAtivo += valor;
       pagamentos++;
     }
+    // Anunciados ainda não recebidos: valor por cota vezes as cotas de hoje. Os que já viraram movimento
+    // (mesmo dia de pagamento) não entram de novo.
+    const porMesAnunciado = new Map<string, number>();
+    if (num(a.quantidade) > 0) {
+      const datasRecebidas = new Set(a.movimentos.map((m) => dataISO(m.data)));
+      for (const p of anunciados.get(codigoDe(a) ?? '') ?? []) {
+        if (p.dataPagamento < hoje || datasRecebidas.has(p.dataPagamento)) continue;
+        const valor = arredondar(p.valorPorCota * num(a.quantidade));
+        if (valor <= 0) continue;
+        itens.push({ data: p.dataPagamento, id: a.id, rotulo, valor, situacao: 'PREVISTO', anunciado: true });
+        const mes = p.dataPagamento.slice(0, 7);
+        porMesAnunciado.set(mes, (porMesAnunciado.get(mes) ?? 0) + valor);
+      }
+    }
+
     total += totalDoAtivo;
     dozeMeses += dozeDoAtivo;
     aplicado += num(a.valorAplicado);
@@ -810,7 +837,9 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
         ultimaData: ultimo ? dataISO(ultimo.data) : null,
         rendimentoSobreOCusto: num(a.valorAplicado) > 0 ? pct(dozeDoAtivo / num(a.valorAplicado)) : null,
       });
-      linhasDoMapa.push({ id: a.id, rotulo, valores: valores.map(arredondar), total: arredondar(valores.reduce((s, v) => s + v, 0)) });
+    }
+    if (totalDoAtivo > 0 || dozeDoAtivo > 0 || porMesAnunciado.size > 0) {
+      linhasDoMapa.push({ id: a.id, rotulo, valores: valores.map(arredondar), total: arredondar(valores.reduce((s, v) => s + v, 0)), porMesAnunciado });
     }
 
     // Agenda estimada: quem pagou quase todo mês repete o último valor todo mês; os demais repetem o calendário
@@ -824,7 +853,7 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
       const dia = recentes[recentes.length - 1].data.slice(8, 10);
       for (let k = jaPagouEsteMes ? 1 : 0; k <= 12; k++) {
         const data = somarMesesNaData(`${mesAtual}-${dia}`, k);
-        if (data <= hoje) continue;
+        if (data <= hoje || porMesAnunciado.has(data.slice(0, 7))) continue;
         itens.push({ data, id: a.id, rotulo, valor: arredondar(valor), situacao: 'PREVISTO' });
       }
     } else {
@@ -832,6 +861,8 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
         const data = somarMesesNaData(r.data, 12);
         // Quem já pagou neste mês não tem outro pagamento previsto para o mesmo mês.
         if (jaPagouEsteMes && data.slice(0, 7) === mesAtual) continue;
+        // O anunciado substitui a estimativa do mesmo mês.
+        if (porMesAnunciado.has(data.slice(0, 7))) continue;
         if (data > hoje) itens.push({ data, id: a.id, rotulo, valor: arredondar(r.valor), situacao: 'PREVISTO' });
       }
     }
@@ -848,6 +879,7 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
   for (let m = inicioDoHistorico; m <= mesAtual; m = mesesAtras(m, -1)) mesesDoHistorico.push(m);
   const previstoAte = (limite: string) => itens.filter((i) => i.situacao === 'PREVISTO' && i.data <= limite).reduce((s, i) => s + i.valor, 0);
   const doMes = itens.filter((i) => i.data.slice(0, 7) === mesAtual);
+  const mesesFuturos = [...new Set(linhasDoMapa.flatMap((l) => [...l.porMesAnunciado.keys()]))].filter((m) => m > mesAtual).sort();
 
   return {
     geradoEm: new Date().toISOString(),
@@ -857,7 +889,14 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
     ultimosDozeMeses: arredondar(dozeMeses),
     rendimentoSobreOCusto: aplicado > 0 ? pct(dozeMeses / aplicado) : null,
     historico: mesesDoHistorico.map((mes) => ({ mes, total: arredondar(porMes.get(mes) ?? 0) })),
-    mapa: { meses: mesesDoMapa, linhas: linhasDoMapa },
+    mapa: {
+      meses: mesesDoMapa,
+      mesesFuturos,
+      linhas: linhasDoMapa.map(({ porMesAnunciado, ...l }) => ({
+        ...l,
+        anunciados: [...mesesDoMapa, ...mesesFuturos].map((m) => arredondar(porMesAnunciado.get(m) ?? 0)),
+      })),
+    },
     porAtivo,
     agenda: {
       esteMes: {

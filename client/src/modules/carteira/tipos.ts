@@ -78,6 +78,7 @@ export interface ItemAgenda {
   rotulo: string; // código do ativo
   valor: number;
   situacao: 'RECEBIDO' | 'PREVISTO';
+  anunciado?: boolean; // PREVISTO anunciado pela B3 (senão, estimativa pelo histórico)
 }
 
 export interface ProventosDTO {
@@ -89,7 +90,12 @@ export interface ProventosDTO {
   rendimentoSobreOCusto: number | null; // proventos de 12 meses sobre o valor aplicado, em %
   historico: { mes: string; total: number }[];
   // Mapa de calor: 12 meses (colunas) por ativo (linhas); valores[i] corresponde a meses[i].
-  mapa: { meses: string[]; linhas: { id: number; rotulo: string; valores: number[]; total: number }[] };
+  // anunciados[i]: anunciado pela B3 e ainda não recebido, alinhado a [...meses, ...mesesFuturos].
+  mapa: {
+    meses: string[];
+    mesesFuturos?: string[];
+    linhas: { id: number; rotulo: string; valores: number[]; total: number; anunciados?: number[] }[];
+  };
   porAtivo: {
     id: number;
     rotulo: string;

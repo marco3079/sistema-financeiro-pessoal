@@ -260,3 +260,19 @@
 .proventos-lista-simples .cart-suave {
   margin-left: auto;
 }
+
+/* Proventos anunciados pela B3 e ainda não pagos */
+.proventos-anunciado {
+  font-style: italic;
+  color: var(--cor-primaria);
+}
+
+.proventos-mapa tfoot tr.proventos-anunciado th,
+.proventos-mapa tfoot tr.proventos-anunciado td {
+  border-top: none;
+  font-weight: 500;
+}
+
+.proventos-mapa thead th.proventos-mes-futuro {
+  font-style: italic;
+}

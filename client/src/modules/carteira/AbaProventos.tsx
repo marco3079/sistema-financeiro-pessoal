@@ -125,8 +125,12 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
   const linhas = dados.mapa.linhas;
   const maiorCelula = linhas.reduce((maior, l) => Math.max(maior, ...l.valores), 0);
   const linhasVisiveis = mostrarTodos ? linhas : linhas.slice(0, LINHAS_INICIAIS);
-  const totaisPorMes = dados.mapa.meses.map((_, i) => linhas.reduce((soma, l) => soma + (l.valores[i] ?? 0), 0));
+  const mesAtual = hojeISO().slice(0, 7);
+  const todosOsMeses = [...dados.mapa.meses, ...(dados.mapa.mesesFuturos ?? [])];
+  const totaisPorMes = todosOsMeses.map((_, i) => linhas.reduce((soma, l) => soma + (l.valores[i] ?? 0), 0));
   const totalGeral = totaisPorMes.reduce((soma, v) => soma + v, 0);
+  const anunciadosPorMes = todosOsMeses.map((_, i) => linhas.reduce((soma, l) => soma + (l.anunciados?.[i] ?? 0), 0));
+  const totalAnunciado = anunciadosPorMes.reduce((soma, v) => soma + v, 0);
 
   return (
     <>
@@ -156,7 +160,16 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
       </Cartao>
 
       <Cartao titulo="Mapa de calor mensal">
-        <p className="cart-suave">Quanto cada ativo pagou em cada um dos últimos 12 meses.</p>
+        <p className="cart-suave">
+          Quanto cada ativo pagou em cada um dos últimos 12 meses.
+          {totalAnunciado > 0 && (
+            <>
+              {' '}
+              Em <span className="proventos-anunciado">itálico</span>, os proventos já anunciados pela B3 e ainda não
+              pagos (valor por cota × as cotas de hoje).
+            </>
+          )}
+        </p>
         {linhas.length === 0 ? (
           <p className="cart-suave">Nenhum pagamento nos últimos 12 meses.</p>
         ) : (
@@ -166,8 +179,8 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
                 <thead>
                   <tr>
                     <th scope="col">Ativo</th>
-                    {dados.mapa.meses.map((m) => (
-                      <th scope="col" key={m}>
+                    {todosOsMeses.map((m) => (
+                      <th scope="col" key={m} className={classes(m > mesAtual && 'proventos-mes-futuro')}>
                         {mesCurto(m)}
                       </th>
                     ))}
@@ -180,20 +193,26 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
                       <th scope="row" className="proventos-mapa-rotulo">
                         {l.rotulo}
                       </th>
-                      {l.valores.map((v, i) => {
+                      {todosOsMeses.map((mes, i) => {
+                        const v = l.valores[i] ?? 0;
+                        const a = l.anunciados?.[i] ?? 0;
                         const intensidade = maiorCelula > 0 && v > 0 ? Math.round((v / maiorCelula) * 70) : 0;
                         const estilo: CSSProperties | undefined =
                           intensidade > 0
                             ? { background: `color-mix(in srgb, var(--cor-primaria) ${intensidade}%, transparent)` }
                             : undefined;
-                        const mes = dados.mapa.meses[i] ?? '';
+                        const titulo =
+                          `${l.rotulo} · ${rotuloMes(mes)}: ${formatarReais(v)}` +
+                          (a > 0 ? ` recebido · ${formatarReais(a)} anunciado` : '');
                         return (
-                          <td
-                            key={i}
-                            style={estilo}
-                            title={`${l.rotulo} · ${rotuloMes(mes)}: ${formatarReais(v)}`}
-                          >
+                          <td key={i} style={estilo} title={titulo}>
                             {v === 0 ? '' : duasCasas(v)}
+                            {a > 0 && (
+                              <span className="proventos-anunciado">
+                                {v > 0 ? ' + ' : ''}
+                                {duasCasas(a)}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -209,6 +228,15 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
                     ))}
                     <td>{duasCasas(totalGeral)}</td>
                   </tr>
+                  {totalAnunciado > 0 && (
+                    <tr className="proventos-anunciado">
+                      <th scope="row">Anunciado</th>
+                      {anunciadosPorMes.map((v, i) => (
+                        <td key={i}>{v === 0 ? '' : duasCasas(v)}</td>
+                      ))}
+                      <td>{duasCasas(totalAnunciado)}</td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>
@@ -317,8 +345,8 @@ function VisaoAgenda({ dados }: { dados: ProventosDTO }) {
   return (
     <>
       <Aviso tipo="info">
-        Os valores marcados como previstos são estimativas: repetem o que cada ativo pagou nos últimos 12 meses. As datas
-        e os valores reais só são conhecidos quando o fundo ou a empresa anuncia.
+        Os marcados como anunciados vêm da B3: o fundo já aprovou o pagamento (valor por cota × as cotas de hoje). Os
+        marcados como previstos são estimativas: repetem o que cada ativo pagou nos últimos 12 meses.
       </Aviso>
 
       <div className="cart-tripla">
@@ -431,7 +459,9 @@ function VisaoAgenda({ dados }: { dados: ProventosDTO }) {
                       <span className="proventos-item-dia">{diaMesCurto(i.data)}</span>
                       <span className="proventos-item-nome">
                         <strong>{i.rotulo}</strong>
-                        <Selo cor={recebido ? 'verde' : 'amarelo'}>{recebido ? 'Recebido' : 'Previsto'}</Selo>
+                        <Selo cor={recebido ? 'verde' : i.anunciado ? 'azul' : 'amarelo'}>
+                          {recebido ? 'Recebido' : i.anunciado ? 'Anunciado' : 'Previsto'}
+                        </Selo>
                       </span>
                       <span className="proventos-item-valor">{formatarReais(i.valor)}</span>
                     </li>

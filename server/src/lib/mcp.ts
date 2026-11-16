@@ -213,7 +213,7 @@ const FERRAMENTAS: Ferramenta[] = [
     nome: 'proventos',
     titulo: 'Proventos',
     descricao:
-      'Dividendos e rendimentos recebidos: total, média mensal, histórico por mês, por ativo e rendimento sobre o custo; e a agenda dos próximos 12 meses. Os itens "PREVISTO" são estimativas pelo histórico, não datas anunciadas.',
+      'Dividendos e rendimentos recebidos: total, média mensal, histórico por mês, por ativo e rendimento sobre o custo; e a agenda dos próximos 12 meses. Os itens "PREVISTO" com anunciado=true foram anunciados pela B3 (valor por cota × cotas de hoje); os demais são estimativas pelo histórico.',
     escrita: false,
     entrada: z.object({ meses }),
     esquema: objeto({ meses: P_MESES }),
