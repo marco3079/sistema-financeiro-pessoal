@@ -19,6 +19,7 @@ import { Aviso, Botao, Caixa, Campo, Cartao, Carregando, Modal, MenuAcoes, Pagin
 import type { AcaoMenu } from '../../ui';
 import { BarraProgresso, NomeComCor, ResumoItem, Rosca, SeloOrigem, Valor } from '../../ui/financas';
 import { DetalheInvestimento } from './DetalheInvestimento';
+import { FundoB3 } from './FundoB3';
 import { ImportarPlanilha } from './ImportarPlanilha';
 import './investimentos.css';
 
@@ -175,6 +176,13 @@ function FormInvestimento({
   );
 }
 
+// Código de fundo imobiliário na bolsa (XPML11).
+const CODIGO_FII = /^[A-Z]{4}11$/;
+
+function semAcento(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 // ---------- Lista ----------
 
 export function Investimentos() {
@@ -185,6 +193,8 @@ export function Investimentos() {
   const [editando, setEditando] = useState<InvestimentoDTO | null>(null);
   const [detalheId, setDetalheId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
+  const [fundoAberto, setFundoAberto] = useState<string | null>(null);
   const { dados, carregando, erro, recarregar } = useDados<RespostaInvestimentos>(
     '/investimentos' + queryString({ tipo, inativos: mostrarInativos ? 'true' : '' })
   );
@@ -216,6 +226,10 @@ export function Investimentos() {
       { rotulo: 'Ver detalhes', icone: 'documento', aoClicar: () => setDetalheId(i.id) },
       { rotulo: 'Editar', icone: 'lapis', aoClicar: () => setEditando(i) },
     ];
+    const codigo = (i.codigo ?? '').toUpperCase();
+    if (i.tipo === 'FII' && CODIGO_FII.test(codigo)) {
+      acoes.splice(1, 0, { rotulo: 'Dados na B3', icone: 'grafico', aoClicar: () => setFundoAberto(codigo) });
+    }
     if (i.ativo) {
       acoes.push({ rotulo: 'Desativar', icone: 'fechar', aoClicar: () => alternarAtivo(i, false) });
     } else {
@@ -227,12 +241,21 @@ export function Investimentos() {
     return acoes;
   }
 
-  const itens = dados?.itens ?? [];
+  const todos = dados?.itens ?? [];
+  const termo = semAcento(busca.trim().toLowerCase());
+  const itens = termo
+    ? todos.filter((i) =>
+        semAcento([i.nome, i.codigo, i.instituicao, i.subtipo, i.emissor].filter(Boolean).join(' ').toLowerCase()).includes(termo)
+      )
+    : todos;
+  // Código de FII digitado na busca: dá para abrir a ficha dele na B3, mesmo sem tê-lo na carteira.
+  const codigoBuscado = busca.trim().toUpperCase();
+  const buscaEhFundo = CODIGO_FII.test(codigoBuscado);
   const total = dados?.total ?? 0;
   const aplicado = dados?.aplicado ?? 0;
   const rendimento = dados?.rendimento ?? 0;
   const porTipo = dados?.porTipo ?? [];
-  const maiores = [...itens].sort((a, b) => b.saldo - a.saldo).slice(0, 5);
+  const maiores = [...todos].sort((a, b) => b.saldo - a.saldo).slice(0, 5);
 
   return (
     <Pagina titulo="Investimentos">
@@ -316,10 +339,34 @@ export function Investimentos() {
       )}
 
       {dados && (
+        <div className="barra-ferramentas">
+          <div className="filtros inv-busca-b3">
+            <Campo rotulo="Buscar investimento ou código de FII" valor={busca} aoMudar={setBusca} />
+            {buscaEhFundo && (
+              <Botao variante="secundario" aoClicar={() => setFundoAberto(codigoBuscado)}>
+                Ver {codigoBuscado} na B3
+              </Botao>
+            )}
+          </div>
+          {termo && (
+            <span className="fin-suave">
+              {itens.length} de {todos.length} investimentos
+            </span>
+          )}
+        </div>
+      )}
+
+      {dados && (
         <Tabela<InvestimentoDTO>
           chave={(i) => i.id}
           dados={itens}
-          vazio="Nenhum investimento. Cadastre um aqui ou conecte sua corretora em Conexões."
+          vazio={
+            termo
+              ? buscaEhFundo
+                ? `Você não tem ${codigoBuscado} na carteira. Clique em "Ver ${codigoBuscado} na B3" para ver os dados do fundo.`
+                : 'Nenhum investimento com esse nome ou código.'
+              : 'Nenhum investimento. Cadastre um aqui ou conecte sua corretora em Conexões.'
+          }
           aoClicarLinha={(i) => setDetalheId(i.id)}
           colunas={[
             {
@@ -388,6 +435,8 @@ export function Investimentos() {
         aoFechar={() => setImportando(false)}
         aoConcluir={recarregar}
       />
+
+      <FundoB3 codigo={fundoAberto} aoFechar={() => setFundoAberto(null)} />
 
       {detalheId !== null && (
         <DetalheInvestimento
