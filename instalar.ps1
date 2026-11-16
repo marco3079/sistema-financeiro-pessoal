@@ -248,6 +248,18 @@ if ($envExiste) {
     Write-Host 'Arquivo .env criado com segredos aleatorios.'
 }
 
+# A tarefa antiga do Windows (atualizar.ps1 -Instalar) da lugar ao conteiner atualizador: os dois juntos
+# brigariam pelo mesmo pedido da tela.
+try {
+    if (Get-ScheduledTask -TaskName 'FinancasPessoais-Atualizador' -ErrorAction SilentlyContinue) {
+        Stop-ScheduledTask -TaskName 'FinancasPessoais-Atualizador' -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName 'FinancasPessoais-Atualizador' -Confirm:$false
+        Write-Host 'Tarefa antiga do atualizador removida: agora ele roda num conteiner.'
+    }
+} catch {
+    Write-Host 'Aviso: nao foi possivel remover a tarefa antiga FinancasPessoais-Atualizador. Rode: atualizar.ps1 -Desinstalar'
+}
+
 # [6/6] Subir os conteineres e esperar a API
 Write-Host '[6/6] Subindo os conteineres (na primeira vez o Docker baixa as dependencias, pode demorar)...'
 $codigoUp = Executar-Comando -Programa 'docker' -Argumentos @('compose', 'up', '-d', '--build')

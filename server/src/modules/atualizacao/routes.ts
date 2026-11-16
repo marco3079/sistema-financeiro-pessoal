@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { asyncHandler, HttpError, validar } from '../../lib/erros';
 
 // Atualização do sistema pelo GitHub. O servidor roda dentro do Docker e não consegue atualizar a si mesmo; quem
-// atualiza é o script atualizar.ps1, no computador. Os dois conversam por arquivos na pasta ./atualizacao
+// atualiza é o contêiner atualizador (atualizador/vigia.js), ou o script atualizar.ps1 rodado à mão no computador.
+// Eles conversam por arquivos na pasta ./atualizacao
 // (montada aqui em /atualizacao):
 //   versao.json  gravado pelo script: commit instalado, ramo e repositório
 //   estado.json  gravado pelo script: situação da última atualização e o "batimento" do vigia
@@ -150,7 +151,7 @@ router.post(
   asyncHandler(async (_req, res) => {
     const estado = await montarEstado(false);
     if (!estado.vigiaAtivo) {
-      throw new HttpError(400, 'O atualizador não está ligado neste computador. Rode "atualizar.ps1 -Instalar" uma vez, ou atualize com "atualizar.ps1".');
+      throw new HttpError(400, 'O atualizador não está ligado neste computador. Rode o instalador de novo (ele cria o contêiner atualizador), ou atualize com "atualizar.ps1".');
     }
     if (estado.ultimaAtualizacao?.situacao === 'ATUALIZANDO' || estado.pedidoPendente) {
       throw new HttpError(409, 'Já há uma atualização em andamento.');
@@ -202,7 +203,7 @@ router.post(
     if (!info || !info.isFile()) throw new HttpError(404, 'Cópia não encontrada');
     const estado = await montarEstado(false);
     if (!estado.vigiaAtivo) {
-      throw new HttpError(400, 'O atualizador não está ligado neste computador. Rode "atualizar.ps1 -Instalar" uma vez, ou restaure com "atualizar.ps1 -Restaurar ' + dados.arquivo + '".');
+      throw new HttpError(400, 'O atualizador não está ligado neste computador. Rode o instalador de novo (ele cria o contêiner atualizador), ou restaure com "atualizar.ps1 -Restaurar ' + dados.arquivo + '".');
     }
     if (estado.ultimaAtualizacao?.situacao === 'ATUALIZANDO' || estado.pedidoPendente) {
       throw new HttpError(409, 'Já há uma atualização ou restauração em andamento.');

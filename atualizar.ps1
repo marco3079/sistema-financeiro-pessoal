@@ -168,15 +168,17 @@ if ($Desinstalar) {
 }
 
 if ($Instalar) {
-  Gravar-Versao
-  $acao = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Vigiar" -WorkingDirectory $Raiz
-  $gatilho = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-  $ajustes = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
-  Register-ScheduledTask -TaskName $NomeDaTarefa -Action $acao -Trigger $gatilho -Settings $ajustes -Description "Espera o pedido do botao Atualizar do sistema Financas Pessoais e atualiza pelo GitHub." -Force | Out-Null
-  Start-ScheduledTask -TaskName $NomeDaTarefa
+  # O botao Atualizar agora e atendido pelo conteiner "atualizador", criado pelo instalador junto com os outros.
+  # A tarefa do Windows nao e mais criada; se houver uma antiga, ela sai (dois vigias brigariam pelo mesmo pedido).
+  if (Get-ScheduledTask -TaskName $NomeDaTarefa -ErrorAction SilentlyContinue) {
+    Stop-ScheduledTask -TaskName $NomeDaTarefa -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $NomeDaTarefa -Confirm:$false
+    Write-Host "A tarefa antiga '$NomeDaTarefa' foi removida."
+  }
+  Write-Host "O atualizador agora e o conteiner 'atualizador', criado pelo instalador (instalar.ps1)."
+  Write-Host "Subindo o atualizador..."
+  Rodar "docker" @("compose", "up", "-d", "--build", "atualizador") | Out-Null
   Write-Host "Pronto. O botao Atualizar da tela ja funciona neste computador."
-  Write-Host "A tarefa '$NomeDaTarefa' inicia sozinha quando voce entra no Windows."
-  Write-Host "Para remover: powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Desinstalar"
   exit 0
 }
 

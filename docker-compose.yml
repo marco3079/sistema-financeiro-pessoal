@@ -68,5 +68,17 @@ services:
       - "${WEB_PORT:-8092}:80"
     restart: unless-stopped
 
+  # Atualiza o sistema pelo botão da tela (Atualização): copia o banco, baixa o último commit e reconstrói a API e
+  # o site. Tem acesso ao Docker do computador e à pasta do projeto; conversa com a API só pela pasta atualizacao/.
+  atualizador:
+    build: ./atualizador
+    environment:
+      NOME_DO_COMPUTADOR: ${COMPUTERNAME:-${HOSTNAME:-}}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - .:/projeto
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
 volumes:
   dados_db:

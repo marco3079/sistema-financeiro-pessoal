@@ -183,13 +183,13 @@ export function Atualizacao() {
             <div className="atu-conteudo">
               <p>
                 {
-                  'O sistema ainda não sabe qual versão está instalada neste computador. Na pasta em que ele foi instalado, clique com o botão direito em atualizar.ps1 e escolha "Executar com o PowerShell" usando o comando abaixo, uma única vez:'
+                  'O sistema ainda não sabe qual versão está instalada neste computador: o atualizador não está rodando. Na pasta em que ele foi instalado, rode o instalador de novo (ele cria o atualizador junto com os outros contêineres):'
                 }
               </p>
-              <code className="atu-codigo">powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Instalar</code>
+              <code className="atu-codigo">powershell -ExecutionPolicy Bypass -File instalar.ps1</code>
               <p className="atu-suave">
                 {
-                  'Isso cria uma tarefa do Windows que espera o seu clique em "Atualizar agora". Ela só sabe baixar a versão nova deste repositório e reconstruir o sistema.'
+                  'No Linux e no Mac: bash instalar.sh. O atualizador é um contêiner que espera o seu clique em "Atualizar agora". Ele só sabe baixar a versão nova deste repositório e reconstruir o sistema.'
                 }
               </p>
             </div>
@@ -224,7 +224,7 @@ export function Atualizacao() {
                     {!vigiaAtivo && (
                       <Aviso tipo="info">
                         {
-                          'O atualizador não está ligado neste computador. Para o botão funcionar, rode uma vez: powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Instalar. Ou atualize agora rodando atualizar.ps1 (sem o -Instalar).'
+                          'O atualizador não está ligado neste computador. Para o botão funcionar, rode o instalador de novo (instalar.ps1 ou instalar.sh), que cria o contêiner atualizador. Ou atualize agora rodando atualizar.ps1.'
                         }
                       </Aviso>
                     )}
@@ -281,7 +281,7 @@ export function Atualizacao() {
               Se você alterou arquivos do sistema neste computador e eles conflitarem com a versão nova, a atualização
               para sem apagar nada e mostra o erro aqui.
             </li>
-            <li>{'Para desligar o atualizador: powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Desinstalar.'}</li>
+            <li>{'Para desligar o atualizador: docker compose stop atualizador (volta com docker compose up -d).'}</li>
           </ul>
         </Cartao>
       </div>

@@ -306,14 +306,14 @@ O que você precisa saber:
 
 ## Atualizar o sistema
 
-O sistema roda dentro do Docker e não consegue trocar o próprio programa; quem atualiza é um script no computador. Há dois jeitos:
+Quem atualiza é o contêiner `atualizador`, criado pelo instalador junto com os outros (Windows, Linux e Mac). Há dois jeitos:
 
-- **Pelo botão da tela (Windows)**: rode uma vez `powershell -ExecutionPolicy Bypass -File atualizar.ps1 -Instalar`. Isso cria uma tarefa do Windows (`FinancasPessoais-Atualizador`) que fica esperando. Depois, quando houver versão nova, aparece um botão no topo; em **Atualização**, clique em **Atualizar agora**.
-- **Pelo script**: dê dois cliques em `atualizar.ps1` (Windows) ou rode `sh atualizar.sh` (Linux e Mac). No Linux e no Mac a tela só avisa que há versão nova.
+- **Pelo botão da tela**: quando houver versão nova, aparece um botão no topo; em **Atualização**, clique em **Atualizar agora**. Não precisa instalar nada além do sistema.
+- **Pelo script**: dê dois cliques em `atualizar.ps1` (Windows) ou rode `sh atualizar.sh` (Linux e Mac).
 
 O que a atualização faz, nesta ordem: guarda uma cópia do banco em `backups/` (ficam as 5 mais recentes), roda `git pull --ff-only` e reconstrói os contêineres. Seus dados não são apagados. Se você alterou arquivos do sistema e eles conflitarem com a versão nova, a atualização para sem apagar nada e mostra o erro na tela.
 
-A tarefa só sabe fazer isso: o servidor grava um arquivo de pedido em `atualizacao/` e a tarefa responde atualizando a partir do repositório de origem; nenhum comando vem da tela. Para remover: `atualizar.ps1 -Desinstalar`. Para a tela saber qual versão está instalada, o repositório precisa ser público no GitHub.
+O atualizador só sabe fazer isso: o servidor grava um arquivo de pedido em `atualizacao/` e o atualizador responde atualizando a partir do repositório de origem; nenhum comando vem da tela. Ele tem acesso ao Docker do computador (`/var/run/docker.sock`) e à pasta do projeto, e não abre porta nenhuma. Para desligar: `docker compose stop atualizador`. A antiga tarefa do Windows (`atualizar.ps1 -Instalar`) não é mais necessária: o instalador a remove. Para a tela saber qual versão está instalada, o repositório precisa ser público no GitHub.
 
 ## Verificação em duas etapas
 
