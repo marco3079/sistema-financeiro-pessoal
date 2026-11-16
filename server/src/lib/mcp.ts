@@ -220,9 +220,10 @@ const FERRAMENTAS: Ferramenta[] = [
     async executar(chave, a) {
       const dados = (await api(chave, 'GET', '/carteira/proventos' + consulta({ meses: a.meses as number | undefined }))) as {
         mapa?: unknown;
+        pagamentos?: unknown;
         agenda?: { itens?: { situacao: string }[] };
       };
-      const { mapa: _mapa, ...resto } = dados;
+      const { mapa: _mapa, pagamentos: _pagamentos, ...resto } = dados;
       if (resto.agenda?.itens) resto.agenda.itens = resto.agenda.itens.filter((i) => i.situacao === 'PREVISTO').slice(0, 120);
       return resto;
     },

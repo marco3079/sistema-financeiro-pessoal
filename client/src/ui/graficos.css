@@ -87,3 +87,27 @@
   color: var(--cor-texto-suave);
   margin: 0;
 }
+
+/* Série prevista (ainda não realizada): barra clara com contorno tracejado */
+.grafico-barra-previsao {
+  fill-opacity: 0.28;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.grafico-legenda-previsao {
+  opacity: 0.45;
+  outline: 1.5px dashed currentColor;
+  outline-offset: 1px;
+}
+
+/* Rótulo do gráfico de barras que abre um detalhe */
+.grafico-clicavel {
+  cursor: pointer;
+  outline: none;
+}
+
+.grafico-clicavel:focus-visible .grafico-faixa {
+  stroke: var(--cor-primaria);
+  stroke-width: 2;
+}

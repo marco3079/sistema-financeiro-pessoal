@@ -9,6 +9,8 @@ export interface SerieGrafico {
   nome: string;
   cor: string; // valor de CSS: 'var(--cor-primaria)', '#f59e0b'...
   valores: (number | null)[];
+  // Barra clara com contorno tracejado: valor previsto, ainda não realizado.
+  previsao?: boolean;
 }
 
 // Cores fixas das séries de comparação (iguais nos dois temas, com contraste nos dois).
@@ -72,12 +74,16 @@ function rotulosVisiveis(quantos: number, largura: number, larguraDoRotulo: numb
   return visiveis;
 }
 
+function classeCor(s: SerieGrafico): string {
+  return s.previsao ? 'grafico-legenda-cor grafico-legenda-previsao' : 'grafico-legenda-cor';
+}
+
 function Legenda({ series }: { series: SerieGrafico[] }) {
   return (
     <ul className="grafico-legenda">
       {series.map((s) => (
         <li key={s.nome}>
-          <span className="grafico-legenda-cor" style={{ background: s.cor }} aria-hidden="true" />
+          <span className={classeCor(s)} style={{ background: s.cor }} aria-hidden="true" />
           {s.nome}
         </li>
       ))}
@@ -93,7 +99,7 @@ function Leitura({ rotulo, series, indice, formato }: { rotulo: string; series: 
         const v = s.valores[indice];
         return (
           <span key={s.nome}>
-            <span className="grafico-legenda-cor" style={{ background: s.cor }} aria-hidden="true" />
+            <span className={classeCor(s)} style={{ background: s.cor }} aria-hidden="true" />
             {s.nome}: {v === null || v === undefined ? '—' : formato(v)}
           </span>
         );
@@ -197,7 +203,18 @@ export function GraficoLinhas({ rotulos, series, formato, altura = 280, descrica
 }
 
 // Barras verticais agrupadas (uma barra por série em cada rótulo), com valores negativos abaixo do zero.
-export function GraficoBarras({ rotulos, series, formato, altura = 260, descricao }: PropsGrafico) {
+// `empilhar`: as séries (só valores positivos) ficam uma sobre a outra numa barra só.
+// `aoClicar`: cada rótulo vira um botão (clique, Enter ou espaço) que recebe o índice.
+export function GraficoBarras({
+  rotulos,
+  series,
+  formato,
+  altura = 260,
+  descricao,
+  empilhar = false,
+  aoClicar,
+  rotuloDoClique,
+}: PropsGrafico & { empilhar?: boolean; aoClicar?: (indice: number) => void; rotuloDoClique?: (indice: number) => string }) {
   const [ref, largura] = useLargura();
   const [sobre, setSobre] = useState<number | null>(null);
   const n = rotulos.length;
@@ -209,11 +226,15 @@ export function GraficoBarras({ rotulos, series, formato, altura = 260, descrica
       </div>
     );
   }
-  const { min, max, passos } = limites(series);
+  const somas: SerieGrafico[] = empilhar
+    ? [{ nome: 'soma', cor: '', valores: rotulos.map((_, i) => series.reduce((s, serie) => s + Math.max(0, serie.valores[i] ?? 0), 0)) }]
+    : series;
+  const { min, max, passos } = limites(somas);
   const l = largura - MARGEM.esquerda - MARGEM.direita;
   const a = altura - MARGEM.cima - MARGEM.baixo;
   const grupo = l / n;
-  const barra = Math.max(2, Math.min(28, (grupo * 0.72) / series.length));
+  const colunas = empilhar ? 1 : series.length;
+  const barra = Math.max(2, Math.min(28, (grupo * 0.72) / colunas));
   const y = (v: number) => MARGEM.cima + a - ((v - min) / (max - min)) * a;
   const visiveis = rotulosVisiveis(n, l, 64);
   const indice = sobre ?? n - 1;
@@ -230,15 +251,48 @@ export function GraficoBarras({ rotulos, series, formato, altura = 260, descrica
         ))}
         {rotulos.map((r, i) => {
           const centro = MARGEM.esquerda + grupo * (i + 0.5);
-          const inicio = centro - (barra * series.length) / 2;
+          const inicio = centro - (barra * colunas) / 2;
+          let base = 0; // empilhado: onde a próxima série começa
+          const clicavel = aoClicar
+            ? {
+                role: 'button',
+                tabIndex: 0,
+                'aria-label': rotuloDoClique ? rotuloDoClique(i) : r,
+                className: 'grafico-clicavel',
+                onClick: () => aoClicar(i),
+                onFocus: () => setSobre(i),
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    aoClicar(i);
+                  }
+                },
+              }
+            : {};
           return (
-            <g key={i} onMouseEnter={() => setSobre(i)}>
+            <g key={i} onMouseEnter={() => setSobre(i)} {...clicavel}>
               <rect x={MARGEM.esquerda + grupo * i} y={MARGEM.cima} width={grupo} height={a} className={sobre === i ? 'grafico-faixa grafico-faixa-ativa' : 'grafico-faixa'} />
               {series.map((s, k) => {
                 const v = s.valores[i];
                 if (v === null || v === undefined || !Number.isFinite(v) || v === 0) return null;
-                const topo = Math.min(y(v), y(0));
-                return <rect key={s.nome} x={inicio + k * barra} y={topo} width={Math.max(1, barra - 1)} height={Math.max(1, Math.abs(y(v) - y(0)))} rx={2} style={{ fill: s.cor }} />;
+                const de = empilhar ? base : 0;
+                const ate = empilhar ? base + Math.max(0, v) : v;
+                if (empilhar) base = ate;
+                if (ate === de) return null;
+                const topo = Math.min(y(ate), y(de));
+                const x = empilhar ? inicio : inicio + k * barra;
+                return (
+                  <rect
+                    key={s.nome}
+                    x={x}
+                    y={topo}
+                    width={Math.max(1, barra - 1)}
+                    height={Math.max(1, Math.abs(y(ate) - y(de)))}
+                    rx={2}
+                    className={s.previsao ? 'grafico-barra-previsao' : undefined}
+                    style={s.previsao ? { fill: s.cor, stroke: s.cor } : { fill: s.cor }}
+                  />
+                );
               })}
               {visiveis.has(i) && (
                 <text className="grafico-eixo" x={centro} y={altura - 8} textAnchor="middle">

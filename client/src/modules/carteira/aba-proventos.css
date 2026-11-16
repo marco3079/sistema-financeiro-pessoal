@@ -276,3 +276,30 @@
 .proventos-mapa thead th.proventos-mes-futuro {
   font-style: italic;
 }
+
+/* Popup com os proventos de um mês */
+.proventos-detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.proventos-detalhe-resumo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.proventos-detalhe-resumo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+}
+
+.proventos-detalhe-resumo strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}

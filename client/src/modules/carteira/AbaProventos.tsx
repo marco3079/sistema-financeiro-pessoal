@@ -10,7 +10,8 @@ import {
   somarMeses,
 } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
-import { Abas, Aviso, Botao, Campo, Cartao, Carregando, Selecao, Selo, Tabela } from '../../ui';
+import { Abas, Aviso, Botao, Campo, Cartao, Carregando, Modal, Selecao, Selo, Tabela } from '../../ui';
+import type { ColunaTabela } from '../../ui';
 import { ResumoItem, Rosca, Vazio } from '../../ui/financas';
 import type { Fatia } from '../../ui/financas';
 import { CORES_SERIE, GraficoBarras } from '../../ui/graficos';
@@ -111,6 +112,8 @@ export function AbaProventos() {
 
 function VisaoResumo({ dados }: { dados: ProventosDTO }) {
   const [mostrarTodos, setMostrarTodos] = useState(false);
+  const [mesAberto, setMesAberto] = useState<string | null>(null);
+  const temAnunciado = dados.historico.some((h) => (h.anunciado ?? 0) > 0);
 
   const ordenados = [...dados.porAtivo].sort((a, b) => b.total - a.total);
 
@@ -153,11 +156,32 @@ function VisaoResumo({ dados }: { dados: ProventosDTO }) {
       <Cartao titulo="Histórico de proventos">
         <GraficoBarras
           rotulos={dados.historico.map((h) => mesCurto(h.mes))}
-          series={[{ nome: 'Proventos', cor: CORES_SERIE.carteira, valores: dados.historico.map((h) => h.total) }]}
+          series={[
+            { nome: 'Recebido', cor: CORES_SERIE.carteira, valores: dados.historico.map((h) => h.total) },
+            ...(temAnunciado
+              ? [
+                  {
+                    nome: 'Anunciado',
+                    cor: CORES_SERIE.carteira,
+                    valores: dados.historico.map((h) => h.anunciado ?? 0),
+                    previsao: true,
+                  },
+                ]
+              : []),
+          ]}
+          empilhar
           formato={dinheiroCurto}
-          descricao="Gráfico de barras com o total de proventos recebido por mês"
+          descricao="Gráfico de barras com o total de proventos recebido por mês e, por cima, o já anunciado pela B3"
+          aoClicar={(i) => setMesAberto(dados.historico[i]?.mes ?? null)}
+          rotuloDoClique={(i) => `Ver os proventos de ${rotuloMes(dados.historico[i]?.mes ?? '')}`}
         />
+        <p className="cart-suave">
+          Clique num mês para ver o detalhe.
+          {temAnunciado && ' A parte clara, tracejada, é o que a B3 já anunciou e ainda não foi pago.'}
+        </p>
       </Cartao>
+
+      <DetalheDoMes dados={dados} mes={mesAberto} aoFechar={() => setMesAberto(null)} />
 
       <Cartao titulo="Mapa de calor mensal">
         <p className="cart-suave">
@@ -473,5 +497,71 @@ function VisaoAgenda({ dados }: { dados: ProventosDTO }) {
         </div>
       </Cartao>
     </>
+  );
+}
+
+interface LinhaDetalhe {
+  chave: string;
+  data: string;
+  rotulo: string;
+  valor: number;
+  anunciado: boolean;
+}
+
+// Popup com os proventos de um mês: o que entrou e o que a B3 já anunciou para ele.
+function DetalheDoMes({ dados, mes, aoFechar }: { dados: ProventosDTO; mes: string | null; aoFechar: () => void }) {
+  const linhas: LinhaDetalhe[] = mes
+    ? [
+        ...(dados.pagamentos ?? [])
+          .filter((p) => p.data.slice(0, 7) === mes)
+          .map((p, i) => ({ chave: `r-${i}`, data: p.data, rotulo: p.rotulo, valor: p.valor, anunciado: false })),
+        ...dados.agenda.itens
+          .filter((p) => p.anunciado && p.data.slice(0, 7) === mes)
+          .map((p, i) => ({ chave: `a-${i}`, data: p.data, rotulo: p.rotulo, valor: p.valor, anunciado: true })),
+      ].sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : b.valor - a.valor))
+    : [];
+  const recebido = linhas.filter((l) => !l.anunciado).reduce((s, l) => s + l.valor, 0);
+  const anunciado = linhas.filter((l) => l.anunciado).reduce((s, l) => s + l.valor, 0);
+
+  const colunas: ColunaTabela<LinhaDetalhe>[] = [
+    { titulo: 'Data', celula: (l) => formatarDia(l.data) },
+    { titulo: 'Ativo', celula: (l) => <strong>{l.rotulo}</strong> },
+    {
+      titulo: 'Situação',
+      celula: (l) => <Selo cor={l.anunciado ? 'azul' : 'verde'}>{l.anunciado ? 'Anunciado' : 'Recebido'}</Selo>,
+    },
+    {
+      titulo: 'Valor',
+      alinhar: 'direita',
+      celula: (l) => <span className={l.anunciado ? 'proventos-anunciado' : undefined}>{formatarReais(l.valor)}</span>,
+    },
+  ];
+
+  return (
+    <Modal aberto={mes !== null} titulo={mes ? `Proventos de ${rotuloMes(mes)}` : ''} aoFechar={aoFechar}>
+      <div className="proventos-detalhe">
+        <div className="proventos-detalhe-resumo">
+          <div>
+            <span className="cart-suave">Recebido</span>
+            <strong>{formatarReais(recebido)}</strong>
+          </div>
+          <div>
+            <span className="cart-suave">Anunciado</span>
+            <strong className="proventos-anunciado">{formatarReais(anunciado)}</strong>
+          </div>
+          <div>
+            <span className="cart-suave">Total</span>
+            <strong>{formatarReais(recebido + anunciado)}</strong>
+          </div>
+        </div>
+        <Tabela<LinhaDetalhe> chave={(l) => l.chave} dados={linhas} vazio="Nenhum provento neste mês." colunas={colunas} />
+        {anunciado > 0 && (
+          <p className="cart-suave">
+            Anunciado: valor por cota informado pela B3 × as cotas que você tem hoje. Entra como recebido quando o
+            pagamento for importado.
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }

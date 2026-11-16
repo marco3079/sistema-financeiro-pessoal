@@ -88,7 +88,9 @@ export interface ProventosDTO {
   mediaMensal: number;
   ultimosDozeMeses: number;
   rendimentoSobreOCusto: number | null; // proventos de 12 meses sobre o valor aplicado, em %
-  historico: { mes: string; total: number }[];
+  // total: recebido; anunciado: anunciado pela B3 e ainda não recebido (inclui meses futuros com anúncio).
+  historico: { mes: string; total: number; anunciado?: number }[];
+  pagamentos?: { data: string; id: number; rotulo: string; valor: number }[]; // recebidos no período, por data
   // Mapa de calor: 12 meses (colunas) por ativo (linhas); valores[i] corresponde a meses[i].
   // anunciados[i]: anunciado pela B3 e ainda não recebido, alinhado a [...meses, ...mesesFuturos].
   mapa: {

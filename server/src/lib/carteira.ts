@@ -716,7 +716,10 @@ export interface ProventosDTO {
   mediaMensal: number;
   ultimosDozeMeses: number;
   rendimentoSobreOCusto: number | null; // proventos de 12 meses sobre o valor aplicado, em %
-  historico: { mes: string; total: number }[];
+  // total: recebido no mês; anunciado: anunciado pela B3 e ainda não recebido. Inclui os meses futuros com anúncio.
+  historico: { mes: string; total: number; anunciado: number }[];
+  // Cada provento recebido no período, em ordem de data (para o detalhe de um mês).
+  pagamentos: { data: string; id: number; rotulo: string; valor: number }[];
   mapa: {
     meses: string[];
     // Meses depois do atual que já têm provento anunciado (vêm depois de `meses` em `anunciados`).
@@ -772,6 +775,7 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
   const mesesDoMapa = Array.from({ length: 12 }, (_, i) => mesesAtras(mesAtual, 11 - i));
   const itens: ProventosDTO['agenda']['itens'] = [];
   const porAtivo: ProventosDTO['porAtivo'] = [];
+  const pagamentosDoPeriodo: ProventosDTO['pagamentos'] = [];
   const linhasDoMapa: (Omit<ProventosDTO['mapa']['linhas'][number], 'anunciados'> & { porMesAnunciado: Map<string, number> })[] = [];
   // Proventos anunciados (B3) dos ativos que ainda estão na carteira.
   const anunciados = await proventosAnunciados(
@@ -802,6 +806,7 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
       if (noMapa >= 0) valores[noMapa] += valor;
       if (primeiroMes !== null && mes < primeiroMes) continue;
       porMes.set(mes, (porMes.get(mes) ?? 0) + valor);
+      pagamentosDoPeriodo.push({ data, id: a.id, rotulo, valor: arredondar(valor) });
       totalDoAtivo += valor;
       pagamentos++;
     }
@@ -880,6 +885,8 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
   const previstoAte = (limite: string) => itens.filter((i) => i.situacao === 'PREVISTO' && i.data <= limite).reduce((s, i) => s + i.valor, 0);
   const doMes = itens.filter((i) => i.data.slice(0, 7) === mesAtual);
   const mesesFuturos = [...new Set(linhasDoMapa.flatMap((l) => [...l.porMesAnunciado.keys()]))].filter((m) => m > mesAtual).sort();
+  const anunciadoNoMes = (mes: string) => linhasDoMapa.reduce((s, l) => s + (l.porMesAnunciado.get(mes) ?? 0), 0);
+  pagamentosDoPeriodo.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : a.rotulo.localeCompare(b.rotulo)));
 
   return {
     geradoEm: new Date().toISOString(),
@@ -888,7 +895,12 @@ export async function montarProventos(meses: number): Promise<ProventosDTO> {
     mediaMensal: arredondar(mesesDoHistorico.length > 0 ? total / mesesDoHistorico.length : 0),
     ultimosDozeMeses: arredondar(dozeMeses),
     rendimentoSobreOCusto: aplicado > 0 ? pct(dozeMeses / aplicado) : null,
-    historico: mesesDoHistorico.map((mes) => ({ mes, total: arredondar(porMes.get(mes) ?? 0) })),
+    historico: [...mesesDoHistorico, ...mesesFuturos].map((mes) => ({
+      mes,
+      total: arredondar(porMes.get(mes) ?? 0),
+      anunciado: arredondar(anunciadoNoMes(mes)),
+    })),
+    pagamentos: pagamentosDoPeriodo,
     mapa: {
       meses: mesesDoMapa,
       mesesFuturos,
