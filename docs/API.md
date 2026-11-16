@@ -209,6 +209,19 @@ Metas aceitam `contaId` ou `investimentoId` (um dos dois): o valor guardado acom
 
 **Usuário somente leitura (`LEITOR`)**: todo método que não seja GET responde 403, exceto sair e trocar a própria senha; as áreas de usuários, MCP, Drive, atualização, segurança, logs, configurações, pasta de entrada, avisos e cupom ficam fechadas também para consulta; o perfil financeiro é o do cadastro do usuário, e o cabeçalho `X-Perfil` é ignorado.
 
+## Automações
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/automacoes` | lista com `aplicados` (lançamentos alterados por cada uma) |
+| POST, PUT, DELETE | `/automacoes`, `/automacoes/:id` | cria, edita e exclui. `tipo`: `PAR_CONTAS`, `PAR_MESMA_CONTA`, `FATURA`, `INVESTIMENTO`, `ESTORNO`, `TEXTO`, `COMBINADA`. `acao`: `TRANSFERENCIA`, `CATEGORIA`, `ESCONDER`. `config`: `contaIds`, `tipoLancamento`, `textos`, `textosEntrada`, `textosSaida`, `valorMin`, `valorMax`, `diasMax`, `tolerancia` |
+| POST | `/automacoes/padrao` | cria o conjunto padrão que ainda não existe |
+| POST | `/automacoes/previa` | `{ automacaoId? }` → o que mudaria, sem gravar |
+| POST | `/automacoes/aplicar` | `{ automacaoId? }` → aplica a todo o histórico |
+| POST | `/automacoes/:id/desfazer` | desfaz o que a automação fez |
+
+O lançamento alterado guarda `automacaoId`; as automações não mexem de novo em quem já tem esse campo, nem em lançamento que já é transferência. Excluir uma automação que tirava lançamentos da lista devolve os lançamentos.
+
 ## Open Finance
 
 | Método | Rota | O que faz |

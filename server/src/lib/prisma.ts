@@ -19,6 +19,7 @@ const MODELOS_DO_PERFIL = new Set([
   'Orcamento',
   'Meta',
   'RegraCategoria',
+  'Automacao',
   'ContaFixa',
   'PagamentoContaFixa',
   'AlocacaoAlvo',

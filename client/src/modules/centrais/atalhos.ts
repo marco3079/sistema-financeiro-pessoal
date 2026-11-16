@@ -22,6 +22,7 @@ const CAMINHOS_SO_TITULAR = [
   '/app/importar',
   '/app/rapido',
   '/app/regras',
+  '/app/automacoes',
   '/app/cupom',
   '/app/avisos',
   '/app/conexoes',
@@ -44,6 +45,7 @@ export const ATALHOS_INVESTIMENTOS: Atalho[] = [
 export const ATALHOS_DADOS: Atalho[] = [
   { caminho: '/app/entrada', titulo: 'Pasta de entrada', texto: 'Arquivos guardados para importar depois.' },
   { caminho: '/app/regras', titulo: 'Regras de categoria', texto: 'Categorias automáticas para novos lançamentos.' },
+  { caminho: '/app/automacoes', titulo: 'Automações', texto: 'Condições que marcam transferências, categorias e o que sai da lista.' },
   { caminho: '/app/categorias', titulo: 'Categorias', texto: 'Crie e organize as categorias de gastos e receitas.' },
   { caminho: '/app/conciliacao', titulo: 'Conciliação', texto: 'Confira os lançamentos com a fatura do cartão.' },
   { caminho: '/app/conexoes', titulo: 'Conexões', texto: 'Bancos e serviços ligados ao sistema.' },

@@ -60,6 +60,7 @@ const AREAS_FECHADAS_AO_LEITOR = [
   '/api/configuracoes',
   '/api/entrada',
   '/api/avisos',
+  '/api/automacoes',
   '/api/cupom',
 ];
 

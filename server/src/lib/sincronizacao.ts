@@ -9,6 +9,7 @@
 import type { Prisma, StatusConexao, TipoConta, TipoInvestimento, TipoMovimentoInvestimento } from '@prisma/client';
 import { comPerfil, prisma } from './prisma';
 import { ehPagamentoDeFaturaNaConta, marcarPixNoCreditoNasContas } from './pixNoCredito';
+import { aplicarAutomacoes } from './automacoes';
 import { gravarProventosDasContas } from './proventosOpenFinance';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
 import {
@@ -860,6 +861,7 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
     // Pix pago no crédito: o crédito do cartão na conta e a saída de mesmo valor viram transferência.
     // Olha 2 anos para trás, para acertar também o que já estava no sistema antes desta regra.
     await marcarPixNoCreditoNasContas(idsDasContas, new Date(hoje().getTime() - 730 * MS_DIA));
+    await aplicarAutomacoes({ desde: new Date(hoje().getTime() - 10 * MS_DIA) }).catch(() => undefined);
     await gravarInvestimentos(referencia, conexao.pluggyItemId);
     // Proventos: os créditos de dividendos e rendimentos na conta viram movimento do ativo (olha 2 anos para trás;
     // não repete o que já foi criado).

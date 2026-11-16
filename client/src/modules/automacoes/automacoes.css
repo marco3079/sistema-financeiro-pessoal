@@ -1,0 +1,128 @@
+/* Tela de automações. Cores só por variáveis do tema. Cabe em 360 px sem rolagem horizontal. */
+
+.automacoes-ajuda {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.automacoes-itens {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.automacoes-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.automacoes-titulo {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.automacoes-nome {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.automacoes-tipo {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.automacoes-cabecalho-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.automacoes-condicoes,
+.automacoes-acao,
+.automacoes-contagem {
+  margin: 0.5rem 0 0;
+  font-size: 0.92rem;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.automacoes-acao {
+  font-weight: 600;
+}
+
+.automacoes-contagem {
+  color: var(--cor-texto-suave);
+}
+
+.automacoes-contas {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.75rem;
+  min-width: 0;
+}
+
+.automacoes-previa {
+  margin-top: 0.5rem;
+  min-width: 0;
+}
+
+.automacoes-resumo {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.automacoes-grupo {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--cor-borda);
+  min-width: 0;
+}
+
+.automacoes-grupo-nome {
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.automacoes-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+.automacoes-linha-data {
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.automacoes-linha-descricao {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--cor-texto);
+}
+
+.automacoes-linha-conta {
+  flex: 0 1 100%;
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.automacoes-linha .fin-valor {
+  white-space: nowrap;
+}

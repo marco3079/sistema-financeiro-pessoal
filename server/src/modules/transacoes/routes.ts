@@ -152,7 +152,7 @@ router.get(
   '/transacoes',
   asyncHandler(async (req, res) => {
     // Créditos de provento já registrados no ativo não entram na lista: aparecem em Carteira > Proventos.
-    const where: Prisma.TransacaoWhereInput = { provento: false };
+    const where: Prisma.TransacaoWhereInput = { provento: false, oculto: false };
 
     const mes = textoQuery(req.query.mes);
     const de = textoQuery(req.query.de);
@@ -198,7 +198,7 @@ router.get(
       if (aberta) {
         const itens = await prisma.transacao.groupBy({
           by: ['tipo'],
-          where: { faturaId: aberta.id, transferencia: false, provento: false },
+          where: { faturaId: aberta.id, transferencia: false, provento: false, oculto: false },
           _sum: { valor: true },
         });
         const somaDosItens =

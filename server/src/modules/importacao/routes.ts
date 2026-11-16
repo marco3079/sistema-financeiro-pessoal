@@ -23,6 +23,7 @@ import {
 import { analisarArquivo } from '../../lib/importacao/extrato';
 import type { ItemLido } from '../../lib/importacao/extrato';
 import { analisarPlanilhaB3 } from '../../lib/importacao/b3';
+import { aplicarAutomacoes } from '../../lib/automacoes';
 import { atualizarCotacoes, buscarCotacao, iniciarCotacoesAutomaticas, tokenDasCotacoes } from '../../lib/cotacoes';
 
 // Importação de arquivos: fatura do cartão e extrato da conta (CSV, OFX ou PDF), planilhas da B3
@@ -369,6 +370,7 @@ router.post(
     );
 
     await registrarPosicaoPatrimonio();
+    await aplicarAutomacoes({ desde: new Date(hoje().getTime() - 10 * MS_DIA) }).catch(() => undefined);
     res.status(201).json({ ...resultado, contaId: conta.id, contaNome: conta.nome });
   })
 );

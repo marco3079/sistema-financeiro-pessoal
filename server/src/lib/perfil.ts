@@ -98,6 +98,7 @@ export async function apagarPerfil(perfilId: number): Promise<void> {
         await db.pagamentoContaFixa.deleteMany({});
         await db.contaFixa.deleteMany({});
         await db.regraCategoria.deleteMany({});
+        await db.automacao.deleteMany({});
         await db.alocacaoAlvo.deleteMany({});
         await db.orcamento.deleteMany({});
         await db.meta.deleteMany({});

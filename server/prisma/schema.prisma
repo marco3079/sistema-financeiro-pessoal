@@ -179,6 +179,11 @@ model Transacao {
   // Crédito de provento na conta da corretora que já virou rendimento do ativo: fica fora da lista de lançamentos
   // (aparece em Carteira > Proventos) e, por ser também transferência, fora das receitas.
   provento      Boolean       @default(false)
+  // Tirado da lista de lançamentos por uma automação (ação ESCONDER). Vai sempre junto com transferencia = true.
+  oculto        Boolean       @default(false)
+  // Automacao.id que mexeu neste lançamento. Com valor, as automações não mexem nele de novo (o que a pessoa
+  // desfizer à mão fica como ela deixou).
+  automacaoId   Int?
   pendente      Boolean       @default(false)
   categoriaId   Int?
   categoria     Categoria?    @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
@@ -414,6 +419,25 @@ model RegraCategoria {
   trecho      String // comparado sem acento e sem diferenciar maiúsculas
   categoriaId Int
   criadoEm    DateTime @default(now())
+
+  @@index([perfilId])
+}
+
+// Automação: condições + ação aplicadas aos lançamentos (marcar transferência, definir categoria, esconder).
+// `config` guarda as condições em JSON (formato em server/src/lib/automacoes.ts).
+model Automacao {
+  id           Int      @id @default(autoincrement())
+  perfilId     Int      @default(1)
+  nome         String
+  tipo         String // PAR_CONTAS | PAR_MESMA_CONTA | FATURA | INVESTIMENTO | ESTORNO | TEXTO | COMBINADA
+  acao         String   @default("TRANSFERENCIA") // TRANSFERENCIA | CATEGORIA | ESCONDER
+  categoriaId  Int? // só para a ação CATEGORIA
+  config       Json     @default("{}")
+  ativa        Boolean  @default(true)
+  ordem        Int      @default(0)
+  padrao       String? // chave do conjunto padrão (para não criar duas vezes)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
 
   @@index([perfilId])
 }

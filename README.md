@@ -107,6 +107,7 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 **Menos trabalho manual**
 
 - **Regras de categoria** ("contém UBER" → Transporte), aplicadas na importação e, com prévia, aos lançamentos que já existem. O mesmo reprocessamento marca como transferência o Pix pago no crédito.
+- **Automações** (em Mais de dados): condições + ação. Tipos: entrada e saída de mesmo valor entre contas ou na mesma conta, pagamento de fatura, aplicação e resgate de investimento, compra e estorno, texto na descrição e condições combinadas (conta, tipo, faixa de valor, texto). Ações: marcar como transferência, definir categoria ou tirar da lista de lançamentos. Rodam sozinhas nos lançamentos dos últimos 10 dias a cada sincronização e importação; para os antigos há prévia, aplicar e desfazer. Um conjunto padrão vem pronto em um clique.
 - **Pasta de entrada**: arquivos CSV e OFX colocados em `financas-pessoais/entrada`, na pasta do Drive, são importados sozinhos e movidos para `importados` ou `com-erro`.
 - **Planilha de investimentos**: CDB, fundos e outros ativos de fora da B3 por um CSV modelo.
 
