@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { formatarDia, formatarReais } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
 import { Aviso, Carregando, Modal, Selo, Tabela } from '../../ui';
@@ -29,7 +30,7 @@ interface IndicadorFii {
   explicacao: string;
 }
 
-interface AnaliseFii {
+export interface AnaliseFii {
   nota: number | null;
   faixa: 'BOA' | 'ATENCAO' | 'FRACA' | null;
   indicadores: IndicadorFii[];
@@ -61,7 +62,7 @@ const ROTULO_AVALIACAO: Record<Avaliacao, { texto: string; cor: 'verde' | 'amare
 };
 
 // Nota de 0 a 100 e a tabela dos indicadores, cada um com a faixa considerada boa e os pontos que valeu.
-function NotaDoFundo({ analise }: { analise: AnaliseFii }) {
+export function NotaDoFundo({ analise, fonte, aviso }: { analise: AnaliseFii; fonte?: string; aviso?: string }) {
   const classeNota =
     analise.faixa === 'BOA' ? 'fb3-nota-boa' : analise.faixa === 'ATENCAO' ? 'fb3-nota-atencao' : analise.faixa === 'FRACA' ? 'fb3-nota-fraca' : '';
   const textoFaixa =
@@ -100,10 +101,11 @@ function NotaDoFundo({ analise }: { analise: AnaliseFii }) {
           <span className="fin-suave">
             Nota pelos indicadores abaixo: cada um vale pontos conforme a faixa em que está, com o peso indicado.
             {analise.pesoConsiderado < 100 && ` Só ${analise.pesoConsiderado} dos 100 pontos tinham dado; a nota é proporcional a eles.`}
-            {analise.dataCvm && ` Patrimônio e cotistas: informe da CVM de ${analise.dataCvm.split('-').reverse().join('/')}.`}
+            {analise.dataCvm && ` ${fonte ?? 'Patrimônio e cotistas: informe da CVM de'} ${analise.dataCvm.split('-').reverse().join('/')}.`}
           </span>
           <span className="fin-suave">
-            A nota é só uma leitura dos números: não avalia os imóveis, os inquilinos nem os créditos, e não é recomendação de compra ou venda.
+            {aviso ??
+              'A nota é só uma leitura dos números: não avalia os imóveis, os inquilinos nem os créditos, e não é recomendação de compra ou venda.'}
           </span>
         </div>
       </div>
@@ -166,33 +168,35 @@ interface FichaFundo {
   } | null;
 }
 
-function porCota(valor: number | null): string {
+export function porCota(valor: number | null): string {
   if (valor === null) return '—';
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
-function inteiro(valor: number | null): string {
+export function inteiro(valor: number | null): string {
   return valor === null ? '—' : valor.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 }
 
-function percentual(valor: number | null): string {
+export function percentual(valor: number | null): string {
   return valor === null ? '—' : valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 }
 
 // Valor de mercado em texto curto: "R$ 1,78 bi", "R$ 350,2 mi".
-function grande(valor: number | null): string {
+export function grande(valor: number | null): string {
   if (valor === null) return '—';
-  if (valor >= 1e9) return `R$ ${(valor / 1e9).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} bi`;
-  if (valor >= 1e6) return `R$ ${(valor / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  const sinal = valor < 0 ? '−' : '';
+  const abs = Math.abs(valor);
+  if (abs >= 1e9) return `${sinal}R$ ${(abs / 1e9).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} bi`;
+  if (abs >= 1e6) return `${sinal}R$ ${(abs / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
   return formatarReais(valor);
 }
 
-function rotuloTipo(tipo: string): string {
+export function rotuloTipo(tipo: string): string {
   const t = tipo.toLowerCase();
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-function Indicador({ rotulo, valor, apoio }: { rotulo: string; valor: string; apoio?: string }) {
+export function Indicador({ rotulo, valor, apoio }: { rotulo: string; valor: string; apoio?: string }) {
   return (
     <div className="fb3-indicador">
       <span className="fin-suave">{rotulo}</span>
@@ -202,9 +206,20 @@ function Indicador({ rotulo, valor, apoio }: { rotulo: string; valor: string; ap
   );
 }
 
-export function FundoB3({ codigo, aoFechar }: { codigo: string | null; aoFechar: () => void }) {
+export function FundoB3({
+  codigo,
+  aoFechar,
+  aoNaoSerFundo,
+}: {
+  codigo: string | null;
+  aoFechar: () => void;
+  aoNaoSerFundo?: () => void; // a B3 não conhece como fundo (unit ou ETF com final 11): quem abriu tenta como ação
+}) {
   const { dados, carregando, erro } = useDados<FichaFundo>(codigo ? `/carteira/fundo/${encodeURIComponent(codigo)}` : null);
   const ficha = dados && dados.fundo.codigo === codigo ? dados : null;
+  useEffect(() => {
+    if (erro && aoNaoSerFundo && /não encontrou o fundo/i.test(erro)) aoNaoSerFundo();
+  }, [erro]);
 
   const colunasProventos: ColunaTabela<ProventoB3>[] = [
     {

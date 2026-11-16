@@ -10,6 +10,7 @@ import { Icone } from '../ui/icones';
 import { BotaoAtualizar } from './BotaoAtualizar';
 import { BotaoCelular } from './BotaoCelular';
 import { Busca } from './Busca';
+import { FichaAtivoProvider } from './FichaAtivo';
 import { agrupar } from './grupos';
 import { MenuUsuario } from './MenuUsuario';
 import { Notificacoes } from './Notificacoes';
@@ -172,7 +173,10 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
               </div>
             </header>
           )}
-          <Outlet />
+          {/* Clicar no código de um ativo, em qualquer tela, abre a ficha dele. */}
+          <FichaAtivoProvider>
+            <Outlet />
+          </FichaAtivoProvider>
         </div>
       </main>
 

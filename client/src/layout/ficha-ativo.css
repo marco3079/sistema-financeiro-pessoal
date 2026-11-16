@@ -1,0 +1,19 @@
+/* Código de ativo que abre a ficha (layout/FichaAtivo.tsx) */
+.codigo-ativo {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.codigo-ativo:hover {
+  color: var(--cor-primaria);
+  text-decoration-style: solid;
+  text-decoration-color: var(--cor-primaria);
+}
+
+.codigo-ativo:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+  border-radius: 3px;
+}

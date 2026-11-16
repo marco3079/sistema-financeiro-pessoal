@@ -9,6 +9,9 @@ import { hojeISO, somarDias } from '../../lib/indices';
 import { prisma } from '../../lib/prisma';
 import { fundoNaCvm } from '../../lib/cvmFii';
 import { analisarFii } from '../../lib/notaFii';
+import { analisarAcao } from '../../lib/notaAcao';
+import { companhiaNaB3, proventosDaClasse } from '../../lib/b3Companhia';
+import { balancoDaCompanhia } from '../../lib/cvmBalancos';
 
 // Carteira de investimentos: resumo, rentabilidade (por dia, mês e ano, contra os índices), relatório e proventos.
 // O cálculo está em lib/carteira.ts.
@@ -147,6 +150,98 @@ router.get(
             ultimaDataRecebida: investimento.movimentos.length
               ? dataISO(investimento.movimentos.reduce((a, m) => (m.data > a ? m.data : a), investimento.movimentos[0].data))
               : null,
+          }
+        : null,
+    });
+  })
+);
+
+// Ficha de uma ação (ou unit): dados da companhia na B3 (código CVM, ações e proventos da classe), o último
+// balanço anual na CVM, a cotação, os indicadores com a nota de 0 a 100 e a posição da pessoa.
+router.get(
+  '/carteira/acao/:codigo',
+  asyncHandler(async (req, res) => {
+    const codigo = String(req.params.codigo ?? '').trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9]{3}\d{1,2}$/.test(codigo)) {
+      throw new HttpError(400, 'Informe o código de uma ação, como ITSA4 ou PETR4.');
+    }
+    const companhia = await companhiaNaB3(codigo);
+    if (!companhia) {
+      throw new HttpError(404, `A B3 não encontrou a empresa de ${codigo}, ou o site dela não respondeu. Confira o código e tente de novo.`);
+    }
+    const hoje = hojeISO();
+
+    // Cotação: brapi (com token) e, sem ela, o último fechamento do Yahoo Finance.
+    const credencial = await tokenDasCotacoes();
+    const cotacao = async (cod: string): Promise<{ preco: number | null; fonte: 'BRAPI' | 'YAHOO' | null }> => {
+      if (credencial) {
+        try {
+          const p = await buscarCotacao(cod, credencial.token);
+          if (p !== null) return { preco: p, fonte: 'BRAPI' };
+        } catch {
+          // limite do plano ou token recusado: tenta o Yahoo
+        }
+      }
+      try {
+        await garantirPrecos([cod], somarDias(hoje, -30));
+        const p = await ultimoPreco(cod);
+        if (p !== null) return { preco: p, fonte: 'YAHOO' };
+      } catch {
+        // sem preço
+      }
+      return { preco: null, fonte: null };
+    };
+    const { preco, fonte: fontePreco } = await cotacao(codigo);
+
+    // Valor de mercado: cada classe pelo próprio preço (ON = final 3, PN = final 4). A unit (final 11) é um pacote
+    // de ações e não entra nessa conta. Sem o preço de uma classe, usa o da outra.
+    const base = codigo.slice(0, 4);
+    const final = codigo.slice(4);
+    const precoOn = companhia.acoesOrdinarias ? (final === '3' ? preco : (await cotacao(`${base}3`)).preco) : null;
+    const precoPn = companhia.acoesPreferenciais ? (final === '4' ? preco : (await cotacao(`${base}4`)).preco) : null;
+    const on = companhia.acoesOrdinarias ?? 0;
+    const pn = companhia.acoesPreferenciais ?? 0;
+    const pOn = precoOn ?? precoPn;
+    const pPn = precoPn ?? precoOn;
+    const valorDeMercado =
+      (on > 0 && pOn !== null) || (pn > 0 && pPn !== null) ? on * (pOn ?? 0) + pn * (pPn ?? 0) : null;
+
+    const balancos = await balancoDaCompanhia(companhia.codigoCvm);
+    const proventos = proventosDaClasse(companhia, codigo);
+    const analise = analisarAcao({
+      balanco: balancos?.atual ?? null,
+      lucro5AnosAntes: balancos?.lucro5AnosAntes ?? null,
+      preco,
+      valorDeMercado,
+      proventos,
+      hoje,
+    });
+
+    const investimento = await prisma.investimento.findFirst({ where: { codigo, ativo: true }, orderBy: { id: 'asc' } });
+    const quantidade = investimento ? num(investimento.quantidade) : 0;
+    const umAnoAtras = somarDias(hoje, -365);
+    res.json({
+      codigo,
+      companhia: {
+        nome: balancos?.atual.companhia || companhia.nomePregao,
+        nomePregao: companhia.nomePregao,
+        codigoCvm: companhia.codigoCvm,
+        segmentoDeListagem: companhia.segmento,
+        acoesTotal: companhia.acoesTotal,
+        balancoConsolidado: balancos?.atual.consolidado ?? null,
+      },
+      preco,
+      fontePreco,
+      analise,
+      // Proventos da classe nos últimos 12 meses e os anunciados a pagar.
+      proventos: proventos.filter((p) => p.dataPagamento > umAnoAtras),
+      posicao: investimento
+        ? {
+            investimentoId: investimento.id,
+            quantidade,
+            valorAplicado: num(investimento.valorAplicado),
+            saldo: num(investimento.saldo),
+            precoMedio: quantidade > 0 ? quatroCasas(num(investimento.valorAplicado) / quantidade) : null,
           }
         : null,
     });

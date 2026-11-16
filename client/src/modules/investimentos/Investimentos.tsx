@@ -19,7 +19,7 @@ import { Aviso, Botao, Caixa, Campo, Cartao, Carregando, Modal, MenuAcoes, Pagin
 import type { AcaoMenu } from '../../ui';
 import { BarraProgresso, NomeComCor, ResumoItem, Rosca, SeloOrigem, Valor } from '../../ui/financas';
 import { DetalheInvestimento } from './DetalheInvestimento';
-import { FundoB3 } from './FundoB3';
+import { CODIGO_ATIVO, CodigoAtivo, useFichaAtivo } from '../../layout/FichaAtivo';
 import { ImportarPlanilha } from './ImportarPlanilha';
 import './investimentos.css';
 
@@ -177,7 +177,7 @@ function FormInvestimento({
 }
 
 // Código de fundo imobiliário na bolsa (XPML11).
-const CODIGO_FII = /^[A-Z]{4}11$/;
+
 
 function semAcento(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -194,7 +194,7 @@ export function Investimentos() {
   const [detalheId, setDetalheId] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
-  const [fundoAberto, setFundoAberto] = useState<string | null>(null);
+  const abrirFicha = useFichaAtivo();
   const { dados, carregando, erro, recarregar } = useDados<RespostaInvestimentos>(
     '/investimentos' + queryString({ tipo, inativos: mostrarInativos ? 'true' : '' })
   );
@@ -227,8 +227,8 @@ export function Investimentos() {
       { rotulo: 'Editar', icone: 'lapis', aoClicar: () => setEditando(i) },
     ];
     const codigo = (i.codigo ?? '').toUpperCase();
-    if (i.tipo === 'FII' && CODIGO_FII.test(codigo)) {
-      acoes.splice(1, 0, { rotulo: 'Dados na B3', icone: 'grafico', aoClicar: () => setFundoAberto(codigo) });
+    if ((i.tipo === 'FII' || i.tipo === 'ACAO' || i.tipo === 'ETF') && CODIGO_ATIVO.test(codigo)) {
+      acoes.splice(1, 0, { rotulo: 'Ver ficha (nota e indicadores)', icone: 'grafico', aoClicar: () => abrirFicha(codigo) });
     }
     if (i.ativo) {
       acoes.push({ rotulo: 'Desativar', icone: 'fechar', aoClicar: () => alternarAtivo(i, false) });
@@ -250,7 +250,7 @@ export function Investimentos() {
     : todos;
   // Código de FII digitado na busca: dá para abrir a ficha dele na B3, mesmo sem tê-lo na carteira.
   const codigoBuscado = busca.trim().toUpperCase();
-  const buscaEhFundo = CODIGO_FII.test(codigoBuscado);
+  const buscaEhFundo = CODIGO_ATIVO.test(codigoBuscado);
   const total = dados?.total ?? 0;
   const aplicado = dados?.aplicado ?? 0;
   const rendimento = dados?.rendimento ?? 0;
@@ -341,10 +341,10 @@ export function Investimentos() {
       {dados && (
         <div className="barra-ferramentas">
           <div className="filtros inv-busca-b3">
-            <Campo rotulo="Buscar investimento ou código de FII" valor={busca} aoMudar={setBusca} />
+            <Campo rotulo="Buscar investimento ou código de ativo" valor={busca} aoMudar={setBusca} />
             {buscaEhFundo && (
-              <Botao variante="secundario" aoClicar={() => setFundoAberto(codigoBuscado)}>
-                Ver {codigoBuscado} na B3
+              <Botao variante="secundario" aoClicar={() => abrirFicha(codigoBuscado)}>
+                Ver a ficha de {codigoBuscado}
               </Botao>
             )}
           </div>
@@ -363,7 +363,7 @@ export function Investimentos() {
           vazio={
             termo
               ? buscaEhFundo
-                ? `Você não tem ${codigoBuscado} na carteira. Clique em "Ver ${codigoBuscado} na B3" para ver os dados do fundo.`
+                ? `Você não tem ${codigoBuscado} na carteira. Clique em "Ver a ficha de ${codigoBuscado}" para ver os dados e a nota.`
                 : 'Nenhum investimento com esse nome ou código.'
               : 'Nenhum investimento. Cadastre um aqui ou conecte sua corretora em Conexões.'
           }
@@ -372,13 +372,20 @@ export function Investimentos() {
             {
               titulo: 'Investimento',
               celula: (i) => {
-                const detalhes = [i.codigo, i.subtipo, i.instituicao].filter(Boolean).join(' · ');
+                const resto = [i.subtipo, i.instituicao].filter(Boolean).join(' · ');
+                const codigo = (i.codigo ?? '').toUpperCase();
                 return (
                   <span className="inv-celula-nome">
                     <span className="inv-nome">
                       {i.nome} <SeloOrigem origem={i.origem} />
                     </span>
-                    {detalhes && <span className="fin-suave inv-apoio">{detalhes}</span>}
+                    {(codigo || resto) && (
+                      <span className="fin-suave inv-apoio">
+                        {codigo && (CODIGO_ATIVO.test(codigo) ? <CodigoAtivo codigo={codigo} /> : codigo)}
+                        {codigo && resto ? ' · ' : ''}
+                        {resto}
+                      </span>
+                    )}
                   </span>
                 );
               },
@@ -436,7 +443,6 @@ export function Investimentos() {
         aoConcluir={recarregar}
       />
 
-      <FundoB3 codigo={fundoAberto} aoFechar={() => setFundoAberto(null)} />
 
       {detalheId !== null && (
         <DetalheInvestimento
