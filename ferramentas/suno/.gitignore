@@ -1,0 +1,4 @@
+# Chave de acesso e login da Suno: ficam só neste computador.
+config.json
+perfil-navegador/
+node_modules/

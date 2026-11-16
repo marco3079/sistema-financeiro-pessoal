@@ -38,6 +38,7 @@ export const ATALHOS_INVESTIMENTOS: Atalho[] = [
   { caminho: '/app/rendimento', titulo: 'Rendimento', texto: 'Quanto os investimentos renderam no período.' },
   { caminho: '/app/ativo', titulo: 'Ficha do ativo', texto: 'Histórico, preço médio e proventos de um ativo.' },
   { caminho: '/app/alvo', titulo: 'Carteira-alvo', texto: 'Compare a carteira atual com a divisão que você quer.' },
+  { caminho: '/app/suno', titulo: 'Carteiras Suno', texto: 'O que falta comprar ou já saiu das carteiras da Suno que você assina.' },
   { caminho: '/app/ir', titulo: 'Imposto de renda', texto: 'Resumo de vendas e imposto estimado do ano.' },
   { caminho: '/app/simulador', titulo: 'Simulador', texto: 'Veja quanto um aporte pode render ao longo do tempo.' },
 ];

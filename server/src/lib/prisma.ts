@@ -26,6 +26,7 @@ const MODELOS_DO_PERFIL = new Set([
   'Divisao',
   'EventoAtivo',
   'AvisoEnviado',
+  'CarteiraSuno',
 ]);
 
 const contexto = new AsyncLocalStorage<{ perfilId: number }>();

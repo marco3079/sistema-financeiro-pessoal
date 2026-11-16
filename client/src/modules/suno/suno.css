@@ -1,0 +1,72 @@
+.suno-ativo {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.suno-direita {
+  align-items: flex-end;
+}
+
+.suno-alerta {
+  font-size: 0.75rem;
+  color: var(--cor-aviso);
+  font-weight: 600;
+}
+
+.suno-falta {
+  color: var(--cor-primaria);
+  font-variant-numeric: tabular-nums;
+}
+
+.suno-sobra {
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.suno-passos {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.suno-codigo {
+  display: block;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.suno-rodape code {
+  overflow-wrap: anywhere;
+}
+
+.suno-rolagem {
+  overflow-x: auto;
+}
+
+.suno-bruta {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 0.85rem;
+}
+
+.suno-bruta th,
+.suno-bruta td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--cor-borda);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.suno-bruta th {
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}

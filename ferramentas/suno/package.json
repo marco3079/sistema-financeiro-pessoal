@@ -1,0 +1,12 @@
+{
+  "name": "financas-suno",
+  "private": true,
+  "description": "Traz as carteiras recomendadas da Suno Research para o sistema financeiro pessoal.",
+  "type": "module",
+  "scripts": {
+    "sincronizar": "node sincronizar.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

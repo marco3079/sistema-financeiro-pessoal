@@ -480,6 +480,21 @@ model AlocacaoAlvo {
   @@index([perfilId])
 }
 
+// Carteira recomendada da Suno Research, trazida pelo script ferramentas/suno (uma linha por carteira e perfil).
+// `dados` guarda as tabelas como a página mostra: recomendada, encerradas e demais (colunas + linhas).
+model CarteiraSuno {
+  id           Int      @id @default(autoincrement())
+  perfilId     Int      @default(1)
+  slug         String // "fiis", "dividendos"... (a parte final do endereço da carteira na Suno)
+  nome         String
+  url          String
+  dados        Json
+  atualizadoEm DateTime @default(now())
+
+  @@unique([perfilId, slug])
+  @@index([perfilId])
+}
+
 // Parte de um lançamento que outra pessoa deve a você.
 model Divisao {
   id          Int       @id @default(autoincrement())
