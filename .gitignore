@@ -9,3 +9,5 @@ dist/
 CLAUDE.md
 drive/
 backups/
+# Estado do atualizador neste computador (a pasta da raiz; os módulos client/ e server/ de mesmo nome entram no repositório)
+/atualizacao/
