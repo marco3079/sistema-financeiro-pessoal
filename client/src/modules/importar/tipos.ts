@@ -98,8 +98,18 @@ export interface AnaliseB3 {
   posicoes: PosicaoB3[];
   movimentos: MovimentoB3[];
   encerradas: string[];
+  // Ativos da carteira que no arquivo só têm proventos (período curto): entram só os proventos.
+  proventosAvulsos?: ProventosAvulsosB3[];
   eventos: { chave: string; data: string; tipo: 'DESDOBRAMENTO' | 'GRUPAMENTO' | 'BONIFICACAO'; fator: number; descricao: string }[];
   totalProventos: number;
+}
+
+export interface ProventosAvulsosB3 {
+  chave: string;
+  investimentoId: number;
+  proventos: number; // soma no arquivo
+  quantidade: number; // quantos proventos
+  ultimoMovimento: string | null;
 }
 
 // Corpo de POST /importacao/b3/confirmar. Em `posicoes`, mande só os campos de PosicaoB3 até `vencimento`.
@@ -111,8 +121,9 @@ export interface ConfirmarB3 {
     PosicaoB3,
     'chave' | 'codigo' | 'nome' | 'tipo' | 'subtipo' | 'instituicao' | 'quantidade' | 'valorAplicado' | 'saldo' | 'vencimento'
   >[];
-  movimentos: MovimentoB3[]; // só os das posições marcadas
+  movimentos: MovimentoB3[]; // só os das posições marcadas e dos avulsos marcados
   encerradas: string[];
+  avulsos?: string[]; // chaves de ProventosAvulsosB3 marcadas
   eventos?: { chave: string; data: string; tipo: 'DESDOBRAMENTO' | 'GRUPAMENTO' | 'BONIFICACAO'; fator: number; descricao: string }[];
 }
 

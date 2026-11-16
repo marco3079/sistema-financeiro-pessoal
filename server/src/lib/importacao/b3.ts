@@ -56,6 +56,9 @@ export interface AnaliseB3 {
   posicoes: PosicaoLida[];
   movimentos: MovimentoLido[];
   encerradas: string[]; // chaves que aparecem no arquivo e terminaram zeradas
+  // Chaves que no arquivo só têm proventos (nenhuma compra, venda ou transferência): o período baixado não diz a
+  // quantidade, então não viram posição nem encerrada. Os proventos entram no ativo que já está na carteira.
+  soProventos: string[];
   eventos: EventoLido[];
   avisos: string[];
 }
@@ -229,7 +232,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
   // A planilha vem da mais nova para a mais antiga: processa na ordem do tempo.
   lidas.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : b.ordem - a.ordem));
 
-  const carteira = new Map<string, { produto: Produto; instituicao: string | null; quantidade: number; custo: number; comprou: boolean; ultimo: string; quantidadeNoProvento: number | null }>();
+  const carteira = new Map<string, { produto: Produto; instituicao: string | null; quantidade: number; custo: number; comprou: boolean; mexeu: boolean; ultimo: string; quantidadeNoProvento: number | null }>();
   const movimentos: MovimentoLido[] = [];
   const eventos: EventoLido[] = [];
   const naoReconhecidas = new Map<string, number>();
@@ -246,7 +249,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
     }
     let posicao = carteira.get(l.produto.chave);
     if (!posicao) {
-      posicao = { produto: l.produto, instituicao: l.instituicao, quantidade: 0, custo: 0, comprou: false, ultimo: l.data, quantidadeNoProvento: null };
+      posicao = { produto: l.produto, instituicao: l.instituicao, quantidade: 0, custo: 0, comprou: false, mexeu: false, ultimo: l.data, quantidadeNoProvento: null };
       carteira.set(l.produto.chave, posicao);
     }
     posicao.produto = l.produto; // fica o nome mais recente
@@ -267,6 +270,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
       }
       continue;
     }
+    posicao.mexeu = true;
     if (efeito === 'COMPRA') {
       posicao.quantidade += l.quantidade;
       posicao.quantidadeNoProvento = null;
@@ -309,9 +313,15 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
 
   const posicoes: PosicaoLida[] = [];
   const encerradas: string[] = [];
+  const soProventos: string[] = [];
   const fim = lidas.length > 0 ? lidas[lidas.length - 1].data : '';
   const umAnoAntes = fim ? `${Number(fim.slice(0, 4)) - 1}${fim.slice(4)}` : '';
   for (const [chave, p] of carteira) {
+    // Só proventos no período: a quantidade é desconhecida (não é zero). Não mexe na posição que já existe.
+    if (!p.mexeu) {
+      soProventos.push(chave);
+      continue;
+    }
     // Sobra menor que uma cota de ativo negociado em bolsa é fração que vai a leilão: não é posição.
     if (p.quantidade < 0.000001 || (p.produto.codigo !== null && CODIGO.test(p.produto.codigo) && p.quantidade < 1)) {
       encerradas.push(chave);
@@ -353,6 +363,7 @@ function analisarMovimentacao(linhas: Celula[][], cabecalho: number): AnaliseB3 
     posicoes,
     movimentos,
     encerradas,
+    soProventos: soProventos.sort(),
     eventos,
     avisos,
   };
@@ -440,6 +451,7 @@ function analisarPosicao(planilhas: Planilha[]): AnaliseB3 {
     posicoes: [...juntas.values()].sort((a, b) => a.tipo.localeCompare(b.tipo) || a.chave.localeCompare(b.chave)),
     movimentos: [],
     encerradas: [],
+    soProventos: [],
     eventos: [],
     avisos:
       juntas.size === 0
@@ -466,6 +478,7 @@ export function analisarPlanilhaB3(planilhas: Planilha[]): AnaliseB3 {
     posicoes: [],
     movimentos: [],
     encerradas: [],
+    soProventos: [],
     eventos: [],
     avisos: [
       'Não reconheci esta planilha. Envie a de "Movimentação" (Extratos > Movimentação) ou a de "Posição" baixada na Área do Investidor da B3.',

@@ -613,18 +613,34 @@ router.post(
   asyncHandler(async (req, res) => {
     const dados = validar(b3AnalisarSchema, req.body);
     const analise = analisarPlanilhaB3(dados.planilhas);
-    const existentes = await investimentosPorChave(analise.posicoes.map((p) => p.chave));
-    const porChave = new Map<string, { proventos: number; movimentos: number }>();
+    const existentes = await investimentosPorChave([...analise.posicoes.map((p) => p.chave), ...analise.soProventos]);
+    const porChave = new Map<string, { proventos: number; movimentos: number; ultimo: string | null }>();
     for (const m of analise.movimentos) {
-      const atual = porChave.get(m.chave) ?? { proventos: 0, movimentos: 0 };
+      const atual = porChave.get(m.chave) ?? { proventos: 0, movimentos: 0, ultimo: null };
       atual.movimentos++;
       if (m.tipo === 'RENDIMENTO') atual.proventos = arredondar(atual.proventos + m.valor);
+      if (atual.ultimo === null || m.data > atual.ultimo) atual.ultimo = m.data;
       porChave.set(m.chave, atual);
+    }
+    // Ativos que no arquivo só têm proventos (período curto, sem as compras): os proventos vão para o ativo da carteira.
+    const proventosAvulsos = analise.soProventos.flatMap((chave) => {
+      const investimento = existentes.get(chave);
+      const resumo = porChave.get(chave);
+      if (!investimento || !resumo || resumo.proventos <= 0) return [];
+      return [{ chave, investimentoId: investimento.id, proventos: resumo.proventos, quantidade: resumo.movimentos, ultimoMovimento: resumo.ultimo }];
+    });
+    const foraDaCarteira = analise.soProventos.filter((chave) => !existentes.has(chave) && (porChave.get(chave)?.proventos ?? 0) > 0);
+    const avisos = [...analise.avisos];
+    if (foraDaCarteira.length > 0) {
+      avisos.push(
+        `Proventos de ativos que não estão na carteira ficaram de fora (${foraDaCarteira.join(', ')}). ` +
+          'Para trazê-los, importe a movimentação desde a primeira compra ou cadastre o ativo antes.'
+      );
     }
     res.json({
       tipo: analise.tipo,
       periodo: analise.periodo,
-      avisos: analise.avisos,
+      avisos,
       posicoes: analise.posicoes.map((p) => ({
         ...p,
         investimentoId: existentes.get(p.chave)?.id ?? null,
@@ -632,6 +648,7 @@ router.post(
       })),
       movimentos: analise.movimentos,
       encerradas: analise.encerradas,
+      proventosAvulsos,
       eventos: analise.eventos,
       totalProventos: arredondar(analise.movimentos.filter((m) => m.tipo === 'RENDIMENTO').reduce((s, m) => s + m.valor, 0)),
     });
@@ -675,6 +692,8 @@ const b3ConfirmarSchema = z.object({
   posicoes: z.array(posicaoSchema).max(2000),
   movimentos: z.array(movimentoSchema).max(60000),
   encerradas: z.array(z.string().max(200)).max(5000),
+  // Ativos da carteira que no arquivo só têm proventos: entram só os proventos, sem mexer na posição.
+  avulsos: z.array(z.string().max(200)).max(5000).default([]),
   eventos: z.array(eventoSchema).max(5000).default([]),
 });
 
@@ -682,11 +701,12 @@ router.post(
   '/importacao/b3/confirmar',
   asyncHandler(async (req, res) => {
     const dados = validar(b3ConfirmarSchema, req.body);
-    if (dados.posicoes.length === 0) {
+    const existentes = await investimentosPorChave([...dados.posicoes.map((p) => p.chave), ...dados.encerradas, ...dados.avulsos]);
+    const escolhidas = new Set(dados.posicoes.map((p) => p.chave));
+    const avulsos = dados.avulsos.filter((chave) => !escolhidas.has(chave) && existentes.has(chave));
+    if (dados.posicoes.length === 0 && avulsos.length === 0) {
       throw new HttpError(400, 'Marque pelo menos um ativo para importar');
     }
-    const existentes = await investimentosPorChave([...dados.posicoes.map((p) => p.chave), ...dados.encerradas]);
-    const escolhidas = new Set(dados.posicoes.map((p) => p.chave));
 
     const resultado = await prisma.$transaction(
       async (db) => {
@@ -732,7 +752,13 @@ router.post(
           }
         }
 
-        // Movimentos (compras, vendas e proventos) só dos ativos importados.
+        // Ativos que no arquivo só têm proventos: recebem os proventos, sem mudar quantidade nem saldo.
+        for (const chave of avulsos) {
+          const atual = existentes.get(chave);
+          if (atual) idPorChave.set(chave, atual.id);
+        }
+
+        // Movimentos (compras, vendas e proventos) só dos ativos importados (e proventos dos avulsos).
         const vistos = new Map<string, number>();
         const linhas: Prisma.MovimentoInvestimentoCreateManyInput[] = [];
         for (const m of dados.movimentos) {

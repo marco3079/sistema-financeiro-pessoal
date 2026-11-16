@@ -4,7 +4,7 @@ import { formatarDia, formatarReais, mensagemErro, rotuloDe, TIPOS_INVESTIMENTO 
 import { Aviso, Botao, Carregando, Selo, Tabela } from '../../ui';
 import type { ColunaTabela } from '../../ui';
 import { ResumoItem } from '../../ui/financas';
-import type { AnaliseB3, ConfirmarB3, Planilha, PosicaoB3, ResultadoB3 } from './tipos';
+import type { AnaliseB3, ConfirmarB3, Planilha, PosicaoB3, ProventosAvulsosB3, ResultadoB3 } from './tipos';
 import './importar-b3.css';
 
 export function PreviaB3(props: {
@@ -18,6 +18,7 @@ export function PreviaB3(props: {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<Record<string, boolean>>({});
+  const [avulsosMarcados, setAvulsosMarcados] = useState<Record<string, boolean>>({});
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export function PreviaB3(props: {
         if (!ativo) return;
         setAnalise(a);
         setMarcadas(Object.fromEntries(a.posicoes.map((p) => [p.chave, !p.suspeita])));
+        setAvulsosMarcados(Object.fromEntries((a.proventosAvulsos ?? []).map((p) => [p.chave, true])));
       })
       .catch((e: unknown) => {
         if (ativo) setErro(mensagemErro(e));
@@ -58,8 +60,15 @@ export function PreviaB3(props: {
 
   const posicoesMarcadas = analise.posicoes.filter((p) => marcadas[p.chave]);
   const quantidadeMarcada = posicoesMarcadas.length;
-  const nenhumaMarcada = quantidadeMarcada === 0;
+  const avulsos = analise.proventosAvulsos ?? [];
+  const avulsosEscolhidos = avulsos.filter((p) => avulsosMarcados[p.chave]);
+  const proventosAvulsosMarcados = avulsosEscolhidos.reduce((soma, p) => soma + p.quantidade, 0);
+  const nenhumaMarcada = quantidadeMarcada === 0 && avulsosEscolhidos.length === 0;
   const somaAplicado = posicoesMarcadas.reduce((soma, p) => soma + (p.valorAplicado ?? 0), 0);
+  const rotuloBotao =
+    quantidadeMarcada > 0
+      ? `Importar ${quantidadeMarcada} ativos` + (avulsosEscolhidos.length > 0 ? ' e proventos' : '')
+      : `Importar ${proventosAvulsosMarcados} ${proventosAvulsosMarcados === 1 ? 'provento' : 'proventos'}`;
 
   const rotuloTipo =
     analise.tipo === 'MOVIMENTACAO'
@@ -88,8 +97,9 @@ export function PreviaB3(props: {
         saldo: p.saldo,
         vencimento: p.vencimento,
       })),
-      movimentos: analise.movimentos.filter((m) => marcadas[m.chave]),
+      movimentos: analise.movimentos.filter((m) => marcadas[m.chave] || avulsosMarcados[m.chave]),
       encerradas: analise.encerradas,
+      avulsos: avulsosEscolhidos.map((p) => p.chave),
       eventos: (analise.eventos ?? []).filter((e) => marcadas[e.chave]),
     };
     setErro(null);
@@ -183,6 +193,39 @@ export function PreviaB3(props: {
     { titulo: 'Último movimento', celula: (p) => formatarDia(p.ultimoMovimento) },
   ];
 
+  const colunasAvulsos: ColunaTabela<ProventosAvulsosB3>[] = [
+    {
+      titulo: 'Importar',
+      celula: (p) => (
+        <input
+          type="checkbox"
+          checked={avulsosMarcados[p.chave] ?? false}
+          onChange={(e) => {
+            const valor = e.target.checked;
+            setAvulsosMarcados((atual) => ({ ...atual, [p.chave]: valor }));
+          }}
+          aria-label={'Importar proventos de ' + p.chave}
+        />
+      ),
+    },
+    {
+      titulo: 'Ativo',
+      celula: (p) => (
+        <span className="b3-celula">
+          <strong>{p.chave}</strong>
+          <span>
+            <Selo cor="azul">Só proventos</Selo>
+          </span>
+        </span>
+      ),
+    },
+    { titulo: 'Proventos no arquivo', alinhar: 'direita', celula: (p) => p.quantidade },
+    { titulo: 'Valor', alinhar: 'direita', celula: (p) => formatarReais(p.proventos) },
+    { titulo: 'Último provento', celula: (p) => formatarDia(p.ultimoMovimento) },
+  ];
+
+  const temPosicoes = analise.posicoes.length > 0;
+
   return (
     <div className="importar-previa">
       <div className="fin-cabecalho">
@@ -201,7 +244,7 @@ export function PreviaB3(props: {
         </Aviso>
       ))}
 
-      {analise.posicoes.length === 0 ? null : (
+      {!temPosicoes && avulsos.length === 0 ? null : (
         <>
           <div className="resumo">
             <ResumoItem icone="investimentos" cor="azul" valor={quantidadeMarcada} rotulo="Ativos a importar" />
@@ -220,35 +263,54 @@ export function PreviaB3(props: {
             />
           </div>
 
-          {analise.posicoes.some((p) => p.suspeita) && (
-            <Aviso tipo="info">
-              Os ativos desmarcados não têm movimento há mais de um ano ou a quantidade não bate com o último provento:
-              provavelmente saíram da carteira ou mudaram de código. Marque só os que você ainda tem.
-            </Aviso>
+          {temPosicoes && (
+            <>
+              {analise.posicoes.some((p) => p.suspeita) && (
+                <Aviso tipo="info">
+                  Os ativos desmarcados não têm movimento há mais de um ano ou a quantidade não bate com o último
+                  provento: provavelmente saíram da carteira ou mudaram de código. Marque só os que você ainda tem.
+                </Aviso>
+              )}
+
+              <div className="pagina-acoes">
+                <Botao variante="texto" aoClicar={() => definirTodas(true)}>
+                  Marcar todos
+                </Botao>
+                <Botao variante="texto" aoClicar={() => definirTodas(false)}>
+                  Desmarcar todos
+                </Botao>
+              </div>
+
+              <Tabela<PosicaoB3>
+                chave={(p) => p.chave}
+                dados={analise.posicoes}
+                vazio="Nenhum ativo."
+                colunas={colunas}
+              />
+            </>
           )}
 
-          <div className="pagina-acoes">
-            <Botao variante="texto" aoClicar={() => definirTodas(true)}>
-              Marcar todos
-            </Botao>
-            <Botao variante="texto" aoClicar={() => definirTodas(false)}>
-              Desmarcar todos
-            </Botao>
-          </div>
-
-          <Tabela<PosicaoB3>
-            chave={(p) => p.chave}
-            dados={analise.posicoes}
-            vazio="Nenhum ativo."
-            colunas={colunas}
-          />
+          {avulsos.length > 0 && (
+            <>
+              <Aviso tipo="info">
+                Estes ativos já estão na carteira e, no período do arquivo, só receberam proventos. Os proventos entram
+                no ativo; a quantidade e o saldo não mudam. Os que já foram importados antes não se repetem.
+              </Aviso>
+              <Tabela<ProventosAvulsosB3>
+                chave={(p) => p.chave}
+                dados={avulsos}
+                vazio="Nenhum provento."
+                colunas={colunasAvulsos}
+              />
+            </>
+          )}
 
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
           {analise.tipo !== 'DESCONHECIDA' && (
             <div className="pagina-acoes">
               <Botao desabilitado={enviando || nenhumaMarcada} aoClicar={confirmar}>
-                Importar {quantidadeMarcada} ativos
+                {rotuloBotao}
               </Botao>
             </div>
           )}
