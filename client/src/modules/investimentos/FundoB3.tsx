@@ -15,6 +15,103 @@ interface ProventoB3 {
   tipo: string;
 }
 
+type Avaliacao = 'BOM' | 'ATENCAO' | 'RUIM';
+
+interface IndicadorFii {
+  chave: string;
+  nome: string;
+  valor: number | null;
+  formato: 'PERCENTUAL' | 'NUMERO' | 'REAIS' | 'REAIS_GRANDE' | 'INTEIRO';
+  referencia: string;
+  avaliacao: Avaliacao | null;
+  pontos: number;
+  peso: number;
+  explicacao: string;
+}
+
+interface AnaliseFii {
+  nota: number | null;
+  faixa: 'BOA' | 'ATENCAO' | 'FRACA' | null;
+  indicadores: IndicadorFii[];
+  pesoConsiderado: number;
+  dataCvm: string | null;
+}
+
+// A B3 informa desdobramento e bonificação como aumento percentual de cotas: 900% = cada cota virou 10.
+function descreverFator(tipo: string, fator: number): string {
+  if (/DESDOBR|BONIFIC/.test(tipo)) {
+    const vezes = 1 + fator / 100;
+    return `+${fator.toLocaleString('pt-BR')}%: cada cota virou ${vezes.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`;
+  }
+  return `fator ${fator.toLocaleString('pt-BR')}`;
+}
+
+function valorDoIndicador(i: IndicadorFii): string {
+  if (i.valor === null) return 'sem dado';
+  if (i.formato === 'PERCENTUAL') return `${i.valor > 0 && i.chave !== 'dy' ? '+' : ''}${i.valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+  if (i.formato === 'REAIS_GRANDE') return grande(i.valor);
+  if (i.formato === 'REAIS') return formatarReais(i.valor);
+  return i.valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+const ROTULO_AVALIACAO: Record<Avaliacao, { texto: string; cor: 'verde' | 'amarelo' | 'vermelho' }> = {
+  BOM: { texto: 'Bom', cor: 'verde' },
+  ATENCAO: { texto: 'Atenção', cor: 'amarelo' },
+  RUIM: { texto: 'Fraco', cor: 'vermelho' },
+};
+
+// Nota de 0 a 100 e a tabela dos indicadores, cada um com a faixa considerada boa e os pontos que valeu.
+function NotaDoFundo({ analise }: { analise: AnaliseFii }) {
+  const classeNota =
+    analise.faixa === 'BOA' ? 'fb3-nota-boa' : analise.faixa === 'ATENCAO' ? 'fb3-nota-atencao' : analise.faixa === 'FRACA' ? 'fb3-nota-fraca' : '';
+  const textoFaixa =
+    analise.faixa === 'BOA' ? 'Indicadores bons' : analise.faixa === 'ATENCAO' ? 'Atenção a alguns pontos' : analise.faixa === 'FRACA' ? 'Indicadores fracos' : 'Sem dados suficientes';
+  const colunas: ColunaTabela<IndicadorFii>[] = [
+    {
+      titulo: 'Indicador',
+      celula: (i) => (
+        <span className="fb3-ind-nome">
+          <strong>{i.nome}</strong>
+          <span className="fin-suave">{i.explicacao}</span>
+        </span>
+      ),
+    },
+    { titulo: 'Valor', alinhar: 'direita', celula: (i) => <strong>{valorDoIndicador(i)}</strong> },
+    { titulo: 'Bom quando', celula: (i) => i.referencia },
+    {
+      titulo: 'Avaliação',
+      celula: (i) => (i.avaliacao ? <Selo cor={ROTULO_AVALIACAO[i.avaliacao].cor}>{ROTULO_AVALIACAO[i.avaliacao].texto}</Selo> : '—'),
+    },
+    {
+      titulo: 'Pontos',
+      alinhar: 'direita',
+      celula: (i) => (i.avaliacao ? `${i.pontos.toLocaleString('pt-BR')} de ${i.peso}` : `— de ${i.peso}`),
+    },
+  ];
+  return (
+    <section className="fb3-secao">
+      <div className="fb3-nota">
+        <div className={`fb3-nota-numero ${classeNota}`}>
+          <strong>{analise.nota ?? '—'}</strong>
+          <span>de 100</span>
+        </div>
+        <div className="fb3-nota-texto">
+          <strong>{textoFaixa}</strong>
+          <span className="fin-suave">
+            Nota pelos indicadores abaixo: cada um vale pontos conforme a faixa em que está, com o peso indicado.
+            {analise.pesoConsiderado < 100 && ` Só ${analise.pesoConsiderado} dos 100 pontos tinham dado; a nota é proporcional a eles.`}
+            {analise.dataCvm && ` Patrimônio e cotistas: informe da CVM de ${analise.dataCvm.split('-').reverse().join('/')}.`}
+          </span>
+          <span className="fin-suave">
+            A nota é só uma leitura dos números: não avalia os imóveis, os inquilinos nem os créditos, e não é recomendação de compra ou venda.
+          </span>
+        </div>
+      </div>
+      <Tabela<IndicadorFii> chave={(i) => i.chave} dados={analise.indicadores} colunas={colunas} />
+    </section>
+  );
+}
+
 interface FichaFundo {
   fundo: {
     codigo: string;
@@ -36,6 +133,15 @@ interface FichaFundo {
     }[];
     eventos: { tipo: string; fator: number | null; dataCom: string | null; aprovadoEm: string | null }[];
   };
+  cvm: {
+    cnpj: string;
+    nome: string;
+    segmento: string | null;
+    mandato: string | null;
+    tipoGestao: string | null;
+    administrador: string | null;
+  } | null;
+  analise: AnaliseFii | null;
   preco: number | null;
   fontePreco: 'BRAPI' | 'YAHOO' | null;
   indicadores: {
@@ -126,24 +232,29 @@ export function FundoB3({ codigo, aoFechar }: { codigo: string | null; aoFechar:
   ];
 
   return (
-    <Modal aberto={codigo !== null} titulo={codigo ? `${codigo} na B3` : ''} aoFechar={aoFechar}>
+    <Modal aberto={codigo !== null} titulo={codigo ? `${codigo} na B3` : ''} aoFechar={aoFechar} largo>
       <div className="fb3">
         {erro && <Aviso tipo="erro">{erro}</Aviso>}
         {carregando && !ficha && !erro && <Carregando />}
         {ficha && (
           <>
             <div className="fb3-cabecalho">
-              <strong>{ficha.fundo.nomePregao ?? ficha.fundo.codigo}</strong>
+              <strong>{ficha.cvm?.nome || ficha.fundo.nomePregao || ficha.fundo.codigo}</strong>
               <span className="fin-suave">
                 {[
+                  ficha.cvm?.segmento && `Segmento: ${ficha.cvm.segmento}`,
+                  ficha.cvm?.tipoGestao && `Gestão ${ficha.cvm.tipoGestao.toLowerCase()}`,
+                  ficha.cvm?.administrador && `Administrador: ${ficha.cvm.administrador}`,
+                  ficha.cvm?.cnpj && `CNPJ ${ficha.cvm.cnpj}`,
                   ficha.fundo.escriturador && `Escriturador: ${ficha.fundo.escriturador}`,
                   ficha.fundo.listadoDesde && `Listado desde ${formatarDia(ficha.fundo.listadoDesde)}`,
-                  ficha.fundo.segmento && `Segmento ${ficha.fundo.segmento.toLowerCase()}`,
                 ]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
             </div>
+
+            {ficha.analise && <NotaDoFundo analise={ficha.analise} />}
 
             <div className="fb3-grade">
               <Indicador
@@ -220,7 +331,7 @@ export function FundoB3({ codigo, aoFechar }: { codigo: string | null; aoFechar:
                   {ficha.fundo.eventos.map((e, i) => (
                     <li key={i}>
                       {rotuloTipo(e.tipo)}
-                      {e.fator !== null && ` (fator ${e.fator.toLocaleString('pt-BR')})`}
+                      {e.fator !== null && ` (${descreverFator(e.tipo, e.fator)})`}
                       {e.dataCom && ` · data com ${formatarDia(e.dataCom)}`}
                     </li>
                   ))}

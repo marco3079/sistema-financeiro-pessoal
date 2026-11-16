@@ -7,6 +7,8 @@ import { buscarCotacao, tokenDasCotacoes } from '../../lib/cotacoes';
 import { CODIGO_FII, fundosNaB3 } from '../../lib/proventosAnunciados';
 import { hojeISO, somarDias } from '../../lib/indices';
 import { prisma } from '../../lib/prisma';
+import { fundoNaCvm } from '../../lib/cvmFii';
+import { analisarFii } from '../../lib/notaFii';
 
 // Carteira de investimentos: resumo, rentabilidade (por dia, mês e ano, contra os índices), relatório e proventos.
 // O cálculo está em lib/carteira.ts.
@@ -70,7 +72,7 @@ router.get(
     }
     if (preco === null) {
       try {
-        await garantirPrecos([codigo], somarDias(hojeISO(), -30));
+        await garantirPrecos([codigo], somarDias(hojeISO(), -400));
         preco = await ultimoPreco(codigo);
         if (preco !== null) fontePreco = 'YAHOO';
       } catch {
@@ -93,8 +95,34 @@ router.get(
     });
     const quantidade = investimento ? num(investimento.quantidade) : 0;
 
+    // Indicadores e nota: informe mensal da CVM (valor patrimonial, patrimônio, cotistas) e a cotação de 12 meses atrás.
+    let cvm = await fundoNaCvm(fundo.isin, fundo.cotasEmitidas);
+    // Confere se o valor patrimonial faz sentido com a cotação (P/VP entre 0,2 e 3). Se não, a ligação pegou outro
+    // fundo (cotas parecidas, ou ISIN informado errado por outro fundo na CVM) e a ficha fica sem os dados da CVM.
+    if (cvm) {
+      const vp = cvm.meses.filter((m) => m.valorPatrimonialCota).at(-1)?.valorPatrimonialCota ?? null;
+      const pvp = preco !== null && vp ? preco / vp : null;
+      if (pvp === null || pvp < 0.2 || pvp > 3) cvm = null;
+    }
+    let preco12m: number | null = null;
+    try {
+      await garantirPrecos([codigo], somarDias(hoje, -400));
+      const antigo = await prisma.precoAtivo.findFirst({
+        where: { codigo, data: { lte: new Date(`${somarDias(hoje, -365)}T00:00:00Z`) } },
+        orderBy: { data: 'desc' },
+      });
+      preco12m = antigo ? antigo.valor : null;
+    } catch {
+      // sem histórico de preço: o indicador fica sem dado
+    }
+    const analise = analisarFii({ fundo, cvm, preco, preco12m, hoje });
+
     res.json({
       fundo,
+      cvm: cvm
+        ? { cnpj: cvm.cnpj, nome: cvm.nome, segmento: cvm.segmento, mandato: cvm.mandato, tipoGestao: cvm.tipoGestao, administrador: cvm.administrador }
+        : null,
+      analise,
       preco,
       fontePreco,
       indicadores: {

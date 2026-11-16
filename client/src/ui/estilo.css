@@ -634,6 +634,10 @@ textarea.campo-controle {
     padding: 1rem;
   }
 
+  .modal.modal-largo {
+    max-width: min(1180px, 94vw);
+  }
+
   .modal {
     width: 100%;
     max-width: 560px;
@@ -784,7 +788,8 @@ textarea.campo-controle {
   align-items: end;
 }
 
-.filtros > .campo {
+.filtros > .campo,
+.filtros > .caixa {
   margin-bottom: 0;
 }
 

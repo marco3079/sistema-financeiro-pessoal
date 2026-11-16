@@ -185,9 +185,10 @@ async function copiarBanco(podar) {
   return nome;
 }
 
-// Reconstrói a API e o site; o banco e o próprio atualizador não são recriados aqui.
+// Reconstrói a API, o site e o serviço da Suno; o banco e o próprio atualizador não são recriados aqui.
 async function reconstruir() {
-  await compose(['build', 'api', 'web']);
+  await compose(['build', 'api', 'web', 'suno']);
+  await compose(['up', '-d', '--no-deps', 'suno']);
   await compose(['up', '-d', '--no-deps', '--wait', 'api']);
   await compose(['up', '-d', '--no-deps', 'web']);
 }

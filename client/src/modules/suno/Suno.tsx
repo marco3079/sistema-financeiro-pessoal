@@ -5,6 +5,7 @@ import { useDados } from '../../lib/useDados';
 import { Abas, Aviso, Botao, Cartao, Carregando, Pagina, Selo, Tabela } from '../../ui';
 import type { ColunaTabela } from '../../ui';
 import { ResumoItem } from '../../ui/financas';
+import { AtualizarSuno } from './AtualizarSuno';
 import './suno.css';
 
 // Carteiras recomendadas da Suno (trazidas pelo script ferramentas/suno) cruzadas com a carteira da pessoa.
@@ -181,7 +182,7 @@ function ComoAtualizar({ primeiraVez }: { primeiraVez: boolean }) {
 }
 
 // Plano da Suno, vencimento e a data dos dados.
-function SuaContaSuno({ dados }: { dados: RespostaSuno }) {
+function SuaContaSuno({ dados, aoAtualizar }: { dados: RespostaSuno; aoAtualizar: () => void }) {
   const [mostrarComo, setMostrarComo] = useState(false);
   const a = dados.assinatura;
   const dias = a?.diasParaVencer ?? null;
@@ -210,8 +211,9 @@ function SuaContaSuno({ dados }: { dados: RespostaSuno }) {
           <strong>{dados.ultimaAtualizacao ? dataHora(dados.ultimaAtualizacao) : 'Nunca'}</strong>
         </div>
         <div className="suno-conta-acao">
-          <Botao variante="secundario" aoClicar={() => setMostrarComo(!mostrarComo)}>
-            {mostrarComo ? 'Fechar' : 'Atualizar com a minha conta Suno'}
+          <Botao aoClicar={aoAtualizar}>Atualizar com a minha conta Suno</Botao>
+          <Botao variante="texto" aoClicar={() => setMostrarComo(!mostrarComo)}>
+            {mostrarComo ? 'Fechar' : 'Usar o script no computador'}
           </Botao>
         </div>
       </div>
@@ -220,13 +222,21 @@ function SuaContaSuno({ dados }: { dados: RespostaSuno }) {
   );
 }
 
-function Instrucoes() {
+function Instrucoes({ aoAtualizar }: { aoAtualizar: () => void }) {
+  const [mostrarComo, setMostrarComo] = useState(false);
   return (
-    <Cartao titulo="Como trazer as carteiras da Suno">
-      <ComoAtualizar primeiraVez />
+    <Cartao titulo="Traga as carteiras da Suno">
       <p className="fin-suave">
-        A senha da Suno fica só no navegador: o sistema não a recebe. Rode de novo sempre que quiser atualizar.
+        Entre com a sua conta da Suno: o sistema lê as carteiras que você assina e o seu plano, e compara com a sua
+        carteira. A senha é usada só na atualização e não fica guardada.
       </p>
+      <div className="pagina-acoes">
+        <Botao variante="texto" aoClicar={() => setMostrarComo(!mostrarComo)}>
+          {mostrarComo ? 'Fechar' : 'Usar o script no computador'}
+        </Botao>
+        <Botao aoClicar={aoAtualizar}>Atualizar com a minha conta Suno</Botao>
+      </div>
+      {mostrarComo && <ComoAtualizar primeiraVez />}
     </Cartao>
   );
 }
@@ -235,6 +245,7 @@ export function Suno() {
   const { dados, carregando, erro, recarregar } = useDados<RespostaSuno>('/suno');
   const [ativa, setAtiva] = useState<string | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
   const carteiras = dados?.carteiras ?? [];
   const carteira = carteiras.find((c) => c.slug === ativa) ?? carteiras[0] ?? null;
 
@@ -263,8 +274,9 @@ export function Suno() {
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       {erroAcao && <Aviso tipo="erro">{erroAcao}</Aviso>}
       {carregando && !dados && <Carregando />}
-      {dados && carteiras.length === 0 && <Instrucoes />}
-      {dados && carteiras.length > 0 && <SuaContaSuno dados={dados} />}
+      {dados && carteiras.length === 0 && <Instrucoes aoAtualizar={() => setAtualizando(true)} />}
+      {dados && carteiras.length > 0 && <SuaContaSuno dados={dados} aoAtualizar={() => setAtualizando(true)} />}
+      <AtualizarSuno aberto={atualizando} aoFechar={() => setAtualizando(false)} aoConcluir={recarregar} />
       {carteira && (
         <>
           <Abas abas={carteiras.map((c) => ({ id: c.slug, rotulo: c.nome }))} ativa={carteira.slug} aoMudar={setAtiva} />

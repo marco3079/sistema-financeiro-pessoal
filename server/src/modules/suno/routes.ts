@@ -195,6 +195,34 @@ function tiposDaCarteira(slug: string): string[] {
   return ['ACAO'];
 }
 
+// Grava as carteiras e o plano no perfil em uso. O envio traz todas as carteiras assinadas: as que não vieram
+// (deixaram de ser assinadas) saem. Devolve os nomes das carteiras gravadas.
+async function gravarEnvio(dados: z.infer<typeof envioSchema>): Promise<string[]> {
+  const nomes: string[] = [];
+  for (const c of dados.carteiras) {
+    const conteudo = { recomendada: c.recomendada, encerradas: c.encerradas, outras: c.outras };
+    const existente = await prisma.carteiraSuno.findFirst({ where: { slug: c.slug } });
+    if (existente) {
+      await prisma.carteiraSuno.update({
+        where: { id: existente.id },
+        data: { nome: c.nome, url: c.url, dados: conteudo, atualizadoEm: new Date() },
+      });
+    } else {
+      await prisma.carteiraSuno.create({ data: { slug: c.slug, nome: c.nome, url: c.url, dados: conteudo } });
+    }
+    nomes.push(c.nome);
+  }
+  await prisma.carteiraSuno.deleteMany({ where: { slug: { notIn: dados.carteiras.map((c) => c.slug) } } });
+  if (dados.assinatura) {
+    const a = dados.assinatura;
+    const campos = { plano: a.plano, inicio: paraData(a.inicio), fim: paraData(a.fim), atualizadoEm: new Date() };
+    const existente = await prisma.assinaturaSuno.findFirst({});
+    if (existente) await prisma.assinaturaSuno.update({ where: { id: existente.id }, data: campos });
+    else await prisma.assinaturaSuno.create({ data: campos });
+  }
+  return nomes;
+}
+
 // ---------- Rotas públicas: envio pelo script (a chave é a credencial) ----------
 
 export const publico = Router();
@@ -209,32 +237,7 @@ publico.post(
       throw new HttpError(403, 'Esta chave é só de consulta. Crie uma com permissão "consulta e lança" para enviar as carteiras.');
     }
     const dados = validar(envioSchema, req.body);
-    const gravadas = await comPerfil(chave.perfilId, async () => {
-      const nomes: string[] = [];
-      for (const c of dados.carteiras) {
-        const conteudo = { recomendada: c.recomendada, encerradas: c.encerradas, outras: c.outras };
-        const existente = await prisma.carteiraSuno.findFirst({ where: { slug: c.slug } });
-        if (existente) {
-          await prisma.carteiraSuno.update({
-            where: { id: existente.id },
-            data: { nome: c.nome, url: c.url, dados: conteudo, atualizadoEm: new Date() },
-          });
-        } else {
-          await prisma.carteiraSuno.create({ data: { slug: c.slug, nome: c.nome, url: c.url, dados: conteudo } });
-        }
-        nomes.push(c.nome);
-      }
-      // O envio traz todas as carteiras assinadas: as que não vieram (deixaram de ser assinadas) saem.
-      await prisma.carteiraSuno.deleteMany({ where: { slug: { notIn: dados.carteiras.map((c) => c.slug) } } });
-      if (dados.assinatura) {
-        const a = dados.assinatura;
-        const campos = { plano: a.plano, inicio: paraData(a.inicio), fim: paraData(a.fim), atualizadoEm: new Date() };
-        const existente = await prisma.assinaturaSuno.findFirst({});
-        if (existente) await prisma.assinaturaSuno.update({ where: { id: existente.id }, data: campos });
-        else await prisma.assinaturaSuno.create({ data: campos });
-      }
-      return nomes;
-    });
+    const gravadas = await comPerfil(chave.perfilId, () => gravarEnvio(dados));
     res.status(201).json({ carteiras: gravadas.length, nomes: gravadas });
   })
 );
@@ -398,6 +401,107 @@ router.get(
           }
         : null,
     });
+  })
+);
+
+// ---------- Atualizar pela tela (serviço da Suno, com o login da pessoa) ----------
+// A tela manda o e-mail e a senha da Suno; o serviço (contêiner suno) entra na conta sem janela e lê as carteiras.
+// A senha só passa por aqui a caminho do serviço: não é gravada nem registrada em log (o log guarda só a rota).
+// A tela acompanha a tarefa por GET; quando fica PRONTA, as carteiras são gravadas uma vez, no perfil em uso.
+
+interface EstadoServico {
+  id?: string;
+  etapa: 'NENHUMA' | 'ENTRANDO' | 'PEDE_CODIGO' | 'LENDO' | 'PRONTA' | 'ERRO' | 'CANCELADA';
+  mensagem?: string;
+  log?: { em: string; texto: string }[];
+  iniciadaEm?: string;
+  terminadaEm?: string | null;
+  resultado?: unknown;
+  erro?: string;
+}
+
+const tarefasGravadas = new Map<string, { carteiras: number; erro: string | null }>();
+
+async function servico(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<{ status: number; dados: EstadoServico }> {
+  const base = process.env.SUNO_URL || 'http://suno:4100';
+  let resposta: Response;
+  try {
+    resposta = await fetch(base + caminho, {
+      method: metodo,
+      headers: {
+        'x-suno-segredo': process.env.SUNO_SEGREDO || '',
+        ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    throw new HttpError(503, 'O serviço da Suno não está rodando. Rode o instalador de novo (ele cria o contêiner suno).');
+  }
+  const dados = (await resposta.json().catch(() => ({ etapa: 'ERRO', erro: 'Resposta inválida do serviço da Suno.' }))) as EstadoServico;
+  return { status: resposta.status, dados };
+}
+
+// O que a tela vê: a etapa, a mensagem e o andamento (nunca o resultado bruto).
+function paraTela(e: EstadoServico, gravacao?: { carteiras: number; erro: string | null }) {
+  return {
+    etapa: gravacao?.erro ? 'ERRO' : e.etapa,
+    mensagem: gravacao?.erro ?? e.mensagem ?? '',
+    log: (e.log ?? []).map((l) => l.texto),
+    iniciadaEm: e.iniciadaEm ?? null,
+    terminadaEm: e.terminadaEm ?? null,
+    carteirasGravadas: gravacao && !gravacao.erro ? gravacao.carteiras : null,
+  };
+}
+
+const loginSuno = z.object({ email: z.string().trim().email().max(200), senha: z.string().min(1).max(200) });
+const codigoSuno = z.object({ codigo: z.string().trim().regex(/^[A-Za-z0-9 ]{4,12}$/) });
+
+router.post(
+  '/suno/atualizar',
+  asyncHandler(async (req, res) => {
+    const { email, senha } = validar(loginSuno, req.body);
+    const { status, dados } = await servico('POST', '/tarefa', { email, senha });
+    if (status >= 400) throw new HttpError(status, dados.erro ?? 'Não foi possível começar a atualização.');
+    res.status(202).json(paraTela(dados));
+  })
+);
+
+router.get(
+  '/suno/atualizar',
+  asyncHandler(async (_req, res) => {
+    const { status, dados } = await servico('GET', '/tarefa');
+    if (status >= 400) throw new HttpError(status, dados.erro ?? 'Não foi possível consultar a atualização.');
+    let gravacao = dados.id ? tarefasGravadas.get(dados.id) : undefined;
+    if (dados.etapa === 'PRONTA' && dados.id && !gravacao) {
+      try {
+        const envio = validar(envioSchema, dados.resultado);
+        const nomes = await gravarEnvio(envio);
+        gravacao = { carteiras: nomes.length, erro: null };
+      } catch (erro) {
+        gravacao = { carteiras: 0, erro: `As carteiras foram lidas, mas não puderam ser gravadas: ${erro instanceof Error ? erro.message : erro}` };
+      }
+      tarefasGravadas.set(dados.id, gravacao);
+    }
+    res.json(paraTela(dados, gravacao));
+  })
+);
+
+router.post(
+  '/suno/atualizar/codigo',
+  asyncHandler(async (req, res) => {
+    const { codigo } = validar(codigoSuno, req.body);
+    const { status, dados } = await servico('POST', '/tarefa/codigo', { codigo: codigo.replace(/\s+/g, '') });
+    if (status >= 400) throw new HttpError(status, dados.erro ?? 'Não foi possível enviar o código.');
+    res.json(paraTela(dados));
+  })
+);
+
+router.post(
+  '/suno/atualizar/cancelar',
+  asyncHandler(async (_req, res) => {
+    const { dados } = await servico('POST', '/tarefa/cancelar');
+    res.json(paraTela(dados));
   })
 );
 

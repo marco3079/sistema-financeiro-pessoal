@@ -420,18 +420,20 @@ export function Modal({
   aberto,
   titulo,
   aoFechar,
+  largo = false,
   children,
 }: {
   aberto: boolean;
   titulo: string;
   aoFechar: () => void;
+  largo?: boolean; // no computador, ocupa quase toda a largura (tabelas largas); no celular é igual
   children?: ReactNode;
 }) {
   if (!aberto) return null;
   return (
     <div className="modal-fundo" onClick={aoFechar}>
       <div
-        className="modal"
+        className={largo ? 'modal modal-largo' : 'modal'}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}

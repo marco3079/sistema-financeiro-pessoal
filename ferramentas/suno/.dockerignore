@@ -1,0 +1,5 @@
+# A chave do sistema e qualquer login local nunca entram na imagem.
+config.json
+sessao.json
+perfil-navegador/
+node_modules/

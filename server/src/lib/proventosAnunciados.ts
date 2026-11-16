@@ -31,6 +31,7 @@ export interface EventoCotasB3 {
 
 export interface FundoB3 {
   codigo: string; // 'RECR11'
+  isin: string | null; // ISIN da cota ('BRRECRCTF004'): liga o fundo ao informe da CVM
   nomePregao: string | null; // nome curto do pregão
   escriturador: string | null;
   cotasEmitidas: number | null;
@@ -121,8 +122,12 @@ async function buscarFundo(codigo: string): Promise<FundoB3 | null> {
     aprovadoEm: data(e.approvedOn),
   }));
 
+  const isinDaCota = [...(Array.isArray(corpo.cashDividends) ? corpo.cashDividends : []), ...(Array.isArray(corpo.subscriptions) ? corpo.subscriptions : [])]
+    .map((i) => String((i as Record<string, unknown>).isinCode ?? ''))
+    .find((i) => /^BR[A-Z]{4}CTF\w{3}$/.test(i));
   return {
     codigo,
+    isin: isinDaCota ?? null,
     nomePregao: texto(corpo.fund),
     escriturador: texto(corpo.ifd),
     cotasEmitidas: numero(corpo.quantity),

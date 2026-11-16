@@ -79,3 +79,69 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* Nota de 0 a 100 */
+.fb3-nota {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.fb3-nota-numero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 6.5rem;
+  height: 6.5rem;
+  border-radius: 50%;
+  border: 6px solid var(--cor-borda);
+  flex-shrink: 0;
+}
+
+.fb3-nota-numero strong {
+  font-size: 2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fb3-nota-numero span {
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+}
+
+.fb3-nota-boa {
+  border-color: var(--cor-sucesso);
+  color: var(--cor-sucesso);
+}
+
+.fb3-nota-atencao {
+  border-color: var(--cor-aviso);
+  color: var(--cor-aviso);
+}
+
+.fb3-nota-fraca {
+  border-color: var(--cor-perigo);
+  color: var(--cor-perigo);
+}
+
+.fb3-nota-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 220px;
+}
+
+.fb3-ind-nome {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 460px;
+  white-space: normal;
+}
+
+.fb3-ind-nome .fin-suave {
+  font-size: 0.8rem;
+}
