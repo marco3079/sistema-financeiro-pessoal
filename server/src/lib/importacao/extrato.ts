@@ -300,7 +300,7 @@ const NOMES_DESCRICAO = [
   'descricao do lancamento', 'memo', 'nome', 'movimentacao', 'description', 'titulo',
 ];
 const NOMES_VALOR = ['valor', 'amount', 'valor (r$)', 'valor r$', 'valor em r$', 'montante', 'valor da compra', 'value', 'valor (em r$)'];
-const NOMES_PARCELA = ['parcela', 'parcelas'];
+const NOMES_PARCELA = ['parcela', 'parcelas', 'parcelamento'];
 const NOMES_CREDITO = ['credito', 'credito (r$)', 'entrada', 'entradas'];
 const NOMES_DEBITO = ['debito', 'debito (r$)', 'saida', 'saidas'];
 
@@ -597,6 +597,13 @@ export function analisarArquivo(entrada: {
     parcial = pdf;
   } else {
     parcial = analisarCsv(entrada.texto, pedido);
+    // Planilha de banco convertida na tela (fatura do Itaú em XLSX): as primeiras linhas trazem "Banco: ..." e
+    // "Vencimento: dd/mm/aaaa", tirados de fora da tabela.
+    const preambulo = entrada.texto.split(/\r?\n/).slice(0, 3).join('\n');
+    if (/^(banco|vencimento):/im.test(preambulo)) {
+      banco = banco ?? detectarBanco('', preambulo);
+      vencimento = vencimentoNoTexto(preambulo);
+    }
   }
 
   const avisos = [...parcial.avisos];

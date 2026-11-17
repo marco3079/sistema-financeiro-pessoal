@@ -1,5 +1,5 @@
 // Abre no navegador o arquivo escolhido e devolve o conteúdo pronto para a API:
-// texto (CSV, OFX e PDF) ou as abas da planilha (XLSX da B3). O arquivo em si não é enviado.
+// texto (CSV, OFX, PDF e XLSX de banco, que vira CSV) ou as abas da planilha (XLSX da B3). O arquivo não é enviado.
 // As bibliotecas de PDF e de planilha são grandes: só são baixadas quando um arquivo desses é aberto.
 import type { Celula, FormatoArquivo, Planilha } from './tipos';
 
@@ -78,6 +78,65 @@ async function lerPlanilha(arquivo: File): Promise<Planilha[]> {
   }));
 }
 
+function semAcento(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+// Planilha da Área do Investidor da B3: cabeçalho com "Produto" e movimentação ou quantidade.
+function ehPlanilhaDaB3(planilhas: Planilha[]): boolean {
+  return planilhas.some((p) =>
+    p.linhas.slice(0, 20).some((linha) => {
+      const t = linha.map((c) => semAcento(String(c ?? '')));
+      return t.includes('produto') && (t.includes('entrada/saida') || t.includes('movimentacao') || t.includes('quantidade'));
+    })
+  );
+}
+
+function celulaCsv(c: Celula): string {
+  if (typeof c === 'number') return String(c).replace('.', ','); // -5916.95 -> -5916,95 (o leitor usa vírgula decimal)
+  const texto = String(c ?? '').replace(/\s+/g, ' ').trim();
+  return /[;"]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+}
+
+// Fatura ou extrato de banco em planilha (a fatura do Itaú, por exemplo): a tabela de lançamentos vira CSV e segue
+// o mesmo caminho dos CSVs. A primeira linha com "Data" e "Valor" é o cabeçalho; a tabela termina na primeira linha
+// vazia depois dela. Antes da tabela, o banco (se a planilha citar) e o vencimento (célula "Vencimento" e a data ao
+// lado ou logo abaixo) vão em linhas próprias, que o leitor usa.
+function planilhaParaCsv(planilhas: Planilha[]): string | null {
+  for (const p of planilhas) {
+    const iCabecalho = p.linhas.findIndex((linha) => {
+      const t = linha.map((c) => semAcento(String(c ?? '')));
+      return t.some((x) => x === 'data' || x.startsWith('data ')) && t.some((x) => x.startsWith('valor'));
+    });
+    if (iCabecalho < 0) continue;
+    const tudo = p.linhas.flat().map((c) => String(c ?? '')).join(' ');
+    const banco = /ita[uú]|personnalit/i.test(tudo) ? 'Itaú' : null;
+    let vencimento: string | null = null;
+    for (let i = 0; i < iCabecalho && !vencimento; i++) {
+      p.linhas[i].forEach((c, j) => {
+        if (vencimento || !semAcento(String(c ?? '')).startsWith('vencimento')) return;
+        const perto = [p.linhas[i][j + 1], p.linhas[i + 1]?.[j], p.linhas[i][j + 2]].map((x) => String(x ?? '').trim());
+        vencimento = perto.find((x) => /^\d{2}\/\d{2}\/\d{4}$/.test(x)) ?? null;
+      });
+    }
+    const saida: string[] = [];
+    if (banco) saida.push(`Banco: ${banco}`);
+    if (vencimento) saida.push(`Vencimento: ${vencimento}`);
+    let linhasDeDados = 0;
+    for (const linha of p.linhas.slice(iCabecalho)) {
+      const vazia = linha.every((c) => c === null || String(c).trim() === '');
+      if (vazia) {
+        if (linhasDeDados > 0) break;
+        continue;
+      }
+      saida.push(linha.map(celulaCsv).join(';'));
+      linhasDeDados++;
+    }
+    if (linhasDeDados > 1) return saida.join('\n');
+  }
+  return null;
+}
+
 // Lança Error com mensagem em português quando o arquivo não pode ser lido.
 export async function lerArquivo(arquivo: File): Promise<ArquivoLido> {
   if (arquivo.size > TAMANHO_MAXIMO) {
@@ -85,11 +144,18 @@ export async function lerArquivo(arquivo: File): Promise<ArquivoLido> {
   }
   const ext = extensao(arquivo.name);
   if (ext === 'xlsx') {
+    let planilhas: Planilha[];
     try {
-      return { tipo: 'planilha', nome: arquivo.name, planilhas: await lerPlanilha(arquivo) };
+      planilhas = await lerPlanilha(arquivo);
     } catch {
-      throw new Error('Não consegui abrir esta planilha. Envie o arquivo .xlsx baixado da Área do Investidor da B3.');
+      throw new Error('Não consegui abrir esta planilha. Envie o .xlsx baixado do banco ou da Área do Investidor da B3.');
     }
+    // Planilha da B3 vai para a prévia da carteira; fatura ou extrato de banco, para a de lançamentos.
+    if (!ehPlanilhaDaB3(planilhas)) {
+      const csv = planilhaParaCsv(planilhas);
+      if (csv) return { tipo: 'texto', nome: arquivo.name, formato: 'csv', texto: csv };
+    }
+    return { tipo: 'planilha', nome: arquivo.name, planilhas };
   }
   if (ext === 'pdf') {
     let texto: string;
@@ -112,5 +178,5 @@ export async function lerArquivo(arquivo: File): Promise<ArquivoLido> {
   if (ext === 'xls') {
     throw new Error('Planilha no formato antigo (.xls). Abra e salve como .xlsx, ou exporte em CSV.');
   }
-  throw new Error('Formato não aceito. Envie CSV, OFX ou PDF (fatura e extrato) ou XLSX (planilha da B3).');
+  throw new Error('Formato não aceito. Envie CSV, OFX, PDF ou XLSX (fatura e extrato do banco, ou a planilha da B3).');
 }
