@@ -57,6 +57,7 @@ interface LinhaFluxo {
 
 interface FluxoDTO {
   saldoInicial: number;
+  base: { receitaMedia: number; despesaMedia: number; faturaMedia: number; meses: string[]; contasFixas: number };
   meses: LinhaFluxo[];
 }
 
@@ -473,9 +474,16 @@ function Fluxo() {
         </>
       )}
 
-      <Aviso tipo="info">
-        Projeção com o que já está cadastrado: contas fixas, faturas e parcelas. Gastos do dia a dia não entram.
-      </Aviso>
+      {dados && (
+        <Aviso tipo="info">
+          Entradas e saídas previstas pela média dos meses {dados.base.meses.map(mesCurto).join(', ')} nas contas (
+          {formatarReais(dados.base.receitaMedia)} de entradas e {formatarReais(dados.base.despesaMedia)} de saídas por
+          mês){dados.base.contasFixas > 0 ? ', ou pelas contas fixas, quando forem maiores' : ''}. No mês atual entra só o
+          que ainda falta. Faturas: as já previstas (abertas e parcelas) e, do mês que vem em diante, a média das últimas (
+          {formatarReais(dados.base.faturaMedia)}) quando for maior, para contar as compras novas no cartão.
+          Transferências entre as suas contas ficam de fora.
+        </Aviso>
+      )}
     </>
   );
 }

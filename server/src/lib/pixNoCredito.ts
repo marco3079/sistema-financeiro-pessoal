@@ -25,25 +25,26 @@ export function ehCreditoDoCartaoNaConta(descricao: string): boolean {
   return d.includes('valor adicionado') && d.includes('credito');
 }
 
-// Marca como transferência os pares "crédito do cartão na conta" + saída de mesmo valor, na mesma conta, no mesmo
-// dia ou até dois dias depois. Só olha créditos que ainda não são transferência: depois de marcado, o par não é
-// mais revisto, e o que a pessoa desmarcar à mão na saída fica como ela deixou.
+// Marca como transferência os pares "crédito do cartão na conta" + saída de mesmo valor, na mesma conta, com até
+// dois dias de diferença. No arquivo do banco o crédito vem no mesmo dia do Pix ou antes; pelo Open Finance ele às
+// vezes chega um dia depois da saída. Depois de marcado, o par não é mais revisto, e o que a pessoa desmarcar à mão
+// na saída fica como ela deixou. Exceção: o crédito que ficou sozinho (marcado sem par) ainda procura uma saída
+// de ANTES dele, o caso que esta regra não cobria (a saída desses nunca tinha sido marcada).
 // Precisa rodar dentro do perfil financeiro (comPerfil). Devolve quantos pares marcou.
 export async function marcarPixNoCreditoNasContas(contaIds: number[], desde: Date): Promise<number> {
   if (contaIds.length === 0) return 0;
   const lancamentos = await prisma.transacao.findMany({
     where: {
       contaId: { in: contaIds },
-      transferencia: false,
       data: { gte: new Date(desde.getTime() - 3 * DIA_MS) },
       conta: { tipo: { not: 'CARTAO' } },
     },
     orderBy: [{ data: 'asc' }, { id: 'asc' }],
-    select: { id: true, contaId: true, data: true, descricao: true, valor: true, tipo: true },
+    select: { id: true, contaId: true, data: true, descricao: true, valor: true, tipo: true, transferencia: true },
   });
   const creditos = lancamentos.filter((l) => l.tipo === 'RECEITA' && ehCreditoDoCartaoNaConta(l.descricao));
   if (creditos.length === 0) return 0;
-  const saidas = lancamentos.filter((l) => l.tipo === 'DESPESA');
+  const saidas = lancamentos.filter((l) => l.tipo === 'DESPESA' && !l.transferencia);
   const usadas = new Set<number>();
   const ids: number[] = [];
   let pares = 0;
@@ -54,9 +55,10 @@ export async function marcarPixNoCreditoNasContas(contaIds: number[], desde: Dat
       if (usadas.has(saida.id) || saida.contaId !== credito.contaId) continue;
       if (Math.abs(Number(saida.valor) - Number(credito.valor)) > 0.005) continue;
       const dias = Math.round((saida.data.getTime() - credito.data.getTime()) / DIA_MS);
-      if (dias < 0 || dias > 2) continue;
-      // Prefere o dia mais próximo e, no empate, a saída que fala em Pix.
-      const nota = dias + (/\bpix\b/.test(semAcento(saida.descricao)) ? 0 : 0.5);
+      if (Math.abs(dias) > 2) continue;
+      if (credito.transferencia && dias >= 0) continue; // crédito já marcado: só a saída de antes dele (ver acima)
+      // Prefere o dia mais próximo (no empate, a saída depois do crédito) e, no empate, a que fala em Pix.
+      const nota = Math.abs(dias) + (dias < 0 ? 0.25 : 0) + (/\bpix\b/.test(semAcento(saida.descricao)) ? 0 : 0.5);
       if (nota < melhorNota) {
         melhor = saida;
         melhorNota = nota;
@@ -66,14 +68,14 @@ export async function marcarPixNoCreditoNasContas(contaIds: number[], desde: Dat
       usadas.add(melhor.id);
       ids.push(credito.id, melhor.id);
       pares++;
-    } else if (Date.now() - credito.data.getTime() > 3 * DIA_MS) {
+    } else if (!credito.transferencia && Date.now() - credito.data.getTime() > 3 * DIA_MS) {
       // Sem saída de mesmo valor (o Pix saiu com outro valor ou por outra conta): o crédito sozinho continua
       // não sendo receita, é dinheiro do cartão. Espera 3 dias para dar tempo de a saída chegar e casar.
       ids.push(credito.id);
     }
   }
   if (ids.length > 0) {
-    await prisma.transacao.updateMany({ where: { id: { in: ids } }, data: { transferencia: true } });
+    await prisma.transacao.updateMany({ where: { id: { in: ids }, transferencia: false }, data: { transferencia: true } });
   }
   return pares;
 }

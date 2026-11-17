@@ -343,9 +343,10 @@ function casar(tipo: TipoAutomacao, pool: Lancamento[], config: ConfigAutomacao,
         tol,
         (e, d) => {
           if (e.contaId !== d.contaId) return null;
-          // A saída vem de 0 a diasMax dias depois da entrada.
-          const dias = diasEntre(d.data, e.data);
-          return dias >= 0 && dias <= diasMax ? dias : null;
+          // Entrada e saída a até diasMax dias uma da outra, em qualquer ordem: no arquivo do banco o crédito do
+          // cartão vem no mesmo dia do Pix, mas pelo Open Finance ele às vezes chega um dia depois.
+          const dias = Math.abs(diasEntre(d.data, e.data));
+          return dias <= diasMax ? dias : null;
         }
       );
 

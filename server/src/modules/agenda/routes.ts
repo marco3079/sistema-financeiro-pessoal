@@ -241,6 +241,49 @@ router.get(
 
 // ---------- Fluxo de caixa projetado ----------
 
+// Média mensal de entradas e saídas das contas (sem cartão) nos últimos 3 meses completos, e o que já entrou e saiu
+// no mês atual. Cartão fica de fora porque chega pelas faturas; transferências, ocultos e proventos também.
+async function mediasDoHistorico(mesInicial: string) {
+  const mesesBase = [somarMeses(mesInicial, -3), somarMeses(mesInicial, -2), somarMeses(mesInicial, -1)];
+  const de = intervaloDoMes(mesesBase[0]).inicio;
+  const ate = intervaloDoMes(mesInicial).fim;
+  const lancamentos = await prisma.transacao.findMany({
+    where: {
+      data: { gte: de, lt: ate }, // fim do intervalo é o dia 1º do mês seguinte (exclusivo)
+      transferencia: false,
+      oculto: false,
+      provento: false,
+      conta: { tipo: { not: 'CARTAO' } },
+    },
+    select: { data: true, valor: true, tipo: true },
+  });
+  // Faturas que venceram nos 3 meses de base: o gasto típico no cartão (compras novas e parcelas).
+  const faturas = await prisma.fatura.aggregate({
+    where: { vencimento: { gte: de, lt: intervaloDoMes(mesesBase[2]).fim } },
+    _sum: { total: true },
+  });
+  const soma = { receitaBase: 0, despesaBase: 0, receitaMes: 0, despesaMes: 0 };
+  for (const t of lancamentos) {
+    const mes = dataISO(t.data).slice(0, 7);
+    const v = num(t.valor);
+    if (mes === mesInicial) {
+      if (t.tipo === 'RECEITA') soma.receitaMes += v;
+      else soma.despesaMes += v;
+    } else if (mesesBase.includes(mes)) {
+      if (t.tipo === 'RECEITA') soma.receitaBase += v;
+      else soma.despesaBase += v;
+    }
+  }
+  return {
+    receitaMedia: arredondar(soma.receitaBase / 3),
+    despesaMedia: arredondar(soma.despesaBase / 3),
+    faturaMedia: arredondar(num(faturas._sum.total) / 3),
+    receitaNoMes: arredondar(soma.receitaMes),
+    despesaNoMes: arredondar(soma.despesaMes),
+    mesesBase,
+  };
+}
+
 const previsaoSchema = z.object({
   meses: z.array(z.object({ mes: z.string(), total: z.number() })),
 });
@@ -253,11 +296,12 @@ router.get(
     const mesInicial = mesAtual();
     const meses = Array.from({ length: quantos }, (_, i) => somarMeses(mesInicial, i));
 
-    const [saldoContas, fixas, pagamentos, previsaoBruta] = await Promise.all([
+    const [saldoContas, fixas, pagamentos, previsaoBruta, medias] = await Promise.all([
       prisma.conta.aggregate({ where: { ativo: true, tipo: { not: 'CARTAO' } }, _sum: { saldo: true } }),
       prisma.contaFixa.findMany({ where: { ativa: true } }),
       prisma.pagamentoContaFixa.findMany({ where: { mes: { in: meses } }, select: { contaFixaId: true, mes: true } }),
       chamarApiInterna(perfilAtual() ?? 1, 'GET', '/cartoes/previsao'),
+      mediasDoHistorico(mesInicial),
     ]);
 
     const previsao = previsaoSchema.safeParse(previsaoBruta);
@@ -270,15 +314,24 @@ router.get(
     let saldo = num(saldoContas._sum.saldo);
     const saldoInicial = arredondar(saldo);
 
-    const linhas = meses.map((mes) => {
-      let entradas = 0;
-      let saidas = 0;
+    // Entradas e saídas de cada mês: as contas fixas cadastradas ou, se o seu padrão dos últimos 3 meses for maior,
+    // a média (as fixas fazem parte dela). No mês atual só conta o que ainda falta: o saldo já tem o que aconteceu.
+    const linhas = meses.map((mes, i) => {
+      let fixasEntrada = 0;
+      let fixasSaida = 0;
       for (const c of fixas) {
         if (pagas.has(`${c.id}|${mes}`)) continue;
-        if (c.tipo === 'RECEITA') entradas += num(c.valor);
-        else saidas += num(c.valor);
+        if (c.tipo === 'RECEITA') fixasEntrada += num(c.valor);
+        else fixasSaida += num(c.valor);
       }
-      const faturas = faturaDoMes.get(mes) ?? 0;
+      const jaEntrou = i === 0 ? medias.receitaNoMes : 0;
+      const jaSaiu = i === 0 ? medias.despesaNoMes : 0;
+      const entradas = Math.max(fixasEntrada, medias.receitaMedia - jaEntrou, 0);
+      const saidas = Math.max(fixasSaida, medias.despesaMedia - jaSaiu, 0);
+      // Fatura: a prevista (faturas abertas e parcelas). Do mês que vem em diante, se a média das faturas dos últimos
+      // 3 meses for maior, vale a média: a previsão não sabe das compras novas que ainda vão ser feitas.
+      const prevista = faturaDoMes.get(mes) ?? 0;
+      const faturas = i === 0 ? prevista : Math.max(prevista, medias.faturaMedia);
       saldo = arredondar(saldo + entradas - saidas - faturas);
       return {
         mes,
@@ -289,7 +342,17 @@ router.get(
       };
     });
 
-    res.json({ saldoInicial, meses: linhas });
+    res.json({
+      saldoInicial,
+      base: {
+        receitaMedia: medias.receitaMedia,
+        despesaMedia: medias.despesaMedia,
+        faturaMedia: medias.faturaMedia,
+        meses: medias.mesesBase,
+        contasFixas: fixas.length,
+      },
+      meses: linhas,
+    });
   })
 );
 

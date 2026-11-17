@@ -11,6 +11,7 @@ import { comPerfil, prisma } from './prisma';
 import { ehPagamentoDeFaturaNaConta, marcarPixNoCreditoNasContas } from './pixNoCredito';
 import { aplicarAutomacoes } from './automacoes';
 import { gravarProventosDasContas } from './proventosOpenFinance';
+import { CODIGO_FII, fundosNaB3 } from './proventosAnunciados';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
 import {
   listarContasDoItem,
@@ -416,6 +417,14 @@ async function fecharFaturaPelaPrevisao(
 
 const PREFIXO_PREVISTA = 'prevista:';
 
+// Saldo do cartão = o que está em aberto nas faturas (as que não foram pagas), como na importação de fatura.
+// O "saldo" que a Pluggy manda é o limite usado, com todas as parcelas futuras: contado inteiro no patrimônio,
+// ele cobrava hoje compras que só vencem nos próximos meses (essas aparecem na previsão de cada mês).
+async function saldoDoCartaoPelasFaturas(contaId: number): Promise<void> {
+  const aberto = await prisma.fatura.aggregate({ where: { contaId, status: { not: 'PAGA' } }, _sum: { total: true } });
+  await prisma.conta.update({ where: { id: contaId }, data: { saldo: Math.max(0, arredondar(Number(aberto._sum.total ?? 0))) } });
+}
+
 type LancamentoComPrevisao = PluggyTransacao & {
   status?: string;
   category?: string | null;
@@ -570,6 +579,14 @@ async function montarClassificador(): Promise<Classificador> {
 
 // Sentido do lançamento. A Pluggy marca DEBIT (saiu/comprou) ou CREDIT (entrou/pagou);
 // sem a marca, vale o sinal: em conta, negativo é saída; em cartão, positivo é compra.
+// Crédito no cartão: pagamento da fatura (dinheiro vindo da conta, vira transferência) ou estorno/ajuste de compra
+// (abate o gasto, fica como receita no cartão, igual à importação de fatura). "Estorno de pagamento" é estorno.
+export function creditoNoCartaoEhPagamento(descricao: string): boolean {
+  const d = descricao.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (d.includes('estorno')) return false;
+  return ['pagamento', 'pgto', 'pagto', 'fatura', 'rotativo'].some((t) => d.includes(t));
+}
+
 function tipoDoLancamento(t: PluggyTransacao, cartao: boolean): 'RECEITA' | 'DESPESA' {
   if (t.type === 'DEBIT') return 'DESPESA';
   if (t.type === 'CREDIT') return 'RECEITA';
@@ -641,7 +658,7 @@ async function gravarLancamentos(
       categoriaId: classificador.categoriaDe(t.category, tipo),
       // Pagamento de fatura (entrada no cartão) e movimentos entre contas próprias não são receita nem despesa.
       transferencia:
-        (cartao && tipo === 'RECEITA') ||
+        (cartao && tipo === 'RECEITA' && creditoNoCartaoEhPagamento(comuns.descricao)) ||
         TRECHOS_TRANSFERENCIA.some((trecho) => categoriaPluggy.includes(trecho)) ||
         (!cartao && tipo === 'DESPESA' && ehPagamentoDeFaturaNaConta(comuns.descricao)),
       origem: 'OPEN_FINANCE',
@@ -717,6 +734,13 @@ async function gravarInvestimentos(conexao: { id: number; instituicao: string },
   const lista = await listarInvestimentosDoItem(itemId).catch(() => null);
   if (lista === null) return; // a instituição não oferece investimentos, ou a consulta falhou: mantém o que há
 
+  // FII que o banco manda como ação (ex.: PMLL11): código "XXXX11" que a B3 reconhece como fundo vira FII.
+  // Units de ação (TAEE11, SANB11) não estão na lista de fundos da B3 e continuam como ação.
+  const suspeitos = lista
+    .filter((i) => tipoDoInvestimento(i) === 'ACAO' && CODIGO_FII.test((i.code ?? '').trim().toUpperCase()))
+    .map((i) => (i.code ?? '').trim().toUpperCase());
+  const fundos = suspeitos.length > 0 ? await fundosNaB3(suspeitos).catch(() => new Map()) : new Map();
+
   const vistos: string[] = [];
   let comMovimentos = 0;
   for (const i of lista) {
@@ -731,7 +755,7 @@ async function gravarInvestimentos(conexao: { id: number; instituicao: string },
           : saldo;
     const atualizaveis = {
       codigo: texto(i.code, 40),
-      tipo: tipoDoInvestimento(i),
+      tipo: fundos.has((i.code ?? '').trim().toUpperCase()) ? ('FII' as const) : tipoDoInvestimento(i),
       subtipo: rotuloSubtipo(i.subtype),
       instituicao: texto(i.institution?.name, 120) ?? conexao.instituicao,
       emissor: texto(i.issuer, 120),
@@ -856,12 +880,17 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
           ? await gravarFaturas(local, conta)
           : { porIdPluggy: new Map<string, number>(), abertaId: null, ultimoFechamento: null, abertaFechamento: null, abertaEstimada: false };
       await gravarLancamentos(local, conta, de, faturas, classificador);
-      if (local.tipo === 'CARTAO') await fecharFaturaEstimada(local.id, faturas, conta);
+      if (local.tipo === 'CARTAO') {
+        await fecharFaturaEstimada(local.id, faturas, conta);
+        await saldoDoCartaoPelasFaturas(local.id);
+      }
     }
     // Pix pago no crédito: o crédito do cartão na conta e a saída de mesmo valor viram transferência.
     // Olha 2 anos para trás, para acertar também o que já estava no sistema antes desta regra.
     await marcarPixNoCreditoNasContas(idsDasContas, new Date(hoje().getTime() - 730 * MS_DIA));
-    await aplicarAutomacoes({ desde: new Date(hoje().getTime() - 10 * MS_DIA) }).catch(() => undefined);
+    // Automações sobre todo o período lido (na primeira carga, um ano): com só os últimos dias, os pares antigos
+    // (transferências entre as contas, Pix no crédito) nunca eram marcados. Lançamento que a pessoa ajustou fica.
+    await aplicarAutomacoes({ desde: de }).catch(() => undefined);
     await gravarInvestimentos(referencia, conexao.pluggyItemId);
     // Proventos: os créditos de dividendos e rendimentos na conta viram movimento do ativo (olha 2 anos para trás;
     // não repete o que já foi criado).
