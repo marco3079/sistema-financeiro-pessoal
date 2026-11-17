@@ -177,6 +177,7 @@ const TRECHOS_PAGAMENTO_FATURA = [
   'pagamento via',
   'pagamento debito automatico',
   'pagamento on line',
+  'fatura paga', // extrato do Itaú: "Fatura Paga PERSON MULTI"
 ];
 
 const TRECHOS_MOVIMENTO_PROPRIO = [
@@ -192,6 +193,15 @@ const TRECHOS_MOVIMENTO_PROPRIO = [
   'resgate de fundo',
   'dinheiro guardado',
   'dinheiro resgatado',
+  // Itaú: aplicação automática do saldo ("Apl Aplic Aut Mais"), o resgate dela ("Res Aplic Aut Mais") e o resgate
+  // de investimento que cai na conta ("INT Resgate PRIVILEGE"). O rendimento ("Rend Pago...") continua receita.
+  'apl aplic aut',
+  'res aplic aut',
+  'int resgate',
+  'int aplicacao',
+  // "INT Aplicação PRIVILEGE": no PDF as palavras às vezes saem embaralhadas ("PRI Aplicação VILEGE INT").
+  'privilege',
+  'vilege int',
   // Pix pago com o cartão: o banco credita o valor na conta e o Pix sai em seguida. O gasto de verdade está na
   // fatura ("Pix no Crédito - Fulano"); este crédito é só o dinheiro passando do cartão para a conta.
   'valor adicionado na conta por cartao de credito',
@@ -470,15 +480,40 @@ function analisarPdf(texto: string, documentoPedido: TipoDocumento | null, venci
   const mesBase = vencimento ? Number(vencimento.slice(5, 7)) : 12;
 
   const itens: ItemLido[] = [];
+  // Extrato: a data costuma vir só no primeiro lançamento do dia (Itaú, BB); as linhas seguintes usam a última data.
+  let ultimaDataTexto: string | null = null;
   for (const bruta of texto.split(/\r?\n/)) {
-    const linha = bruta.replace(/\s+/g, ' ').trim();
-    const comData = DATA_NO_INICIO.exec(linha);
+    // A legenda da coluna da esquerda do extrato do Itaú sai na mesma linha do lançamento
+    // ("D = débito a compensar 02/01 PAG BOLETO ... 4.231,86-"): o trecho da legenda sai, a data volta ao começo.
+    const linha = bruta
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^(?:[A-Z] = [a-zà-ú ]+?(?=\s\d{2}\/\d{2}\b|\s[A-Z]{2,})|Para demais siglas, consulte as Notas|Explicativas no final do extrato|pela Bolsa de Valores)\s+/, '');
+    // Depois do "Saldo final" vêm os relatórios de investimento (no Itaú, uma tabela diária só de números que
+    // virava lançamento): o extrato da conta acabou.
+    if (documento === 'EXTRATO' && (/^saldo final\b/.test(chave(linha)) || chave(linha).includes('totalizador de aplicacoes automaticas'))) break;
+    let comData = DATA_NO_INICIO.exec(linha);
+    if (!comData && documento === 'EXTRATO' && ultimaDataTexto) {
+      comData = [linha, ultimaDataTexto, linha] as unknown as RegExpExecArray;
+    }
     if (!comData) continue;
-    const comValor = DINHEIRO_NO_FIM.exec(comData[2]);
+    let comValor = DINHEIRO_NO_FIM.exec(comData[2]);
     if (!comValor) continue;
+    // Duas quantias no fim ("Rend Pago Aplic Aut Mais 0,02 1,00"): a primeira é o lançamento; a segunda, o saldo
+    // do dia na coluna ao lado.
+    if (documento === 'EXTRATO') {
+      // "8.426,63- 1,00": o "-" é do valor de antes, não do saldo (a expressão o pega junto com o "1,00").
+      let corte = comValor.index;
+      if (/^-/.test(comValor[1]) && /\d$/.test(comData[2].slice(0, corte))) corte += 1;
+      const antes = DINHEIRO_NO_FIM.exec(comData[2].slice(0, corte).trim());
+      if (antes && antes.index > 0) comValor = antes;
+    }
     const valor = lerDinheiro(comValor[1]);
     if (valor === null) continue;
     let descricao = comData[2].slice(0, comValor.index).trim();
+    // Descrição só com números e símbolos (tabela de totais): não é lançamento.
+    if (!/[a-zà-ú]/i.test(descricao)) continue;
+    if (DATA_NO_INICIO.test(linha)) ultimaDataTexto = comData[1];
     // Segunda data colada no começo da descrição (extratos com "data do lançamento" e "data do movimento").
     descricao = descricao.replace(/^\d{2}[/.]\d{2}(?:[/.]\d{2,4})?\s+/, '');
     if (descricao === '' || LINHAS_QUE_NAO_SAO_COMPRAS.some((t) => chave(descricao).includes(t))) continue;
