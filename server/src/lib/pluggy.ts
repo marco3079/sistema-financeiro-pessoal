@@ -305,3 +305,21 @@ export function listarInvestimentosDoItem(itemId: string): Promise<PluggyInvesti
 export function listarMovimentosDoInvestimento(investimentoId: string): Promise<PluggyMovimentoInvestimento[]> {
   return listarPaginado<PluggyMovimentoInvestimento>(`/investments/${encodeURIComponent(investimentoId)}/transactions`);
 }
+
+// Id do conector "MeuPluggy" (o Open Finance pessoal e gratuito da Pluggy), para o widget abrir direto nele.
+// Procurado pelo nome na Pluggy e guardado em memória; null se a conta não tiver esse conector liberado.
+let idMeuPluggy: { valor: number | null; ate: number } | null = null;
+
+export async function idDoConectorMeuPluggy(): Promise<number | null> {
+  if (idMeuPluggy && idMeuPluggy.ate > Date.now()) return idMeuPluggy.valor;
+  let valor: number | null = null;
+  try {
+    const r = await chamar<{ results?: { id: number; name?: string }[] }>('GET', '/connectors?name=MeuPluggy');
+    const achado = (r.results ?? []).find((c) => (c.name ?? '').toLowerCase().replace(/\s+/g, '') === 'meupluggy');
+    valor = achado?.id ?? null;
+  } catch {
+    valor = null;
+  }
+  idMeuPluggy = { valor, ate: Date.now() + (valor === null ? 5 * 60_000 : 24 * 3_600_000) };
+  return valor;
+}

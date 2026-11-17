@@ -11,6 +11,7 @@ import {
   credenciaisPluggy,
   criarConnectToken,
   esquecerChavePluggy,
+  idDoConectorMeuPluggy,
   obterItem,
 } from '../../lib/pluggy';
 import { iniciarSincronizacaoAutomatica, sincronizarConexao, sincronizarTudo } from '../../lib/sincronizacao';
@@ -133,8 +134,8 @@ router.post(
     if (dados.conexaoId !== undefined) {
       itemId = (await conexaoPorId(dados.conexaoId)).pluggyItemId;
     }
-    const accessToken = await criarConnectToken(itemId ?? undefined);
-    res.json({ accessToken, sandbox: credenciais.sandbox, itemId });
+    const [accessToken, meuPluggyId] = await Promise.all([criarConnectToken(itemId ?? undefined), idDoConectorMeuPluggy()]);
+    res.json({ accessToken, sandbox: credenciais.sandbox, itemId, meuPluggyId });
   })
 );
 

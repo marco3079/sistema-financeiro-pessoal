@@ -6,7 +6,7 @@ import type { ConexaoDTO } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
 import { Aviso, Botao, Cartao, Carregando, MenuAcoes, Modal, Pagina, Selo, formatarDataHora } from '../../ui';
 import type { AcaoMenu } from '../../ui';
-import { ResumoItem, Vazio } from '../../ui/financas';
+import { ResumoItem } from '../../ui/financas';
 import { Icone } from '../../ui/icones';
 import { Credenciais } from './Credenciais';
 import { ConexoesDiretas } from './ConexaoDireta';
@@ -23,6 +23,7 @@ interface TokenOpenFinanceDTO {
   accessToken: string;
   sandbox: boolean;
   itemId: string | null;
+  meuPluggyId: number | null;
 }
 
 export function Conexoes() {
@@ -58,11 +59,12 @@ export function Conexoes() {
   }
 
   // Abre o widget "Pluggy Connect" para conectar uma instituição nova (null) ou reconectar uma existente.
-  async function abrirWidget(conexao: ConexaoDTO | null) {
+  // diretoNoMeuPluggy: pula a lista de bancos e abre já no MeuPluggy (o Open Finance pessoal da Pluggy).
+  async function abrirWidget(conexao: ConexaoDTO | null, diretoNoMeuPluggy = false) {
     setErro(null);
     setSucesso(null);
     try {
-      const { accessToken, sandbox, itemId } = await api.post<TokenOpenFinanceDTO>(
+      const { accessToken, sandbox, itemId, meuPluggyId } = await api.post<TokenOpenFinanceDTO>(
         '/openfinance/token',
         conexao ? { conexaoId: conexao.id } : {},
       );
@@ -70,6 +72,7 @@ export function Conexoes() {
         connectToken: accessToken,
         includeSandbox: sandbox,
         ...(itemId ? { updateItem: itemId } : {}),
+        ...(!itemId && diretoNoMeuPluggy && meuPluggyId ? { selectedConnectorId: meuPluggyId } : {}),
         onSuccess: ({ item }) => {
           void aoConectar(item.id, conexao);
         },
@@ -169,8 +172,11 @@ export function Conexoes() {
             <Botao variante="secundario" desabilitado={sincronizando} aoClicar={() => void sincronizarTudo()}>
               Sincronizar tudo
             </Botao>
-            <Botao desabilitado={sincronizando} aoClicar={() => void abrirWidget(null)}>
-              Conectar instituição
+            <Botao variante="secundario" desabilitado={sincronizando} aoClicar={() => void abrirWidget(null)}>
+              Outra instituição
+            </Botao>
+            <Botao desabilitado={sincronizando} aoClicar={() => void abrirWidget(null, true)}>
+              Conectar meus bancos (MeuPluggy)
             </Botao>
           </>
         ) : undefined
@@ -185,39 +191,26 @@ export function Conexoes() {
       {carregando && <Carregando />}
 
       {dados && !dados.configurado && (
-        <>
-          <Vazio
-            icone="conexoes"
-            titulo="Conecte seus bancos pelo Open Finance"
-            texto="Traga saldos, faturas do cartão e investimentos automaticamente. Primeiro informe as credenciais da Pluggy."
-          >
-            <Botao aoClicar={() => setMostrarCredenciais(true)}>Configurar credenciais</Botao>
-          </Vazio>
-          <Cartao titulo="Como obter as credenciais">
-            <ol>
-              <li>
-                Crie uma conta gratuita em{' '}
-                <a href="https://dashboard.pluggy.ai" target="_blank" rel="noreferrer">
-                  dashboard.pluggy.ai
-                </a>
-                .
-              </li>
-              <li>Crie uma aplicação e copie o Client ID e o Client Secret.</li>
-              <li>
-                Para ler os seus próprios bancos sem custo, ative o conector "MeuPluggy" (
-                <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer">
-                  meu.pluggy.ai
-                </a>
-                ) na aplicação.
-              </li>
-              <li>Cole as credenciais aqui e clique em Conectar instituição.</li>
-            </ol>
-            <p className="fin-suave">
-              Para testar sem banco real, marque 'Mostrar bancos de teste' e use o Pluggy Bank com usuário user-ok e
-              senha password-ok.
-            </p>
-          </Cartao>
-        </>
+        <Cartao titulo="Ligue o Open Finance (uma vez só)">
+          <ol className="conexoes-passos">
+            <li>
+              Entre em{' '}
+              <a href="https://dashboard.pluggy.ai" target="_blank" rel="noreferrer">
+                dashboard.pluggy.ai
+              </a>{' '}
+              (conta grátis), crie uma aplicação e copie o <strong>Client ID</strong> e o <strong>Client Secret</strong>.
+            </li>
+            <li>Cole os dois aqui embaixo e salve. O sistema confere na Pluggy antes de gravar.</li>
+            <li>
+              Depois é só clicar em <strong>Conectar meus bancos (MeuPluggy)</strong>: os bancos que você ligou em{' '}
+              <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer">
+                meu.pluggy.ai
+              </a>{' '}
+              chegam de uma vez, sem custo.
+            </li>
+          </ol>
+          <Credenciais estado={dados} aoSalvo={recarregar} />
+        </Cartao>
       )}
 
       {dados && dados.configurado && (
@@ -229,11 +222,27 @@ export function Conexoes() {
           </div>
 
           {conexoes.length === 0 ? (
-            <Vazio
-              icone="conexoes"
-              titulo="Nenhuma instituição conectada"
-              texto="Clique em Conectar instituição e escolha seu banco, cartão ou corretora."
-            />
+            <Cartao titulo="Conecte seus bancos em 2 passos">
+              <ol className="conexoes-passos">
+                <li>
+                  <strong>No MeuPluggy, ligue seus bancos.</strong> Entre em{' '}
+                  <a href="https://meu.pluggy.ai" target="_blank" rel="noreferrer">
+                    meu.pluggy.ai
+                  </a>{' '}
+                  (grátis para uso pessoal) e conecte cada banco pela opção Open Finance. A autorização é feita no app
+                  do próprio banco: ninguém vê a sua senha.
+                </li>
+                <li>
+                  <strong>Aqui, traga tudo de uma vez.</strong> Clique no botão abaixo e entre com o login do MeuPluggy.
+                  Contas, cartões e investimentos chegam sozinhos e atualizam a cada 6 horas.
+                </li>
+              </ol>
+              <div className="pagina-acoes">
+                <Botao desabilitado={sincronizando} aoClicar={() => void abrirWidget(null, true)}>
+                  Conectar meus bancos (MeuPluggy)
+                </Botao>
+              </div>
+            </Cartao>
           ) : (
             <div className="fin-cartoes">
               {conexoes.map((c) => (
