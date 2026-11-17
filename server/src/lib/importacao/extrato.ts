@@ -600,6 +600,21 @@ export function analisarArquivo(entrada: {
   }
 
   const avisos = [...parcial.avisos];
+  // Linhas com valor zero (comuns no extrato do Itaú: "SALDO DO DIA", "SALDO ANTERIOR", lançamentos estornados)
+  // não são lançamentos: saem da prévia, em vez de travar a importação inteira ("o valor mínimo é 0").
+  const zeradas = parcial.itens.filter((i) => !(i.valor > 0)).length;
+  if (zeradas > 0) {
+    parcial = { ...parcial, itens: parcial.itens.filter((i) => i.valor > 0) };
+    avisos.push(`${zeradas} ${zeradas === 1 ? 'linha com valor zero foi ignorada' : 'linhas com valor zero foram ignoradas'} (saldo do dia ou lançamento sem valor).`);
+  }
+  // Linhas de saldo ("SALDO DO DIA", "SALDO ANTERIOR", "SALDO TOTAL DISPONÍVEL DIA"...) mostram o saldo da conta,
+  // não um lançamento: no CSV e no OFX do Itaú vêm com valor e entrariam como receita.
+  const ehSaldo = (descricao: string) => /^(saldo|sdo)\b/.test(chave(descricao));
+  const deSaldo = parcial.itens.filter((i) => ehSaldo(i.descricao)).length;
+  if (deSaldo > 0) {
+    parcial = { ...parcial, itens: parcial.itens.filter((i) => !ehSaldo(i.descricao)) };
+    avisos.push(`${deSaldo} ${deSaldo === 1 ? 'linha de saldo foi ignorada' : 'linhas de saldo foram ignoradas'} (não são lançamentos).`);
+  }
   if (parcial.documento === 'FATURA') {
     vencimento = vencimento ?? doNome;
     if (!vencimento) {
