@@ -119,6 +119,25 @@ model ConexaoBancaria {
   @@index([perfilId])
 }
 
+// ---------- Conexão direta com a API do banco (conta PJ) ----------
+
+// Credenciais (e certificado mTLS) que o próprio banco dá à empresa. Os lançamentos entram na conta ligada (Conta MANUAL,
+// com chaveImportacao "api:<banco>:<id do banco>" para não repetir). banco: 'inter' | 'cora' | 'mercadopago'.
+model ConexaoDireta {
+  id                  Int           @id @default(autoincrement())
+  perfilId            Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  banco               String
+  apelido             String
+  credenciaisCifradas String // JSON cifrado (lib/cripto); nunca volta para o navegador
+  contaId             Int? // Conta.id onde caem saldo e lançamentos
+  status              StatusConexao @default(ATUALIZANDO)
+  erro                String?
+  ultimaSincronizacao DateTime?
+  criadoEm            DateTime      @default(now())
+
+  @@index([perfilId])
+}
+
 // ---------- Contas, cartões e lançamentos ----------
 
 model Conta {

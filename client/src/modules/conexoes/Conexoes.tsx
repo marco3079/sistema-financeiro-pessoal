@@ -9,6 +9,7 @@ import type { AcaoMenu } from '../../ui';
 import { ResumoItem, Vazio } from '../../ui/financas';
 import { Icone } from '../../ui/icones';
 import { Credenciais } from './Credenciais';
+import { ConexoesDiretas } from './ConexaoDireta';
 
 export interface EstadoOpenFinanceDTO {
   configurado: boolean;
@@ -284,6 +285,8 @@ export function Conexoes() {
           </Cartao>
         </>
       )}
+
+      {dados && <ConexoesDiretas />}
 
       <Modal aberto={mostrarCredenciais} titulo="Credenciais da Pluggy" aoFechar={() => setMostrarCredenciais(false)}>
         {dados && (

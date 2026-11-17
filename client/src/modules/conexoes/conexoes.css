@@ -51,3 +51,76 @@
 .conexoes-item-linha {
   display: block;
 }
+
+/* API direta e quadro de formas de conexão por banco. */
+.conexoes-logo-cor {
+  color: #fff;
+  border: none;
+}
+
+.conexoes-direta-passos {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+}
+
+.conexoes-direta-passos ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.conexoes-catalogo {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.conexoes-catalogo-linha {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.4fr) 0.6fr 0.8fr 2fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--cor-borda);
+  align-items: center;
+}
+
+.conexoes-catalogo-cabecalho {
+  border-top: none;
+  background: var(--cor-superficie-2);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.conexoes-catalogo-sim {
+  color: var(--cor-sucesso, var(--cor-primaria));
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .conexoes-catalogo-cabecalho {
+    display: none;
+  }
+  .conexoes-catalogo-linha {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 0.75rem;
+  }
+  .conexoes-catalogo-linha > span:first-child,
+  .conexoes-catalogo-linha > span:last-child {
+    grid-column: 1 / -1;
+  }
+  .conexoes-catalogo-linha > span:nth-child(2)::before {
+    content: 'Arquivo: ';
+  }
+  .conexoes-catalogo-linha > span:nth-child(3)::before {
+    content: 'Open Finance: ';
+  }
+  .conexoes-catalogo-linha > span:last-child::before {
+    content: 'API direta: ';
+    color: var(--cor-texto-suave, inherit);
+  }
+}

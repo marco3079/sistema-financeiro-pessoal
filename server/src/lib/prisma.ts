@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 
 const MODELOS_DO_PERFIL = new Set([
   'ConexaoBancaria',
+  'ConexaoDireta',
   'Conta',
   'Categoria',
   'Transacao',

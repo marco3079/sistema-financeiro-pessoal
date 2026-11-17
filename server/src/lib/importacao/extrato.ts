@@ -213,7 +213,7 @@ function ehPagamentoDeFatura(descricao: string): boolean {
   return TRECHOS_PAGAMENTO_FATURA.some((t) => d.includes(t));
 }
 
-function ehMovimentoProprio(descricao: string): boolean {
+export function ehMovimentoProprio(descricao: string): boolean {
   const d = chave(descricao);
   return ehPagamentoDeFatura(descricao) || TRECHOS_MOVIMENTO_PROPRIO.some((t) => d.includes(t));
 }

@@ -21,6 +21,7 @@ import {
   registrarPosicaoPatrimonio,
 } from '../../lib/financas';
 import { analisarArquivo } from '../../lib/importacao/extrato';
+import { categoriasPorHistorico, montarClassificador } from '../../lib/importacao/categorizar';
 import type { ItemLido } from '../../lib/importacao/extrato';
 import { analisarPlanilhaB3 } from '../../lib/importacao/b3';
 import { aplicarAutomacoes } from '../../lib/automacoes';
@@ -171,50 +172,6 @@ router.post(
     });
   })
 );
-
-// Categoria pelo que o próprio usuário já fez (mesma descrição) e, na falta disso, por palavras conhecidas.
-const PALAVRAS: { nome: string; trechos: string[] }[] = [
-  { nome: 'Transporte', trechos: ['uber', '99app', '99 app', '99pop', 'posto', 'combustivel', 'estacionamento', 'pedagio', 'sem parar', 'patinete', 'metro', 'pneus', 'shell', 'ipiranga'] },
-  { nome: 'Restaurantes', trechos: ['ifood', 'restaurante', 'pizza', 'lanchonete', 'burger', 'padaria', 'panificadora', 'cafeteria', 'bar ', 'churrascaria', 'rappi', 'sushi'] },
-  { nome: 'Mercado', trechos: ['supermercado', 'mercado ', 'atacadao', 'assai', 'carrefour', 'pao de acucar', 'hortifruti', 'conveniencia', 'mercadinho'] },
-  { nome: 'Assinaturas', trechos: ['netflix', 'spotify', 'apple.com/bill', 'amazon prime', 'amazonprime', 'amazon music', 'globoplay', 'disney', 'hbo', 'youtube', 'microsoft', 'google', 'canva', 'melimais', 'chatgpt', 'openai', 'icloud', 'deezer'] },
-  { nome: 'Saúde', trechos: ['farmacia', 'drogaria', 'drogasil', 'pague menos', 'hospital', 'clinica', 'laboratorio', 'otica', 'dentista', 'unimed', 'hapvida'] },
-  { nome: 'Contas da casa', trechos: ['neoenergia', 'energia', 'enel', 'cemig', 'copel', 'celpe', 'telefonica', 'vivo', 'claro', 'tim ', 'oi fibra', 'saneamento', 'compesa', 'sabesp', 'condominio', 'gas '] },
-  { nome: 'Educação', trechos: ['escola', 'faculdade', 'universidade', 'curso', 'udemy', 'alura', 'hotmart', 'livraria'] },
-  { nome: 'Lazer', trechos: ['cinema', 'ingresso', 'show', 'steam', 'playstation', 'xbox', 'xsolla', 'gamers club', 'hotel', 'airbnb', 'booking'] },
-  { nome: 'Compras', trechos: ['mercadolivre', 'mercado livre', 'amazon', 'shopee', 'tiktok shop', 'magazine', 'magalu', 'renner', 'riachuelo', 'c&a', 'aliexpress', 'shein', 'americanas', 'casas bahia'] },
-  { nome: 'Impostos e taxas', trechos: ['iof', 'anuidade', 'juros', 'multa', 'tarifa', 'encargo'] },
-];
-
-async function montarClassificador(): Promise<(item: ItemLido) => number | null> {
-  const categorias = await prisma.categoria.findMany({ select: { id: true, nome: true, tipo: true } });
-  const idDespesa = new Map(categorias.filter((c) => c.tipo === 'DESPESA').map((c) => [c.nome, c.id]));
-  const cache = new Map<string, number | null>();
-  return (item) => {
-    if (item.transferencia || item.tipo !== 'DESPESA') return null;
-    const d = semAcento(item.descricao);
-    if (cache.has(d)) return cache.get(d) ?? null;
-    const achada = PALAVRAS.find((p) => p.trechos.some((t) => d.includes(t)));
-    const id = achada ? (idDespesa.get(achada.nome) ?? null) : null;
-    cache.set(d, id);
-    return id;
-  };
-}
-
-// Categorias que o usuário já deu a lançamentos com a mesma descrição (a mais recente vence).
-async function categoriasPorHistorico(descricoes: string[]): Promise<Map<string, number>> {
-  const mapa = new Map<string, number>();
-  const unicas = [...new Set(descricoes)];
-  for (let i = 0; i < unicas.length; i += 300) {
-    const lote = await prisma.transacao.findMany({
-      where: { descricao: { in: unicas.slice(i, i + 300) }, categoriaId: { not: null } },
-      select: { descricao: true, categoriaId: true },
-      orderBy: { id: 'asc' },
-    });
-    for (const t of lote) if (t.categoriaId !== null) mapa.set(t.descricao, t.categoriaId);
-  }
-  return mapa;
-}
 
 const confirmarSchema = z.object({
   arquivo: z.string().trim().min(1).max(200),

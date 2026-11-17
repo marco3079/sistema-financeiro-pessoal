@@ -62,6 +62,7 @@ const AREAS_FECHADAS_AO_LEITOR = [
   '/api/avisos',
   '/api/automacoes',
   '/api/cupom',
+  '/api/bancos',
 ];
 
 function caminhoDaRequisicao(req: Request): string {
