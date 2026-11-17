@@ -32,11 +32,29 @@ function tamanho(bytes: number): string {
 // Cópias do banco guardadas antes de cada atualização, com a opção de voltar a uma delas.
 // `aoPedir` avisa a tela de fora que um pedido foi aceito, para ela acompanhar o andamento.
 export function CopiasDoBanco({ ocupado, aoPedir }: { ocupado: boolean; aoPedir: () => void }) {
-  const { dados, carregando, erro } = useDados<CopiasDTO>('/atualizacao/copias');
+  const { dados, carregando, erro, recarregar } = useDados<CopiasDTO>('/atualizacao/copias');
   const [escolhida, setEscolhida] = useState<CopiaDTO | null>(null);
   const [digitado, setDigitado] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
+  const [copiando, setCopiando] = useState(false);
+  const [erroCopia, setErroCopia] = useState<string | null>(null);
+
+  // Pede a cópia ao atualizador; a lista é recarregada depois de alguns segundos (o pg_dump é rápido).
+  async function criarCopia() {
+    setCopiando(true);
+    setErroCopia(null);
+    try {
+      await api.post('/atualizacao/copiar');
+      aoPedir();
+      window.setTimeout(recarregar, 6000);
+      window.setTimeout(recarregar, 15000);
+    } catch (e) {
+      setErroCopia(mensagemErro(e));
+    } finally {
+      setCopiando(false);
+    }
+  }
 
   async function restaurar() {
     if (!escolhida) return;
@@ -55,11 +73,19 @@ export function CopiasDoBanco({ ocupado, aoPedir }: { ocupado: boolean; aoPedir:
   }
 
   return (
-    <Cartao titulo="Cópias do banco de dados">
+    <Cartao>
+      <div className="fin-cabecalho">
+        <strong>Cópias do banco de dados</strong>
+        <Botao desabilitado={!dados?.vigiaAtivo || ocupado || copiando} aoClicar={() => void criarCopia()}>
+          {copiando ? 'Pedindo…' : 'Criar cópia agora'}
+        </Botao>
+      </div>
       <p className="atu-suave">
-        Antes de cada atualização o sistema guarda uma cópia de todos os dados na pasta backups (ficam as 5 mais recentes).
-        Restaurar troca os dados de agora pelos da cópia; antes de trocar, o estado atual também é guardado.
+        Antes de cada atualização o sistema guarda uma cópia de todos os dados na pasta backups, e você pode criar uma
+        quando quiser (ficam as 5 mais recentes). Restaurar troca os dados de agora pelos da cópia; antes de trocar, o
+        estado atual também é guardado.
       </p>
+      {erroCopia && <Aviso tipo="erro">{erroCopia}</Aviso>}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       {!dados && carregando && <Carregando />}
       {dados && !dados.vigiaAtivo && dados.copias.length > 0 && (
@@ -72,7 +98,7 @@ export function CopiasDoBanco({ ocupado, aoPedir }: { ocupado: boolean; aoPedir:
         <Tabela<CopiaDTO>
           chave={(c) => c.arquivo}
           dados={dados.copias}
-          vazio="Nenhuma cópia ainda. A primeira é feita na próxima atualização."
+          vazio="Nenhuma cópia ainda. Crie uma agora ou espere a próxima atualização."
           colunas={[
             { titulo: 'Feita em', celula: (c) => quando(c.feitaEm) },
             { titulo: 'Arquivo', celula: (c) => c.arquivo },

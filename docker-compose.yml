@@ -41,6 +41,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Serviço da Suno (atualizar as carteiras pela tela, com o login da pessoa).
       SUNO_URL: "http://suno:4100"
+      CALCULADORA_RTC_URL: "http://calculadora:8080/api/calculadora"
       SUNO_SEGREDO: ${JWT_SECRET:-troque-este-segredo-de-exemplo}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
       PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
@@ -77,6 +78,14 @@ services:
     build: ./ferramentas/suno
     environment:
       SUNO_SEGREDO: ${JWT_SECRET:-troque-este-segredo-de-exemplo}
+      TZ: ${TZ:-America/Sao_Paulo}
+    restart: unless-stopped
+
+  # Calculadora oficial da Reforma Tributária (CBS, IBS e Imposto Seletivo), da Receita Federal. Só a API a usa:
+  # não publica porta no computador.
+  calculadora:
+    build: ./ferramentas/calculadora-rtc
+    environment:
       TZ: ${TZ:-America/Sao_Paulo}
     restart: unless-stopped
 

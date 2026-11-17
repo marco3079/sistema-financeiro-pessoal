@@ -29,6 +29,16 @@ const leituraSchema = z.object({
   estabelecimento: z.string().nullable(),
   categoria: z.string().nullable(),
   itens: z.number().int().nullable(),
+  listaItens: z
+    .array(
+      z.object({
+        descricao: z.string(),
+        quantidade: z.number().nullable(),
+        valor: z.number().nullable(),
+        ncm: z.string().nullable(),
+      })
+    )
+    .nullable(),
 });
 
 const leituraEntradaSchema = z.object({
@@ -146,6 +156,9 @@ router.post(
       'estabelecimento: nome da loja. ' +
       `categoria: a categoria de gasto mais provável, escolhida somente entre estas: ${listaCategorias}. Se nenhuma servir, use null. ` +
       'itens: quantidade de itens comprados. ' +
+      'listaItens: cada produto do cupom, na ordem: descricao (como está impressa), quantidade, valor (valor total ' +
+      'da linha, em reais) e ncm (código NCM de 8 dígitos: o impresso no cupom, se houver; senão o NCM mais provável ' +
+      'para o produto, só os dígitos; null se não der para saber). Use null em listaItens se o cupom não listar produtos. ' +
       'Não invente valores: se não estiver legível, use null.';
 
     const cliente = new Anthropic({ apiKey: config.chave, timeout: 60_000, maxRetries: 2 });
@@ -154,7 +167,7 @@ router.post(
     try {
       resposta = await cliente.messages.parse({
         model: config.modelo,
-        max_tokens: 1024,
+        max_tokens: 4096,
         output_config: { format: zodOutputFormat(leituraSchema) },
         messages: [
           {
@@ -181,7 +194,17 @@ router.post(
     const categoriaSugerida = sugerida ? (nomes.find((n) => n.toLowerCase() === sugerida) ?? null) : null;
     const itens = lido.itens !== null && Number.isInteger(lido.itens) && lido.itens >= 0 ? lido.itens : 0;
 
-    res.json({ valor, data, estabelecimento, categoriaSugerida, itens });
+    const listaItens = (lido.listaItens ?? [])
+      .map((i) => ({
+        descricao: i.descricao.trim().slice(0, 120),
+        quantidade: i.quantidade !== null && Number.isFinite(i.quantidade) && i.quantidade > 0 ? i.quantidade : 1,
+        valor: i.valor !== null && Number.isFinite(i.valor) && i.valor > 0 ? arredondar(i.valor) : null,
+        ncm: i.ncm && /^\d{8}$/.test(i.ncm.replace(/\D/g, '')) ? i.ncm.replace(/\D/g, '') : null,
+      }))
+      .filter((i) => i.descricao !== '')
+      .slice(0, 100);
+
+    res.json({ valor, data, estabelecimento, categoriaSugerida, itens, listaItens });
   })
 );
 

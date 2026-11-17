@@ -176,6 +176,9 @@ model Categoria {
   nome     String
   tipo     TipoTransacao
   cor      String        @default("#64748b")
+  // Reforma tributária: como os gastos desta categoria são tributados pela CBS/IBS (lib/reformaTributaria).
+  // null = o sistema escolhe pelo nome da categoria.
+  tratamentoTributario String?
 
   transacoes Transacao[]
   orcamento  Orcamento?

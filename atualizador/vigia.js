@@ -212,12 +212,12 @@ async function copiarBanco(podar) {
   return nome;
 }
 
-// Reconstrói a API, o site e o serviço da Suno; o banco e o próprio atualizador não são recriados aqui.
+// Reconstrói a API, o site, o serviço da Suno e a calculadora da Reforma Tributária; o banco e o próprio atualizador não são recriados aqui.
 // A barra vai de 15% a 75% durante a montagem (pelo tempo, comparado ao da última vez) e daí até 95% ao religar.
 async function reconstruir() {
   const parar = andarComOTempo(15, 75, duracaoEstimada());
   try {
-    await compose(['build', 'api', 'web', 'suno']);
+    await compose(['build', 'api', 'web', 'suno', 'calculadora']);
   } finally {
     const levou = parar();
     try {
@@ -227,7 +227,7 @@ async function reconstruir() {
     }
   }
   gravarEstado('ATUALIZANDO', 'Ligando o serviço da Suno...', 78);
-  await compose(['up', '-d', '--no-deps', 'suno']);
+  await compose(['up', '-d', '--no-deps', 'suno', 'calculadora']);
   gravarEstado('ATUALIZANDO', 'Ligando a API (espera ela responder)...', 82);
   await compose(['up', '-d', '--no-deps', '--wait', 'api']);
   gravarEstado('ATUALIZANDO', 'Ligando o site...', 95);
@@ -299,6 +299,13 @@ async function restaurar(nome) {
   gravarEstado('OK', `Banco restaurado da cópia ${nome}. O banco de antes ficou em ${anterior}.`, 100);
 }
 
+// Cópia pedida pela tela (botão "Criar cópia agora"): só o pg_dump, sem atualizar nada.
+async function copiarAgora() {
+  gravarEstado('ATUALIZANDO', 'Criando uma cópia do banco de dados...', 30);
+  const nome = await copiarBanco(true);
+  gravarEstado('OK', `Cópia do banco criada: ${nome}`, 100);
+}
+
 async function atenderPedido() {
   let tipo = '';
   let arquivo = '';
@@ -312,6 +319,7 @@ async function atenderPedido() {
   fs.rmSync(ARQUIVO_PEDIDO, { force: true });
   try {
     if (tipo === 'RESTAURAR') await restaurar(arquivo);
+    else if (tipo === 'COPIAR') await copiarAgora();
     else await atualizar();
   } catch (erro) {
     const mensagem = String(erro instanceof Error ? erro.message : erro).slice(0, 400);
@@ -319,6 +327,8 @@ async function atenderPedido() {
       // Se parou no meio, tenta religar o sistema para ele não ficar fora do ar.
       await rodar('docker', ['compose', '--project-directory', pastaNoDocker, '-p', projeto, 'up', '-d', '--no-deps', 'api', 'web'], { env: ambienteDoCompose() });
       gravarEstado('ERRO', `A restauração falhou: ${mensagem}`);
+    } else if (tipo === 'COPIAR') {
+      gravarEstado('ERRO', `A cópia do banco falhou: ${mensagem}`);
     } else {
       gravarEstado('ERRO', mensagem);
     }

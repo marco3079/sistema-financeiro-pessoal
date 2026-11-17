@@ -201,6 +201,22 @@ router.get(
   })
 );
 
+// Pede uma cópia do banco agora (o atualizador do computador roda o pg_dump; ficam as 5 mais recentes).
+router.post(
+  '/atualizacao/copiar',
+  asyncHandler(async (_req, res) => {
+    const estado = await montarEstado(false);
+    if (!estado.vigiaAtivo) {
+      throw new HttpError(400, 'O atualizador não está ligado neste computador. Rode o instalador de novo (ele cria o contêiner atualizador).');
+    }
+    if (estado.ultimaAtualizacao?.situacao === 'ATUALIZANDO' || estado.pedidoPendente) {
+      throw new HttpError(409, 'Já há uma atualização, restauração ou cópia em andamento.');
+    }
+    await fs.writeFile(ARQUIVO_PEDIDO, JSON.stringify({ tipo: 'COPIAR', pedidoEm: new Date().toISOString() }));
+    res.status(202).json(await montarEstado(false));
+  })
+);
+
 // Pede a restauração de uma cópia: grava o pedido para o atualizador do computador. O servidor não mexe no banco.
 router.post(
   '/atualizacao/restaurar',

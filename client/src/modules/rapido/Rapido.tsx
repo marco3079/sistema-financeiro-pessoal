@@ -6,6 +6,8 @@ import type { CategoriaDTO, ContaDTO, TipoTransacao, TransacaoDTO } from '../../
 import { formatarReais, hojeISO, lerValor, mensagemErro, valorParaCampo } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
 import { Aviso, Botao, Carregando, Cartao, Pagina } from '../../ui';
+import { ItensDoCupom } from './ItensDoCupom';
+import type { ItemCupom } from './ItensDoCupom';
 import './rapido.css';
 
 const CHAVE_CONTA = 'financas.rapido.conta';
@@ -21,6 +23,7 @@ interface LeituraCupom {
   estabelecimento: string | null;
   categoriaSugerida: string | null;
   itens: number;
+  listaItens?: ItemCupom[];
 }
 
 // Reduz a foto no navegador (até 1280 px no maior lado, JPEG qualidade 0.7) e devolve só o base64, sem prefixo.
@@ -94,6 +97,7 @@ export function Rapido() {
   const [sessao, setSessao] = useState<TransacaoDTO[]>([]);
   const [lendoCupom, setLendoCupom] = useState(false);
   const [avisoCupom, setAvisoCupom] = useState<string | null>(null);
+  const [itensCupom, setItensCupom] = useState<ItemCupom[]>([]);
   const estadoCupom = useDados<{ configurada: boolean }>('/cupom/estado');
   const fotoRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
@@ -204,6 +208,7 @@ export function Rapido() {
   // Lê a foto do cupom e preenche os campos. Nada é lançado: a pessoa confere e clica em Lançar.
   async function lerCupom(arquivo: File) {
     setAvisoCupom(null);
+    setItensCupom([]);
     setErroEnvio(null);
     setLendoCupom(true);
     try {
@@ -211,6 +216,7 @@ export function Rapido() {
       const lido = await api.post<LeituraCupom>('/cupom/ler', { imagem, tipo: 'image/jpeg' });
       if (lido.valor !== null) setValorTexto(valorParaCampo(lido.valor));
       if (lido.data) setData(lido.data);
+      setItensCupom(lido.listaItens ?? []);
       if (lido.estabelecimento) setDescricao(lido.estabelecimento);
       if (lido.categoriaSugerida) {
         const sugerida = (categorias.dados ?? []).find(
@@ -332,6 +338,7 @@ export function Rapido() {
             </>
           )}
           {avisoCupom && <Aviso tipo="info">{avisoCupom}</Aviso>}
+          {itensCupom.length > 0 && <ItensDoCupom itens={itensCupom} />}
         </div>
 
         <Cartao titulo="Categoria">

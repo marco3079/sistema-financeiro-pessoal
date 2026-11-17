@@ -141,3 +141,43 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Itens lidos do cupom e CBS/IBS de cada um. */
+.rapido-itens-cupom {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+}
+
+.rapido-itens-cupom summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.rapido-itens-cupom table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.rapido-itens-cupom th,
+.rapido-itens-cupom td {
+  padding: 0.3rem 0.4rem;
+  border-top: 1px solid var(--cor-borda);
+  text-align: left;
+}
+
+.rapido-itens-cupom .rapido-direita {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rapido-itens-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

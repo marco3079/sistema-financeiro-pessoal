@@ -1,0 +1,147 @@
+/* Reforma tributária: só variáveis de cor de estilo.css; a cor da categoria entra por style. */
+
+.trib-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.trib-resumo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+}
+
+.trib-resumo strong {
+  font-size: 1.15rem;
+  color: var(--cor-texto);
+}
+
+.trib-anos {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  height: 8rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.trib-ano {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.trib-ano-barra {
+  width: 100%;
+  max-width: 3rem;
+  border-radius: 6px 6px 0 0;
+  background: var(--cor-borda);
+}
+
+.trib-ano-ativo .trib-ano-barra {
+  background: var(--cor-primaria);
+}
+
+.trib-ano-ativo {
+  color: var(--cor-texto);
+  font-weight: 600;
+}
+
+.trib-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.trib-ponto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trib-select {
+  min-width: 11rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.trib-filtros {
+  display: grid;
+  grid-template-columns: 8rem 6rem minmax(12rem, 1fr);
+  gap: 0.75rem;
+}
+
+.trib-item {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+}
+
+.trib-item-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trib-item-campos {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2fr) minmax(12rem, 1.6fr) 1fr 0.7fr 0.6fr;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.trib-ncm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.trib-ncm > .campo {
+  flex: 1;
+}
+
+.trib-resultado {
+  margin-top: 1rem;
+}
+
+.trib-erro {
+  display: block;
+  color: var(--cor-perigo, #dc2626);
+  font-size: 0.85rem;
+}
+
+.trib-memoria pre {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  background: var(--cor-superficie-2);
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+@media (max-width: 760px) {
+  .trib-filtros,
+  .trib-item-campos {
+    grid-template-columns: 1fr 1fr;
+  }
+  .trib-item-campos > :first-child,
+  .trib-ncm {
+    grid-column: 1 / -1;
+  }
+}
