@@ -110,7 +110,7 @@ export function Conexoes() {
   async function removerConexao(conexao: ConexaoDTO, manterDados: boolean) {
     const pergunta = manterDados
       ? `Remover a conexão com ${conexao.instituicao}? As contas e lançamentos dela continuam como manuais.`
-      : `Remover a conexão com ${conexao.instituicao} e apagar as contas, faturas, lançamentos e investimentos que vieram dela?`;
+      : `Remover a conexão com ${conexao.instituicao} e apagar as contas, faturas e lançamentos que vieram dela?`;
     if (!window.confirm(pergunta)) return;
     setErro(null);
     setSucesso(null);
@@ -162,7 +162,6 @@ export function Conexoes() {
 
   const conexoes = dados?.conexoes ?? [];
   const totalContas = conexoes.reduce((soma, c) => soma + c.contas, 0);
-  const totalInvestimentos = conexoes.reduce((soma, c) => soma + c.investimentos, 0);
 
   return (
     <Pagina
@@ -187,7 +186,7 @@ export function Conexoes() {
       {erroCarga && <Aviso tipo="erro">{erroCarga}</Aviso>}
       {sucesso && <Aviso tipo="sucesso">{sucesso}</Aviso>}
       {sincronizando && (
-        <Aviso tipo="info">Buscando contas, faturas e investimentos... isso pode levar até um minuto.</Aviso>
+        <Aviso tipo="info">Buscando contas, cartões e faturas... isso pode levar até um minuto.</Aviso>
       )}
       {carregando && <Carregando />}
 
@@ -219,7 +218,6 @@ export function Conexoes() {
           <div className="resumo">
             <ResumoItem icone="conexoes" cor="azul" valor={conexoes.length} rotulo="Instituições conectadas" />
             <ResumoItem icone="contas" cor="verde" valor={totalContas} rotulo="Contas e cartões" />
-            <ResumoItem icone="investimentos" cor="roxo" valor={totalInvestimentos} rotulo="Investimentos" />
           </div>
 
           {conexoes.length === 0 ? (
@@ -235,7 +233,7 @@ export function Conexoes() {
                 </li>
                 <li>
                   <strong>Aqui, traga tudo de uma vez.</strong> Clique no botão abaixo e entre com o login do MeuPluggy.
-                  Contas, cartões e investimentos chegam sozinhos e atualizam a cada 6 horas.
+                  Contas e cartões chegam sozinhos e atualizam a cada 6 horas. Investimentos ficam de fora: lance a carteira pela planilha da B3.
                 </li>
               </ol>
               <div className="pagina-acoes">
@@ -265,7 +263,7 @@ export function Conexoes() {
                     <MenuAcoes rotulo={'Ações de ' + c.instituicao} acoes={acoesDaConexao(c)} />
                   </div>
                   <span className="fin-suave conexoes-item-linha">
-                    {c.contas} contas e cartões · {c.investimentos} investimentos
+                    {c.contas} contas e cartões
                   </span>
                   <span className="fin-suave conexoes-item-linha">
                     {c.ultimaSincronizacao

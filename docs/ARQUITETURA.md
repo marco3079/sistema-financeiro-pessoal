@@ -176,7 +176,7 @@ sequenceDiagram
 - **Contas**: `BANK` vira corrente ou poupança; `CREDIT` vira cartão, com limite, bandeira e dias de fechamento e vencimento.
 - **Faturas**: as fechadas vêm de `/bills`. A em aberto é montada com o saldo do cartão e a data de vencimento informada. Como a Pluggy não diz se a fatura foi paga, vale o pagamento registrado ou o vencimento já ter passado.
 - **Lançamentos**: `DEBIT` vira despesa e `CREDIT` vira receita. A categoria da Pluggy é traduzida para uma categoria padrão quando há correspondência. Pagamento de fatura e movimento entre contas próprias entram como transferência.
-- **Investimentos**: tipo e subtipo da Pluggy viram o tipo do sistema; o valor aplicado usa o valor original informado ou o saldo menos o lucro. Posição que deixa de vir é marcada como inativa.
+- **Investimentos**: não vêm pelo Open Finance (ele não informa o preço de compra). A carteira entra à mão ou pela planilha da B3; os proventos que caem na conta da corretora viram rendimento do ativo de mesmo código.
 - **O que é do usuário não é sobrescrito**: nome e cor da conta, nome do investimento, categoria, observação e marcação de transferência.
 - **Quando sincroniza**: ao conectar, pelo botão, um minuto depois de o servidor subir e a cada 6 horas. Antes de ler, o servidor pede à Pluggy uma nova coleta e espera até 90 segundos.
 - **Remover conexão**: apaga o item na Pluggy (revoga o consentimento) e apaga os dados importados, ou os mantém como manuais.

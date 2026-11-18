@@ -74,41 +74,6 @@ export interface PluggyFatura {
   payments?: { amount?: number | null; paymentDate?: string | null }[] | null;
 }
 
-export interface PluggyInvestimento {
-  id: string;
-  name?: string | null;
-  code?: string | null;
-  number?: string | null;
-  type?: string;
-  subtype?: string | null;
-  balance?: number | null;
-  amount?: number | null;
-  amountOriginal?: number | null;
-  amountProfit?: number | null;
-  quantity?: number | null;
-  value?: number | null;
-  date?: string | null;
-  dueDate?: string | null;
-  rate?: number | null;
-  rateType?: string | null;
-  fixedAnnualRate?: number | null;
-  issuer?: string | null;
-  status?: string | null;
-  institution?: { name?: string | null } | null;
-}
-
-export interface PluggyMovimentoInvestimento {
-  id: string;
-  type?: string;
-  movementType?: 'CREDIT' | 'DEBIT' | string;
-  amount?: number | null;
-  value?: number | null;
-  quantity?: number | null;
-  date?: string | null;
-  tradeDate?: string | null;
-  description?: string | null;
-}
-
 // ---------- Credenciais ----------
 
 export interface CredenciaisPluggy {
@@ -322,14 +287,6 @@ export async function listarTransacoesDaConta(contaId: string, de: string): Prom
 
 export function listarFaturasDaConta(contaId: string): Promise<PluggyFatura[]> {
   return listarPaginado<PluggyFatura>(`/bills?accountId=${encodeURIComponent(contaId)}`);
-}
-
-export function listarInvestimentosDoItem(itemId: string): Promise<PluggyInvestimento[]> {
-  return listarPaginado<PluggyInvestimento>(`/investments?itemId=${encodeURIComponent(itemId)}`);
-}
-
-export function listarMovimentosDoInvestimento(investimentoId: string): Promise<PluggyMovimentoInvestimento[]> {
-  return listarPaginado<PluggyMovimentoInvestimento>(`/investments/${encodeURIComponent(investimentoId)}/transactions`);
 }
 
 // Id do conector "MeuPluggy" (o Open Finance pessoal e gratuito da Pluggy), para o widget abrir direto nele.

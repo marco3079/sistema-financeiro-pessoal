@@ -1,35 +1,32 @@
-// Sincronização do Open Finance: traz da Pluggy as contas, os cartões, as faturas, os lançamentos
-// e os investimentos de uma conexão e grava nas tabelas do sistema (origem OPEN_FINANCE).
+// Sincronização do Open Finance: traz da Pluggy as contas, os cartões, as faturas e os lançamentos de uma conexão
+// e grava nas tabelas do sistema (origem OPEN_FINANCE). Investimentos não vêm pelo Open Finance: a carteira é
+// lançada à mão ou pela planilha da B3, que traz o preço de compra (o Open Finance não informa).
 // Regras:
 // - Cada registro é reconhecido pelo id da Pluggy (pluggyAccountId, pluggyTransactionId, ...): sincronizar de novo atualiza, não duplica.
-// - O que o usuário pode mudar num registro do Open Finance é preservado: nome e cor da conta, nome do investimento,
-//   categoria, observação e marcação de transferência do lançamento.
+// - O que o usuário pode mudar num registro do Open Finance é preservado: nome e cor da conta, categoria,
+//   observação, data e marcação de transferência do lançamento.
 // - Nada do que foi digitado à mão (origem MANUAL) é tocado.
 
-import type { Prisma, StatusConexao, TipoConta, TipoInvestimento, TipoMovimentoInvestimento } from '@prisma/client';
+import type { Prisma, StatusConexao, TipoConta } from '@prisma/client';
 import { comPerfil, prisma } from './prisma';
 import { ehPagamentoDeFaturaNaConta, marcarPixNoCreditoNasContas } from './pixNoCredito';
 import { aplicarAutomacoes } from './automacoes';
 import { gravarProventosDasContas } from './proventosOpenFinance';
-import { CODIGO_FII, fundosNaB3 } from './proventosAnunciados';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
 import {
   listarContasDoItem,
   listarFaturasDaConta,
-  listarInvestimentosDoItem,
-  listarMovimentosDoInvestimento,
   listarTransacoesDaConta,
   obterItem,
   pedirAtualizacaoDoItem,
 } from './pluggy';
-import type { PluggyConta, PluggyInvestimento, PluggyItem, PluggyTransacao } from './pluggy';
+import type { PluggyConta, PluggyItem, PluggyTransacao } from './pluggy';
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 const DIAS_PRIMEIRA_CARGA = 365;
 const DIAS_RECARGA = 90;
 const ESPERA_MAXIMA_MS = 90 * 1000;
 const INTERVALO_ESPERA_MS = 3000;
-const MAXIMO_INVESTIMENTOS_COM_MOVIMENTOS = 60;
 const TAMANHO_LOTE = 500;
 
 // ---------- Auxiliares ----------
@@ -843,180 +840,6 @@ async function gravarLancamentos(
   }
 }
 
-// ---------- Investimentos ----------
-
-function tipoDoInvestimento(i: PluggyInvestimento): TipoInvestimento {
-  const subtipo = (i.subtype ?? '').toUpperCase();
-  if (subtipo.includes('REAL_ESTATE')) return 'FII';
-  if (subtipo.includes('RETIREMENT') || subtipo.includes('PGBL') || subtipo.includes('VGBL')) return 'PREVIDENCIA';
-  if (subtipo.includes('CRYPTO')) return 'CRIPTO';
-  if (subtipo === 'ETF') return 'ETF';
-  switch (i.type) {
-    case 'FIXED_INCOME':
-      return 'RENDA_FIXA';
-    case 'MUTUAL_FUND':
-      return 'FUNDO';
-    case 'EQUITY':
-      return 'ACAO';
-    case 'ETF':
-      return 'ETF';
-    case 'SECURITY':
-      return 'PREVIDENCIA';
-    default:
-      return 'OUTRO';
-  }
-}
-
-function taxaDoInvestimento(i: PluggyInvestimento): string | null {
-  const numero = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-  if (typeof i.rate === 'number' && i.rateType) {
-    const fixa = typeof i.fixedAnnualRate === 'number' && i.fixedAnnualRate > 0 ? ` + ${numero(i.fixedAnnualRate)}% a.a.` : '';
-    return `${numero(i.rate)}% do ${i.rateType}${fixa}`;
-  }
-  if (typeof i.fixedAnnualRate === 'number' && i.fixedAnnualRate > 0) return `${numero(i.fixedAnnualRate)}% a.a.`;
-  return null;
-}
-
-function rotuloSubtipo(subtipo: string | null | undefined): string | null {
-  const limpo = texto(subtipo, 60);
-  return limpo ? limpo.replace(/_/g, ' ') : null;
-}
-
-function tipoDoMovimento(tipo: string | undefined, sentido: string | undefined): TipoMovimentoInvestimento | null {
-  switch (tipo) {
-    case 'BUY':
-      return 'APLICACAO';
-    case 'SELL':
-      return 'RESGATE';
-    case 'TAX':
-      return 'IMPOSTO';
-    case 'INTEREST':
-    case 'DIVIDEND':
-    case 'AMORTIZATION':
-      return 'RENDIMENTO';
-    case 'TRANSFER':
-      return null;
-    default:
-      if (sentido === 'CREDIT') return 'APLICACAO';
-      if (sentido === 'DEBIT') return 'RESGATE';
-      return null;
-  }
-}
-
-async function gravarInvestimentos(conexao: { id: number; instituicao: string }, itemId: string): Promise<void> {
-  const lista = await listarInvestimentosDoItem(itemId).catch(() => null);
-  if (lista === null) return; // a instituição não oferece investimentos, ou a consulta falhou: mantém o que há
-
-  // FII que o banco manda como ação (ex.: PMLL11): código "XXXX11" que a B3 reconhece como fundo vira FII.
-  // Units de ação (TAEE11, SANB11) não estão na lista de fundos da B3 e continuam como ação.
-  const suspeitos = lista
-    .filter((i) => tipoDoInvestimento(i) === 'ACAO' && CODIGO_FII.test((i.code ?? '').trim().toUpperCase()))
-    .map((i) => (i.code ?? '').trim().toUpperCase());
-  const fundos = suspeitos.length > 0 ? await fundosNaB3(suspeitos).catch(() => new Map()) : new Map();
-
-  const vistos: string[] = [];
-  let comMovimentos = 0;
-  for (const i of lista) {
-    vistos.push(i.id);
-    const saldo = dinheiro(i.balance);
-    // Valor aplicado: o original informado; senão o saldo menos o lucro; senão o próprio saldo.
-    const aplicado =
-      typeof i.amountOriginal === 'number' && i.amountOriginal > 0
-        ? dinheiro(i.amountOriginal)
-        : typeof i.amountProfit === 'number'
-          ? Math.max(0, arredondar(saldo - i.amountProfit))
-          : saldo;
-    const atualizaveis = {
-      codigo: texto(i.code, 40),
-      tipo: fundos.has((i.code ?? '').trim().toUpperCase()) ? ('FII' as const) : tipoDoInvestimento(i),
-      subtipo: rotuloSubtipo(i.subtype),
-      instituicao: texto(i.institution?.name, 120) ?? conexao.instituicao,
-      emissor: texto(i.issuer, 120),
-      valorAplicado: aplicado,
-      saldo,
-      quantidade: typeof i.quantity === 'number' && Number.isFinite(i.quantity) ? i.quantity : null,
-      taxa: taxaDoInvestimento(i),
-      vencimento: diaDe(i.dueDate),
-      dataPosicao: i.date && !Number.isNaN(Date.parse(i.date)) ? new Date(i.date) : new Date(),
-      ativo: i.status !== 'TOTAL_WITHDRAWAL' && saldo > 0,
-      origem: 'OPEN_FINANCE' as const,
-      conexaoId: conexao.id,
-    };
-    // O mesmo ativo pode já estar no sistema pela planilha da B3 (registro manual, com o histórico de compras e
-    // proventos). Para não contar duas vezes, o ativo do Open Finance é ligado a esse registro: ele guarda o
-    // histórico da B3 e passa a receber daqui só a posição atual (quantidade e saldo).
-    const codigoBolsa = (atualizaveis.codigo ?? '').toUpperCase();
-    if (/^[A-Z]{4}\d{1,2}$/.test(codigoBolsa)) {
-      const ligado = await prisma.investimento.findUnique({
-        where: { pluggyInvestmentId: i.id },
-        select: { id: true, origem: true },
-      });
-      let daPlanilha = ligado && ligado.origem === 'MANUAL' ? ligado.id : null;
-      if (daPlanilha === null) {
-        const gemeo = await prisma.investimento.findFirst({
-          where: { origem: 'MANUAL', pluggyInvestmentId: null, codigo: { equals: codigoBolsa, mode: 'insensitive' } },
-          orderBy: [{ ativo: 'desc' }, { id: 'asc' }],
-          select: { id: true },
-        });
-        if (gemeo) {
-          // Sai o registro repetido do Open Finance (com os movimentos dele) e o da planilha assume a ligação.
-          if (ligado) await prisma.investimento.delete({ where: { id: ligado.id } });
-          await prisma.investimento.update({ where: { id: gemeo.id }, data: { pluggyInvestmentId: i.id } });
-          daPlanilha = gemeo.id;
-        }
-      }
-      if (daPlanilha !== null) {
-        await prisma.investimento.update({
-          where: { id: daPlanilha },
-          data: {
-            saldo: atualizaveis.saldo,
-            quantidade: atualizaveis.quantidade,
-            dataPosicao: atualizaveis.dataPosicao,
-            ativo: atualizaveis.ativo,
-          },
-        });
-        continue; // compras, vendas e proventos deste ativo vêm da planilha da B3 e dos créditos na conta
-      }
-    }
-
-    const gravado = await prisma.investimento.upsert({
-      where: { pluggyInvestmentId: i.id },
-      update: atualizaveis, // o nome é do usuário depois da primeira carga
-      create: { ...atualizaveis, pluggyInvestmentId: i.id, nome: texto(i.name, 120) ?? texto(i.code, 120) ?? 'Investimento' },
-      select: { id: true },
-    });
-
-    if (comMovimentos < MAXIMO_INVESTIMENTOS_COM_MOVIMENTOS) {
-      comMovimentos++;
-      const movimentos = await listarMovimentosDoInvestimento(i.id).catch(() => []);
-      const dados: Prisma.MovimentoInvestimentoCreateManyInput[] = [];
-      for (const m of movimentos) {
-        const tipo = tipoDoMovimento(m.type, m.movementType);
-        const data = diaDe(m.tradeDate ?? m.date);
-        const valor = Math.abs(dinheiro(m.amount ?? (m.value ?? 0) * (m.quantity ?? 0)));
-        if (!tipo || !data || valor <= 0) continue;
-        dados.push({
-          investimentoId: gravado.id,
-          data,
-          tipo,
-          valor,
-          quantidade: typeof m.quantity === 'number' && Number.isFinite(m.quantity) ? Math.abs(m.quantity) : null,
-          descricao: texto(m.description, 200),
-          pluggyId: m.id,
-        });
-      }
-      for (const lote of emLotes(dados)) {
-        await prisma.movimentoInvestimento.createMany({ data: lote, skipDuplicates: true });
-      }
-    }
-  }
-  // O que a instituição deixou de devolver foi resgatado ou vendido.
-  await prisma.investimento.updateMany({
-    where: { conexaoId: conexao.id, origem: 'OPEN_FINANCE', pluggyInvestmentId: { notIn: vistos } },
-    data: { ativo: false, saldo: 0 },
-  });
-}
-
 // ---------- Sincronização de uma conexão ----------
 
 const emAndamento = new Map<number, Promise<void>>();
@@ -1069,9 +892,8 @@ async function executar(conexaoId: number, opcoes: OpcoesSincronizacao): Promise
     // Automações sobre todo o período lido (na primeira carga, um ano): com só os últimos dias, os pares antigos
     // (transferências entre as contas, Pix no crédito) nunca eram marcados. Lançamento que a pessoa ajustou fica.
     await aplicarAutomacoes({ desde: de }).catch(() => undefined);
-    await gravarInvestimentos(referencia, conexao.pluggyItemId);
-    // Proventos: os créditos de dividendos e rendimentos na conta viram movimento do ativo (olha 2 anos para trás;
-    // não repete o que já foi criado).
+    // Proventos: os créditos de dividendos e rendimentos na conta da corretora viram movimento do ativo da carteira
+    // com o mesmo código (olha 2 anos para trás; não repete o que já foi criado nem o que veio da planilha da B3).
     await gravarProventosDasContas(idsDasContas, conexao.id, new Date(hoje().getTime() - 730 * MS_DIA));
 
     await prisma.conexaoBancaria.update({
