@@ -74,8 +74,15 @@ interface AssinaturaSuno {
   atualizadoEm: string;
 }
 
+interface ForaDeTodas extends Fora {
+  tipo: string;
+  encerradaNa: string | null;
+  encerradaEm: string | null;
+}
+
 interface RespostaSuno {
   carteiras: CarteiraSuno[];
+  foraDeTodas: ForaDeTodas[];
   ultimaAtualizacao: string | null;
   assinatura: AssinaturaSuno | null;
 }
@@ -257,7 +264,13 @@ export function Suno() {
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const carteiras = dados?.carteiras ?? [];
+  const foraDeTodas = dados?.foraDeTodas ?? [];
+  const naAbaFora = ativa === ABA_FORA && foraDeTodas.length > 0;
   const carteira = carteiras.find((c) => c.slug === ativa) ?? carteiras[0] ?? null;
+  const abas = [
+    ...carteiras.map((c) => ({ id: c.slug, rotulo: c.nome })),
+    ...(foraDeTodas.length > 0 ? [{ id: ABA_FORA, rotulo: 'Fora das carteiras' }] : []),
+  ];
 
   async function apagar() {
     if (!window.confirm('Apagar as carteiras da Suno guardadas aqui? Rode o script de novo para trazê-las.')) return;
@@ -289,15 +302,69 @@ export function Suno() {
       <AtualizarSuno aberto={atualizando} aoFechar={() => setAtualizando(false)} aoConcluir={recarregar} />
       {carteira && (
         <>
-          <Abas abas={carteiras.map((c) => ({ id: c.slug, rotulo: c.nome }))} ativa={carteira.slug} aoMudar={setAtiva} />
-          <DetalheCarteira carteira={carteira} />
+          <Abas abas={abas} ativa={naAbaFora ? ABA_FORA : carteira.slug} aoMudar={setAtiva} />
+          {naAbaFora ? <ForaDasCarteiras lista={foraDeTodas} /> : <DetalheCarteira carteira={carteira} />}
           <p className="fin-suave suno-rodape">
-            Carteira {carteira.nome} atualizada em {dataHora(carteira.atualizadoEm)}. O sistema só cruza o que a Suno
-            publica com o que você tem: não é recomendação de compra ou venda.
+            {naAbaFora
+              ? 'Comparado com todas as carteiras da Suno que você assina.'
+              : `Carteira ${carteira.nome} atualizada em ${dataHora(carteira.atualizadoEm)}.`}{' '}
+            O sistema só cruza o que a Suno publica com o que você tem: não é recomendação de compra ou venda.
           </p>
         </>
       )}
     </Pagina>
+  );
+}
+
+const ABA_FORA = '__fora-das-carteiras';
+const ROTULO_TIPO_ATIVO: Record<string, string> = { FII: 'FII', ACAO: 'Ação', ETF: 'ETF', BDR: 'BDR' };
+
+// Seus ativos que não aparecem na carteira recomendada de nenhuma carteira da Suno.
+function ForaDasCarteiras({ lista }: { lista: ForaDeTodas[] }) {
+  const total = lista.reduce((s, f) => s + f.saldo, 0);
+  return (
+    <Cartao titulo="Seus ativos fora das carteiras da Suno">
+      <p className="fin-suave">
+        {lista.length} {lista.length === 1 ? 'ativo' : 'ativos'} ({formatarReais(total)}) que não estão na carteira
+        recomendada de nenhuma carteira da Suno que você assina. Quando a Suno já recomendou e encerrou, aparece em qual
+        carteira e quando.
+      </p>
+      <Tabela<ForaDeTodas>
+        chave={(f) => f.ticker}
+        dados={lista}
+        colunas={[
+          {
+            titulo: 'Ativo',
+            celula: (f) => (
+              <span className="suno-ativo">
+                <strong>{f.ticker}</strong>
+                <span className="fin-suave">{f.nome}</span>
+              </span>
+            ),
+          },
+          { titulo: 'Tipo', celula: (f) => ROTULO_TIPO_ATIVO[f.tipo] ?? f.tipo },
+          {
+            titulo: 'Na Suno',
+            celula: (f) =>
+              f.encerradaNa ? (
+                <span className="suno-ativo">
+                  <Selo cor="vermelho">Encerrada</Selo>
+                  <span className="fin-suave suno-pequeno">
+                    {f.encerradaNa}
+                    {f.encerradaEm ? ` em ${formatarDia(f.encerradaEm)}` : ''}
+                  </span>
+                </span>
+              ) : (
+                <Selo cor="cinza">Nunca recomendada</Selo>
+              ),
+          },
+          { titulo: 'Suas cotas', alinhar: 'direita', celula: (f) => numero(f.quantidade, 0) },
+          { titulo: 'Seu preço médio', alinhar: 'direita', celula: (f) => numero(f.precoMedio) },
+          { titulo: 'Preço hoje', alinhar: 'direita', celula: (f) => numero(f.precoAtual) },
+          ...colunasDeRetorno<ForaDeTodas>(),
+        ]}
+      />
+    </Cartao>
   );
 }
 
@@ -364,6 +431,10 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
     },
     { titulo: 'DY esperado', alinhar: 'direita', celula: (l) => pct(l.dyEsperado) },
     { titulo: 'Alocação Suno', alinhar: 'direita', celula: (l) => pct(l.alocacao) },
+  ];
+  // Sem nada do tipo da carteira (ex.: só FIIs numa carteira de ações), as colunas da sua posição ficariam vazias.
+  const temPosicao = c.base > 0 || c.linhas.some((l) => l.saldo > 0);
+  const colunasDaPosicao: ColunaTabela<LinhaSuno>[] = [
     { titulo: 'Sua alocação', alinhar: 'direita', celula: (l) => (l.situacao === 'TEM' ? pct(l.minhaAlocacao) : '—') },
     ...colunasDeRetorno<LinhaSuno>(),
     {
@@ -379,8 +450,8 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
           </span>
         ),
     },
-    { titulo: 'Situação', celula: (l) => <SeloSituacao l={l} /> },
   ];
+  colunas.push(...(temPosicao ? colunasDaPosicao : []), { titulo: 'Situação', celula: (l) => <SeloSituacao l={l} /> });
 
   const ordenadas = [...c.linhas].sort((a, b) => {
     const ordem: Record<Situacao, number> = { COMPRAR: 0, TEM: 1, AGUARDAR: 2, ENCERRADA: 3, FORA: 4 };
@@ -402,6 +473,12 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
       </div>
 
       <Cartao titulo={`Carteira recomendada: ${c.nome}`}>
+        {!temPosicao && tipos && (
+          <p className="fin-suave">
+            Você não tem {tipos} na sua carteira, então as colunas da sua posição (alocação, retorno, proventos e saldo)
+            ficam de fora desta tabela.
+          </p>
+        )}
         {c.base > 0 && tipos && (
           <p className="fin-suave">
             "Para a alocação Suno" compara a alocação da Suno com o que você tem em {tipos} ({formatarReais(c.base)}): é

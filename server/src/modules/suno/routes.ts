@@ -298,8 +298,12 @@ router.get(
       const recomendada = lerRecomendada(dados.recomendada);
       const outrasAlocacoes = lerOutrasAlocacoes(dados.recomendada);
       const encerradas = lerEncerradas(dados.encerradas);
-      const tipos = tiposDaCarteira(c.slug);
       const naCarteira = new Set(recomendada.map((a) => a.ticker));
+      // Carteiras mistas (a Start tem ações e FIIs): entram também os tipos dos ativos dela que a pessoa tem.
+      const tipos = [...new Set([
+        ...tiposDaCarteira(c.slug),
+        ...investimentos.filter((i) => naCarteira.has((i.codigo ?? '').toUpperCase())).map((i) => i.tipo),
+      ])];
       // Base da comparação: tudo o que a pessoa tem do mesmo tipo (FIIs para a carteira de FIIs, ações para as de ações).
       const doTipo = investimentos.filter((i) => tipos.includes(i.tipo));
       const base = doTipo.reduce((s, i) => s + num(i.saldo), 0);
@@ -352,7 +356,9 @@ router.get(
         })
         .sort((a, b) => b.saldo - a.saldo);
       const encerrou = new Set(encerradas.map((e) => e.ticker));
+      // "Fora" fica só no tipo principal da carteira: na Start (ações) não lista todos os seus FIIs.
       const fora = doTipo
+        .filter((i) => tiposDaCarteira(c.slug).includes(i.tipo))
         .filter((i) => !naCarteira.has((i.codigo ?? '').toUpperCase()) && !encerrou.has((i.codigo ?? '').toUpperCase()))
         .map((i) => ({
           ticker: (i.codigo ?? '').toUpperCase(),
@@ -390,12 +396,40 @@ router.get(
         ],
       };
     });
+    // Ativos da pessoa que não estão na recomendada de nenhuma carteira (com a carteira em que a Suno os encerrou, se houver).
+    const recomendados = new Set<string>();
+    const encerradoEm = new Map<string, { carteira: string; data: string | null }>();
+    for (const c of carteiras) {
+      const dados = c.dados as unknown as { recomendada: Tabela | null; encerradas: Tabela | null };
+      for (const a of lerRecomendada(dados.recomendada)) recomendados.add(a.ticker);
+      for (const e of lerEncerradas(dados.encerradas)) {
+        const atual = encerradoEm.get(e.ticker);
+        if (!atual || (e.encerramento ?? '') > (atual.data ?? '')) encerradoEm.set(e.ticker, { carteira: c.nome, data: e.encerramento });
+      }
+    }
+    const foraDeTodas = investimentos
+      .filter((i) => !recomendados.has((i.codigo ?? '').toUpperCase()))
+      .map((i) => {
+        const ticker = (i.codigo ?? '').toUpperCase();
+        const enc = encerradoEm.get(ticker);
+        return {
+          ticker,
+          nome: i.nome,
+          tipo: i.tipo,
+          encerradaNa: enc?.carteira ?? null,
+          encerradaEm: enc?.data ?? null,
+          ...posicao(i),
+        };
+      })
+      .sort((a, b) => b.saldo - a.saldo);
+
     const assinatura = await prisma.assinaturaSuno.findFirst({});
     const ultima = carteiras.reduce<Date | null>((m, c) => (m === null || c.atualizadoEm > m ? c.atualizadoEm : m), null);
     const hojeIso = new Date().toISOString().slice(0, 10);
     const fim = assinatura?.fim ? dataISO(assinatura.fim) : null;
     res.json({
       carteiras: resultado,
+      foraDeTodas,
       ultimaAtualizacao: ultima ? ultima.toISOString() : null,
       assinatura: assinatura
         ? {

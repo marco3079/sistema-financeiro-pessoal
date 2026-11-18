@@ -824,6 +824,11 @@ textarea.campo-controle {
   overflow-x: auto;
 }
 
+/* Selos numa linha só: se a tabela não couber, ela rola de lado em vez de empilhar o texto do selo. */
+.tabela .selo {
+  white-space: nowrap;
+}
+
 /* Dentro da tabela as palavras não quebram letra por letra (o cartão em volta permite quebra em qualquer ponto). */
 .tabela th,
 .tabela td {
