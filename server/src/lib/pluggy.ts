@@ -1,10 +1,11 @@
 // Cliente HTTP da Pluggy (agregador de Open Finance). Documentação: https://docs.pluggy.ai
 // Autenticação: POST /auth com clientId e clientSecret devolve uma apiKey que vale 2 horas;
 // as demais chamadas mandam a apiKey no cabeçalho X-API-KEY.
-// As credenciais vêm das Configurações gravadas no banco (segredo cifrado) ou, na falta delas,
-// de PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET do .env.
+// As credenciais são de cada perfil financeiro (PerfilFinanceiro.pluggy*, segredo cifrado). As antigas, gravadas
+// para o sistema todo (ConfiguracaoPlataforma) ou no .env, continuam valendo só para o perfil mais antigo e para os
+// perfis que já têm conexão feita com elas.
 
-import { prisma } from './prisma';
+import { perfilAtual, prisma } from './prisma';
 import { decifrar } from './cripto';
 import { HttpError } from './erros';
 
@@ -113,10 +114,30 @@ export interface CredenciaisPluggy {
   clientSecret: string;
   sandbox: boolean;
   origem: 'BANCO' | 'ENV';
+  doPerfil: boolean; // false = credenciais antigas do sistema, herdadas por este perfil
 }
 
 // Credenciais em uso, ou null se o Open Finance ainda não foi configurado.
 export async function credenciaisPluggy(): Promise<CredenciaisPluggy | null> {
+  const perfilId = perfilAtual();
+  // Fora de uma requisição ou tarefa de perfil não há credenciais: toda chamada à Pluggy acontece dentro de um perfil.
+  if (perfilId === null) return null;
+  const perfil = await prisma.perfilFinanceiro.findUnique({
+    where: { id: perfilId },
+    select: { pluggyClientId: true, pluggyClientSecretCifrado: true, pluggySandbox: true },
+  });
+  if (perfil?.pluggyClientId && perfil.pluggyClientSecretCifrado) {
+    const segredo = decifrar(perfil.pluggyClientSecretCifrado);
+    if (segredo) {
+      return { clientId: perfil.pluggyClientId, clientSecret: segredo, sandbox: perfil.pluggySandbox, origem: 'BANCO', doPerfil: true };
+    }
+  }
+  // Credenciais antigas (do sistema todo): só para o perfil mais antigo e para quem já tem conexão feita com elas.
+  const [maisAntigo, conexoes] = await Promise.all([
+    prisma.perfilFinanceiro.findFirst({ orderBy: { id: 'asc' }, select: { id: true } }),
+    prisma.conexaoBancaria.count(),
+  ]);
+  if (maisAntigo?.id !== perfilId && conexoes === 0) return null;
   const config = await prisma.configuracaoPlataforma.findUnique({
     where: { id: 1 },
     select: { pluggyClientId: true, pluggyClientSecretCifrado: true, pluggySandbox: true },
@@ -125,7 +146,7 @@ export async function credenciaisPluggy(): Promise<CredenciaisPluggy | null> {
   if (config?.pluggyClientId && config.pluggyClientSecretCifrado) {
     const segredo = decifrar(config.pluggyClientSecretCifrado);
     if (segredo) {
-      return { clientId: config.pluggyClientId, clientSecret: segredo, sandbox, origem: 'BANCO' };
+      return { clientId: config.pluggyClientId, clientSecret: segredo, sandbox, origem: 'BANCO', doPerfil: false };
     }
   }
   const idEnv = (process.env.PLUGGY_CLIENT_ID ?? '').trim();
@@ -136,6 +157,7 @@ export async function credenciaisPluggy(): Promise<CredenciaisPluggy | null> {
       clientSecret: segredoEnv,
       sandbox: sandbox || process.env.PLUGGY_SANDBOX === 'true',
       origem: 'ENV',
+      doPerfil: false,
     };
   }
   return null;
@@ -143,10 +165,11 @@ export async function credenciaisPluggy(): Promise<CredenciaisPluggy | null> {
 
 // ---------- Chamadas ----------
 
-let chaveEmCache: { clientId: string; apiKey: string; ate: number } | null = null;
+// Uma apiKey por Client ID: perfis com credenciais diferentes não derrubam a chave um do outro.
+const chavesEmCache = new Map<string, { apiKey: string; ate: number }>();
 
 export function esquecerChavePluggy(): void {
-  chaveEmCache = null;
+  chavesEmCache.clear();
 }
 
 async function buscar(caminho: string, opcoes: RequestInit): Promise<Response> {
@@ -193,11 +216,12 @@ async function apiKey(): Promise<string> {
     throw new HttpError(400, 'O Open Finance ainda não foi configurado. Informe as credenciais da Pluggy em Conexões.');
   }
   const agora = Date.now();
-  if (chaveEmCache && chaveEmCache.clientId === credenciais.clientId && chaveEmCache.ate > agora) {
-    return chaveEmCache.apiKey;
+  const guardada = chavesEmCache.get(credenciais.clientId);
+  if (guardada && guardada.ate > agora) {
+    return guardada.apiKey;
   }
   const chave = await autenticarNaPluggy(credenciais.clientId, credenciais.clientSecret);
-  chaveEmCache = { clientId: credenciais.clientId, apiKey: chave, ate: agora + VALIDADE_CHAVE_MS };
+  chavesEmCache.set(credenciais.clientId, { apiKey: chave, ate: agora + VALIDADE_CHAVE_MS });
   return chave;
 }
 

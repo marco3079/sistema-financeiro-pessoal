@@ -410,6 +410,10 @@ model PerfilFinanceiro {
   nome     String
   cor      String   @default("#2563eb")
   criadoEm DateTime @default(now())
+  // Credenciais da Pluggy deste perfil (cada pessoa liga o próprio MeuPluggy). O segredo fica cifrado e nunca sai pela API.
+  pluggyClientId            String?
+  pluggyClientSecretCifrado String?
+  pluggySandbox             Boolean @default(false)
 }
 
 // ===== Índices de referência (Selic, IPCA, Ibovespa, IFIX) =====

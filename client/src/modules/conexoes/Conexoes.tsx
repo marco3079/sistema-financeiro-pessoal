@@ -14,6 +14,7 @@ import { ConexoesDiretas } from './ConexaoDireta';
 export interface EstadoOpenFinanceDTO {
   configurado: boolean;
   origemCredenciais: 'BANCO' | 'ENV' | null;
+  credenciaisDoPerfil: boolean; // false = usando as credenciais antigas do sistema
   clientId: string | null;
   sandbox: boolean;
   conexoes: ConexaoDTO[];
@@ -280,11 +281,16 @@ export function Conexoes() {
           <Cartao>
             <div className="fin-cabecalho">
               <div>
-                <strong>Credenciais da Pluggy</strong>
+                <strong>Credenciais da Pluggy deste perfil</strong>
                 <p className="fin-suave">
                   Client ID: {dados.clientId}
                   {dados.origemCredenciais === 'ENV' && ' (definidas no arquivo .env)'}
                   {dados.sandbox && ' · bancos de teste ligados'}
+                </p>
+                <p className="fin-suave">
+                  {dados.credenciaisDoPerfil
+                    ? 'Valem só para este perfil financeiro. Cada perfil guarda as próprias.'
+                    : 'Este perfil está usando as credenciais antigas do sistema. Salve as dele para separar dos outros perfis.'}
                 </p>
               </div>
               <Botao variante="secundario" aoClicar={() => setMostrarCredenciais(true)}>

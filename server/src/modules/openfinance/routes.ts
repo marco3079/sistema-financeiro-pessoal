@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { ConexaoBancaria } from '@prisma/client';
-import { prisma } from '../../lib/prisma';
+import { perfilAtual, prisma } from '../../lib/prisma';
 import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { cifrar } from '../../lib/cripto';
 import { registrarPosicaoPatrimonio } from '../../lib/financas';
@@ -52,6 +52,13 @@ async function conexaoPorId(id: number): Promise<ConexaoComContagem> {
   return conexao;
 }
 
+// Perfil financeiro da requisição (sempre existe nas rotas: o middleware escolherPerfil define).
+function perfilDaRequisicao(): number {
+  const id = perfilAtual();
+  if (id === null) throw new HttpError(400, 'Perfil financeiro não identificado');
+  return id;
+}
+
 async function estado() {
   const [credenciais, conexoes] = await Promise.all([
     credenciaisPluggy(),
@@ -60,6 +67,8 @@ async function estado() {
   return {
     configurado: credenciais !== null,
     origemCredenciais: credenciais?.origem ?? null,
+    // false = este perfil ainda usa as credenciais antigas do sistema (não tem as próprias)
+    credenciaisDoPerfil: credenciais?.doPerfil ?? false,
     clientId: credenciais?.clientId ?? null,
     sandbox: credenciais?.sandbox ?? false,
     conexoes: conexoes.map(conexaoDTO),
@@ -100,7 +109,8 @@ router.put(
       pluggyClientSecretCifrado: cifrar(segredo),
       pluggySandbox: dados.sandbox,
     };
-    await prisma.configuracaoPlataforma.upsert({ where: { id: 1 }, create: { id: 1, ...gravar }, update: gravar });
+    // As credenciais são do perfil financeiro em uso: cada perfil liga a própria conta da Pluggy.
+    await prisma.perfilFinanceiro.update({ where: { id: perfilDaRequisicao() }, data: gravar });
     esquecerChavePluggy();
     res.json(await estado());
   })
@@ -109,10 +119,14 @@ router.put(
 router.delete(
   '/openfinance/credenciais',
   asyncHandler(async (_req, res) => {
-    await prisma.configuracaoPlataforma.updateMany({
-      where: { id: 1 },
-      data: { pluggyClientId: null, pluggyClientSecretCifrado: null, pluggySandbox: false },
-    });
+    const atuais = await credenciaisPluggy();
+    const limpar = { pluggyClientId: null, pluggyClientSecretCifrado: null, pluggySandbox: false };
+    if (atuais && !atuais.doPerfil) {
+      // Este perfil usava as credenciais antigas do sistema: são elas que saem.
+      await prisma.configuracaoPlataforma.updateMany({ where: { id: 1 }, data: limpar });
+    } else {
+      await prisma.perfilFinanceiro.update({ where: { id: perfilDaRequisicao() }, data: limpar });
+    }
     esquecerChavePluggy();
     res.json(await estado());
   })
