@@ -1,6 +1,7 @@
 .suno-ativo {
   display: inline-flex;
   flex-direction: column;
+  align-items: flex-start; /* selos do tamanho do texto, sem esticar na largura da coluna */
   gap: 0.1rem;
 }
 
