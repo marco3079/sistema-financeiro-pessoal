@@ -303,7 +303,9 @@ export function Suno() {
       {carteira && (
         <>
           <Abas abas={abas} ativa={naAbaFora ? ABA_FORA : carteira.slug} aoMudar={setAtiva} />
-          {naAbaFora ? <ForaDasCarteiras lista={foraDeTodas} /> : <DetalheCarteira carteira={carteira} />}
+          <div className="suno-tabelas">
+            {naAbaFora ? <ForaDasCarteiras lista={foraDeTodas} /> : <DetalheCarteira carteira={carteira} />}
+          </div>
           <p className="fin-suave suno-rodape">
             {naAbaFora
               ? 'Comparado com todas as carteiras da Suno que você assina.'

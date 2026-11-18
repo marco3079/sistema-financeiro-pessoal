@@ -5,6 +5,16 @@
   gap: 0.1rem;
 }
 
+/* Tabelas com muitas colunas: o título quebra em duas linhas para a coluna ficar da largura dos números,
+   sem os vãos que os títulos compridos ("Retorno c/ proventos") abriam. */
+.suno-tabelas .tabela th {
+  white-space: normal;
+  min-width: 4.5rem;
+  max-width: 7.5rem;
+  vertical-align: bottom;
+  line-height: 1.3;
+}
+
 .suno-direita {
   align-items: flex-end;
 }
