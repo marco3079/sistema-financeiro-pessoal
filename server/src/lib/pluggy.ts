@@ -60,6 +60,8 @@ export interface PluggyTransacao {
     installmentNumber?: number | null;
     totalInstallments?: number | null;
     billId?: string | null;
+    billPostDate?: string | null; // dia em que a compra entrou na fatura
+    billForecastDate?: string | null; // "AAAA-MM" da fatura em que o banco prevê cobrar
   } | null;
 }
 

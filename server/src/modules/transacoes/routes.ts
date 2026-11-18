@@ -34,7 +34,7 @@ const tipoSchema = z.enum(TIPOS);
 const valorPositivo = dinheiroSchema.refine((v) => v > 0, 'O valor deve ser maior que zero');
 
 // Campos que um lançamento do Open Finance aceita alterar (ver CONTRATOS.md, regra de ouro).
-const CAMPOS_LIBERADOS_OPEN_FINANCE = new Set(['categoriaId', 'observacao', 'transferencia']);
+const CAMPOS_LIBERADOS_OPEN_FINANCE = new Set(['categoriaId', 'observacao', 'transferencia', 'data']);
 const MSG_OPEN_FINANCE = 'Este registro vem do Open Finance e é atualizado automaticamente.';
 
 // Extratos trazem descrições longas (nome completo, CNPJ, agência e conta): o mesmo limite da importação.
@@ -387,6 +387,10 @@ router.put(
 
       const alteracoes: Prisma.TransacaoUncheckedUpdateInput = {};
       if (dados.data !== undefined) alteracoes.data = paraData(dados.data);
+      // Data trocada num lançamento do Open Finance: a sincronização passa a respeitar a escolha.
+      if (dados.data !== undefined && transacao.origem === 'OPEN_FINANCE' && paraData(dados.data).getTime() !== transacao.data.getTime()) {
+        alteracoes.dataAjustada = true;
+      }
       if (dados.descricao !== undefined) alteracoes.descricao = dados.descricao;
       if (dados.valor !== undefined) alteracoes.valor = dados.valor;
       if (dados.tipo !== undefined) alteracoes.tipo = dados.tipo;

@@ -88,6 +88,7 @@ export function FormLancamento({
     try {
       if (lancamento && ehOpenFinance) {
         await api.put(`/transacoes/${lancamento.id}`, {
+          ...(data !== lancamento.data ? { data } : {}),
           categoriaId: idCategoria(categoriaId),
           transferencia,
           observacao: textoOpcional(observacao),
@@ -127,9 +128,11 @@ export function FormLancamento({
     <form onSubmit={salvar}>
       {ehOpenFinance && (
         <Aviso tipo="info">
-          Este lançamento vem do Open Finance. Você pode mudar só a categoria, a observação e a marcação de transferência.
+          Este lançamento vem do Open Finance. Você pode mudar a data, a categoria, a observação e a marcação de
+          transferência; o que você mudar a sincronização não desfaz.
         </Aviso>
       )}
+      {ehOpenFinance && <Campo rotulo="Data" tipo="date" obrigatorio valor={data} aoMudar={setData} />}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
       {!ehOpenFinance && (

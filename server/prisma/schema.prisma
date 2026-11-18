@@ -217,6 +217,9 @@ model Transacao {
 
   origem              Origem   @default(MANUAL)
   pluggyTransactionId String?  @unique
+  // Data mudada pela pessoa num lançamento do Open Finance (ex.: entrada do dia 31 contada no mês seguinte):
+  // a sincronização não volta a data para a do banco.
+  dataAjustada        Boolean  @default(false)
   // Lançamento que veio de um arquivo (CSV, OFX, PDF): impede importar o mesmo duas vezes. O registro continua MANUAL.
   chaveImportacao     String?
   importacaoId        Int? // Importacao.id do arquivo que trouxe este registro (histórico: ver, editar e remover)

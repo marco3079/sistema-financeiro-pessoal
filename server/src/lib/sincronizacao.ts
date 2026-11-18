@@ -285,7 +285,7 @@ async function fecharFaturaPelaPrevisao(
   const agora = hoje().getTime();
   const contagem = new Map<string, number>();
   for (const t of pendentes) {
-    const data = diaDe(t.date);
+    const data = diaDoLancamento(t.date);
     if (!data || t.type !== 'DEBIT' || data.getTime() > agora || data.getTime() < agora - 45 * MS_DIA) continue;
     const p = previsao(t) as string;
     contagem.set(p, (contagem.get(p) ?? 0) + 1);
@@ -305,7 +305,7 @@ async function fecharFaturaPelaPrevisao(
   // Também é do ciclo a compra pendente feita depois do último fechamento, mesmo que o banco a marque com a
   // previsão da fatura anterior (acontece com compras dos dias seguintes ao fechamento).
   const depoisDoFechamento = (t: LancamentoComPrevisao) => {
-    const data = diaDe(t.date);
+    const data = diaDoLancamento(t.date);
     if (!data || !faturas.ultimoFechamento || data.getTime() <= faturas.ultimoFechamento.getTime()) return false;
     return !faturas.abertaFechamento || data.getTime() <= faturas.abertaFechamento.getTime();
   };
@@ -364,7 +364,13 @@ async function fecharFaturaPelaPrevisao(
 
   // Parcelas que o banco ainda não enviou: compras parceladas da última fatura fechada com parcela a vencer e sem
   // lançamento de mesmo valor neste ciclo entram como "parcela prevista". São recriadas a cada sincronização e
-  // somem quando o banco manda a parcela de verdade.
+  // somem quando o banco manda a parcela de verdade. A categoria que a pessoa escolheu numa parcela prevista não se
+  // perde: vale para a parcela prevista recriada e passa para a parcela de verdade quando ela chega.
+  const anteriores = await prisma.transacao.findMany({
+    where: { contaId, pluggyTransactionId: { startsWith: PREFIXO_PREVISTA } },
+    select: { pluggyTransactionId: true, categoriaId: true },
+  });
+  const categoriaDaPrevista = new Map(anteriores.map((p) => [p.pluggyTransactionId as string, p.categoriaId]));
   await prisma.transacao.deleteMany({ where: { contaId, pluggyTransactionId: { startsWith: PREFIXO_PREVISTA } } });
   const abertaInfo = await prisma.fatura.findUnique({ where: { id: abertaId }, select: { vencimento: true } });
   const anterior = abertaInfo
@@ -380,13 +386,21 @@ async function fecharFaturaPelaPrevisao(
       where: { faturaId: anterior.id, tipo: 'DESPESA', transferencia: false, parcela: { not: null } },
       select: { id: true, data: true, descricao: true, valor: true, parcela: true, totalParcelas: true, categoriaId: true },
     });
-    const valoresDoCiclo = doCiclo.filter((t) => t.type === 'DEBIT').map((t) => ({ valor: valorEmReais(t), usado: false }));
+    const valoresDoCiclo = doCiclo
+      .filter((t) => t.type === 'DEBIT')
+      .map((t) => ({ id: t.id, valor: valorEmReais(t), usado: false }));
     const novas: Prisma.TransacaoCreateManyInput[] = [];
     for (const t of continuam) {
       if (t.parcela === null || t.totalParcelas === null || t.parcela >= t.totalParcelas) continue;
+      const chave = `${PREFIXO_PREVISTA}${t.id}:${t.parcela + 1}`;
+      const escolhida = categoriaDaPrevista.get(chave);
       const igual = valoresDoCiclo.find((v) => !v.usado && Math.abs(v.valor - Number(t.valor)) <= 0.005);
       if (igual) {
         igual.usado = true;
+        // A parcela chegou: a categoria escolhida na prevista passa para ela.
+        if (escolhida !== undefined && escolhida !== null && escolhida !== t.categoriaId) {
+          await prisma.transacao.updateMany({ where: { contaId, pluggyTransactionId: igual.id }, data: { categoriaId: escolhida } });
+        }
         continue;
       }
       previstas += Number(t.valor);
@@ -400,10 +414,10 @@ async function fecharFaturaPelaPrevisao(
         pendente: true,
         parcela: t.parcela + 1,
         totalParcelas: t.totalParcelas,
-        categoriaId: t.categoriaId,
+        categoriaId: escolhida !== undefined ? escolhida : t.categoriaId,
         origem: 'OPEN_FINANCE',
         observacao: 'Parcela prevista: o banco ainda não enviou este lançamento.',
-        pluggyTransactionId: `${PREFIXO_PREVISTA}${t.id}:${t.parcela + 1}`,
+        pluggyTransactionId: chave,
       });
     }
     if (novas.length > 0) await prisma.transacao.createMany({ data: novas, skipDuplicates: true });
@@ -423,6 +437,59 @@ const PREFIXO_PREVISTA = 'prevista:';
 async function saldoDoCartaoPelasFaturas(contaId: number): Promise<void> {
   const aberto = await prisma.fatura.aggregate({ where: { contaId, status: { not: 'PAGA' } }, _sum: { total: true } });
   await prisma.conta.update({ where: { id: contaId }, data: { saldo: Math.max(0, arredondar(Number(aberto._sum.total ?? 0))) } });
+}
+
+// Fatura fechada cujos lançamentos não somam o total cobrado pelo banco. Acontece com as parcelas de compras feitas
+// antes do período que o Open Finance devolve (o banco cobra a parcela, mas não manda o lançamento) e com encargos
+// que não vêm como lançamento. A diferença entra como um lançamento da fatura, para as despesas do mês baterem com
+// a fatura (e com o extrato do banco). É refeito a cada sincronização e some quando os itens passam a bater.
+// "Saldo em rotativo" fica fora da soma: é o resto da fatura anterior, que o banco não conta no total desta.
+// Só entra a diferença a mais (o banco cobrou mais do que mandou). Quando os lançamentos passam do total, quem está
+// errado costuma ser o total: alguns bancos mandam o que faltava pagar depois de um pagamento antecipado.
+const PREFIXO_ACERTO = 'acerto-fatura:';
+
+async function acertarFaturasFechadas(contaId: number): Promise<void> {
+  const faturas = await prisma.fatura.findMany({
+    where: { contaId, pluggyBillId: { not: null } },
+    select: { id: true, vencimento: true, total: true },
+  });
+  for (const fatura of faturas) {
+    const chave = `${PREFIXO_ACERTO}${fatura.id}`;
+    const itens = await prisma.transacao.findMany({
+      where: { faturaId: fatura.id, transferencia: false, NOT: { pluggyTransactionId: chave } },
+      select: { valor: true, tipo: true, descricao: true },
+    });
+    const soma = itens
+      .filter((t) => !/rotativo/i.test(t.descricao))
+      .reduce((s, t) => s + (t.tipo === 'DESPESA' ? Number(t.valor) : -Number(t.valor)), 0);
+    const diferenca = arredondar(Number(fatura.total) - soma);
+    if (diferenca < 0.05) {
+      await prisma.transacao.deleteMany({ where: { pluggyTransactionId: chave } });
+      continue;
+    }
+    // Data no mês das compras da fatura (o vencimento cai no mês seguinte ao do ciclo).
+    const dados = {
+      data: new Date(fatura.vencimento.getTime() - 15 * MS_DIA),
+      descricao: 'Parcelas e encargos que o banco não detalhou',
+      valor: diferenca,
+      tipo: 'DESPESA' as const,
+      faturaId: fatura.id,
+    };
+    const existente = await prisma.transacao.findUnique({ where: { pluggyTransactionId: chave }, select: { id: true } });
+    if (existente) {
+      await prisma.transacao.update({ where: { id: existente.id }, data: dados });
+    } else {
+      await prisma.transacao.create({
+        data: {
+          ...dados,
+          contaId,
+          origem: 'OPEN_FINANCE',
+          pluggyTransactionId: chave,
+          observacao: 'Diferença entre o total da fatura e os lançamentos que o banco enviou pelo Open Finance.',
+        },
+      });
+    }
+  }
 }
 
 type LancamentoComPrevisao = PluggyTransacao & {
@@ -557,8 +624,26 @@ const MAPA_CATEGORIAS: { trecho: string; nome: string }[] = [
   { trecho: 'fees', nome: 'Impostos e taxas' },
 ];
 
-// Categorias da Pluggy que são movimento entre contas próprias (não contam como receita/despesa).
-const TRECHOS_TRANSFERENCIA = ['credit card payment', 'same person transfer', 'investment', 'fixed income', 'mutual fund'];
+// Categorias da Pluggy que nunca são receita nem despesa: o pagamento da fatura do cartão.
+// "Same person transfer" não entra aqui: dinheiro seu vindo de (ou indo para) uma conta que não está no sistema é
+// receita (ou despesa), como na importação de extrato. Entre duas contas do sistema, a automação "Transferência entre
+// minhas contas" casa as duas pernas. Aplicação e resgate (RDB, CDB, corretora) seguem a mesma ideia: o dinheiro
+// sai das contas e volta para elas.
+const TRECHOS_TRANSFERENCIA = ['credit card payment'];
+
+// Conta da corretora (a conta de investimentos que a Pluggy lista como conta corrente): quase tudo nela é
+// provento, compra e venda na bolsa e aplicação em fundo. Ela fica fora das receitas e despesas, como se o
+// sistema não a enxergasse: o que sai da conta do banco para ela é despesa, o que volta é receita.
+const CATEGORIAS_DE_INVESTIMENTO = ['proceeds', 'dividend', 'investment', 'mutual fund', 'fixed income'];
+
+function ehContaDeCorretora(lista: PluggyTransacao[]): boolean {
+  if (lista.length < 5) return false;
+  const deInvestimento = lista.filter((t) => {
+    const categoria = (t.category ?? '').toLowerCase();
+    return CATEGORIAS_DE_INVESTIMENTO.some((c) => categoria.includes(c));
+  }).length;
+  return deInvestimento / lista.length >= 0.5;
+}
 
 interface Classificador {
   categoriaDe(categoriaPluggy: string | null | undefined, tipo: 'RECEITA' | 'DESPESA'): number | null;
@@ -594,29 +679,100 @@ function tipoDoLancamento(t: PluggyTransacao, cartao: boolean): 'RECEITA' | 'DES
   return t.amount < 0 ? 'DESPESA' : 'RECEITA';
 }
 
+// Dia do lançamento no horário de Brasília. A Pluggy manda data e hora em UTC: um Pix feito às 23h vem como
+// 02h do dia seguinte. Meia-noite UTC em ponto é só a data (sem hora) e fica como veio.
+function diaDoLancamento(texto: string | null | undefined): Date | null {
+  if (!texto || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(texto) || /T00:00(:00(\.0+)?)?Z?$/.test(texto)) return diaDe(texto);
+  const instante = new Date(texto);
+  if (Number.isNaN(instante.getTime())) return diaDe(texto);
+  return diaDe(new Date(instante.getTime() - 3 * 60 * 60 * 1000).toISOString());
+}
+
+// Lançamento que nunca conta como receita nem despesa, pelas regras do sistema (o que a pessoa ajusta à mão e as
+// automações vêm depois).
+function ehTransferenciaPelaRegra(
+  t: PluggyTransacao,
+  descricao: string,
+  tipo: 'RECEITA' | 'DESPESA',
+  cartao: boolean,
+  corretora: boolean
+): boolean {
+  if (corretora) return true;
+  const categoriaPluggy = (t.category ?? '').toLowerCase();
+  return (
+    (cartao && tipo === 'RECEITA' && creditoNoCartaoEhPagamento(descricao)) ||
+    TRECHOS_TRANSFERENCIA.some((trecho) => categoriaPluggy.includes(trecho)) ||
+    (!cartao && tipo === 'DESPESA' && ehPagamentoDeFaturaNaConta(descricao))
+  );
+}
+
+// Bancos cujo extrato do cartão mostra a compra no dia em que ela entra na fatura, não no dia da compra (código do
+// banco no número da conta corrente da mesma conexão). Nubank: o Pix no crédito e várias compras entram dias depois.
+const BANCOS_QUE_DATAM_PELA_FATURA = ['260'];
+
+function bancoDataPelaFatura(contas: PluggyConta[]): boolean {
+  return contas.some((c) => {
+    const numero = (c as { bankData?: { transferNumber?: string | null } | null }).bankData?.transferNumber ?? '';
+    return BANCOS_QUE_DATAM_PELA_FATURA.some((codigo) => numero.startsWith(`${codigo}/`));
+  });
+}
+
+// Dia de um lançamento do cartão. Além do banco que data pela fatura, vale a data de entrada na fatura quando a
+// compra pendente vem com a data da compra original meses antes (parcela futura de compra antiga, como manda a XP):
+// com a data da compra ela caía de novo num mês que já passou.
+function diaNoCartao(t: PluggyTransacao, pelaFatura: boolean): Date | null {
+  const data = diaDoLancamento(t.date);
+  const lancada = diaDe(t.creditCardMetadata?.billPostDate);
+  if (!data || !lancada) return data;
+  if (pelaFatura) return lancada;
+  if (t.status === 'PENDING' && lancada.getTime() - data.getTime() > 31 * MS_DIA) return lancada;
+  return data;
+}
+
+// Parcela que o banco ainda lista como pendente, mas cuja fatura prevista já fechou sem ela: a compra foi estornada
+// ou cancelada e o banco não vai cobrar (o Nubank segue listando as parcelas restantes). Não conta como despesa.
+// A compra pendente feita perto do fechamento ainda pode entrar: só vale para a de mais de 10 dias antes dele.
+const OBS_PARCELA_NAO_COBRADA = 'Parcela que o banco lista, mas não cobrou na fatura: não conta como despesa.';
+
+function parcelaNaoCobrada(t: PluggyTransacao, data: Date, faturas: FaturasDaConta): boolean {
+  const previsao = t.creditCardMetadata?.billForecastDate;
+  if (t.status !== 'PENDING' || !faturas.ultimoFechamento || typeof previsao !== 'string' || !/^\d{4}-\d{2}/.test(previsao)) {
+    return false;
+  }
+  const mesFechado = dataISO(faturas.ultimoFechamento).slice(0, 7);
+  return previsao.slice(0, 7) <= mesFechado && data.getTime() < faturas.ultimoFechamento.getTime() - 10 * MS_DIA;
+}
+
 async function gravarLancamentos(
   contaLocal: { id: number; tipo: TipoConta },
   contaPluggy: PluggyConta,
   de: Date,
   faturas: FaturasDaConta,
-  classificador: Classificador
+  classificador: Classificador,
+  opcoes: { reclassificar: boolean; pelaFatura: boolean }
 ): Promise<void> {
+  const { reclassificar, pelaFatura } = opcoes;
   const cartao = contaLocal.tipo === 'CARTAO';
   const lista = await listarTransacoesDaConta(contaPluggy.id, dataISO(de));
   if (lista.length === 0) return;
+  const corretora = !cartao && ehContaDeCorretora(lista);
+  if (corretora) {
+    // Tudo o que já estava gravado nesta conta também sai das receitas e despesas.
+    await prisma.transacao.updateMany({ where: { contaId: contaLocal.id, transferencia: false }, data: { transferencia: true } });
+  }
 
-  const existentes = new Map<string, number>();
+  const existentes = new Map<string, { id: number; dataAjustada: boolean }>();
   for (const lote of emLotes(lista.map((t) => t.id))) {
     const achados = await prisma.transacao.findMany({
       where: { pluggyTransactionId: { in: lote } },
-      select: { id: true, pluggyTransactionId: true },
+      select: { id: true, pluggyTransactionId: true, dataAjustada: true },
     });
-    for (const a of achados) if (a.pluggyTransactionId) existentes.set(a.pluggyTransactionId, a.id);
+    for (const a of achados) if (a.pluggyTransactionId) existentes.set(a.pluggyTransactionId, { id: a.id, dataAjustada: a.dataAjustada });
   }
 
   const novos: Prisma.TransacaoCreateManyInput[] = [];
   for (const t of lista) {
-    const data = diaDe(t.date);
+    const data = cartao ? diaNoCartao(t, pelaFatura) : diaDoLancamento(t.date);
     if (!data) continue;
     const tipo = tipoDoLancamento(t, cartao);
     const meta = t.creditCardMetadata ?? null;
@@ -645,22 +801,39 @@ async function gravarLancamentos(
       parcela: parcelado ? (meta?.installmentNumber ?? null) : null,
       totalParcelas: parcelado ? (meta?.totalInstallments ?? null) : null,
     };
-    const idExistente = existentes.get(t.id);
-    if (idExistente !== undefined) {
-      // Categoria, observação e transferência são do usuário: não mudam aqui.
-      await prisma.transacao.update({ where: { id: idExistente }, data: comuns });
+    const naoCobrada = cartao && tipo === 'DESPESA' && parcelaNaoCobrada(t, data, faturas);
+    if (naoCobrada) comuns.faturaId = null;
+    const transferencia = naoCobrada || ehTransferenciaPelaRegra(t, comuns.descricao, tipo, cartao, corretora);
+    const existente = existentes.get(t.id);
+    if (existente !== undefined) {
+      const idExistente = existente.id;
+      // Categoria, observação, transferência e a data que a pessoa mudou são dela: não mudam aqui. Na reclassificação
+      // (pedida à parte) a transferência volta para a regra, menos no que uma automação marcou, nos proventos e no
+      // que tem observação.
+      const { data: dataDoBanco, ...resto } = comuns;
+      await prisma.transacao.update({
+        where: { id: idExistente },
+        data: existente.dataAjustada ? resto : { ...resto, data: dataDoBanco },
+      });
+      if (naoCobrada) {
+        await prisma.transacao.updateMany({
+          where: { id: idExistente, transferencia: false, observacao: null, automacaoId: null },
+          data: { transferencia: true, observacao: OBS_PARCELA_NAO_COBRADA },
+        });
+      } else if (reclassificar) {
+        await prisma.transacao.updateMany({
+          where: { id: idExistente, automacaoId: null, provento: false, oculto: false, observacao: null },
+          data: { transferencia },
+        });
+      }
       continue;
     }
-    const categoriaPluggy = (t.category ?? '').toLowerCase();
     novos.push({
       ...comuns,
       contaId: contaLocal.id,
       categoriaId: classificador.categoriaDe(t.category, tipo),
-      // Pagamento de fatura (entrada no cartão) e movimentos entre contas próprias não são receita nem despesa.
-      transferencia:
-        (cartao && tipo === 'RECEITA' && creditoNoCartaoEhPagamento(comuns.descricao)) ||
-        TRECHOS_TRANSFERENCIA.some((trecho) => categoriaPluggy.includes(trecho)) ||
-        (!cartao && tipo === 'DESPESA' && ehPagamentoDeFaturaNaConta(comuns.descricao)),
+      transferencia,
+      ...(naoCobrada ? { observacao: OBS_PARCELA_NAO_COBRADA } : {}),
       origem: 'OPEN_FINANCE',
       pluggyTransactionId: t.id,
     });
@@ -848,7 +1021,9 @@ async function gravarInvestimentos(conexao: { id: number; instituicao: string },
 
 const emAndamento = new Map<number, Promise<void>>();
 
-async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<void> {
+async function executar(conexaoId: number, opcoes: OpcoesSincronizacao): Promise<void> {
+  const pedirAtualizacao = opcoes.pedirAtualizacao ?? false;
+  const reclassificar = opcoes.reclassificar ?? false;
   const conexao = await prisma.conexaoBancaria.findUnique({ where: { id: conexaoId } });
   if (!conexao) return;
   try {
@@ -865,12 +1040,14 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
       data: { instituicao, instituicaoCor, instituicaoLogo: texto(item.connector?.imageUrl, 500) ?? conexao.instituicaoLogo },
     });
 
-    const primeiraCarga = conexao.ultimaSincronizacao === null;
-    const de = new Date(hoje().getTime() - (primeiraCarga ? DIAS_PRIMEIRA_CARGA : DIAS_RECARGA) * MS_DIA);
+    // Na primeira carga e na reclassificação, um ano; depois, só os últimos meses.
+    const anoInteiro = conexao.ultimaSincronizacao === null || reclassificar;
+    const de = new Date(hoje().getTime() - (anoInteiro ? DIAS_PRIMEIRA_CARGA : DIAS_RECARGA) * MS_DIA);
     const classificador = await montarClassificador();
     const referencia = { id: conexao.id, instituicao, instituicaoCor };
 
     const contas = await listarContasDoItem(conexao.pluggyItemId);
+    const pelaFatura = bancoDataPelaFatura(contas);
     const idsDasContas: number[] = [];
     for (const conta of contas) {
       const local = await gravarConta(referencia, conta);
@@ -879,9 +1056,10 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
         local.tipo === 'CARTAO'
           ? await gravarFaturas(local, conta)
           : { porIdPluggy: new Map<string, number>(), abertaId: null, ultimoFechamento: null, abertaFechamento: null, abertaEstimada: false };
-      await gravarLancamentos(local, conta, de, faturas, classificador);
+      await gravarLancamentos(local, conta, de, faturas, classificador, { reclassificar, pelaFatura });
       if (local.tipo === 'CARTAO') {
         await fecharFaturaEstimada(local.id, faturas, conta);
+        await acertarFaturasFechadas(local.id);
         await saldoDoCartaoPelasFaturas(local.id);
       }
     }
@@ -912,14 +1090,22 @@ async function executar(conexaoId: number, pedirAtualizacao: boolean): Promise<v
 
 // Sincroniza uma conexão. Nunca lança: o resultado fica em ConexaoBancaria.status e .erro.
 // Duas chamadas ao mesmo tempo para a mesma conexão compartilham a mesma execução.
-export function sincronizarConexao(conexaoId: number, opcoes: { pedirAtualizacao?: boolean } = {}): Promise<void> {
+// Opções: pedirAtualizacao = pede ao banco dados novos antes de ler; reclassificar = relê o último ano e devolve a
+// marcação de transferência dos lançamentos já gravados às regras atuais (menos o que uma automação marcou e o que tem
+// observação), para quando as regras mudam.
+export interface OpcoesSincronizacao {
+  pedirAtualizacao?: boolean;
+  reclassificar?: boolean;
+}
+
+export function sincronizarConexao(conexaoId: number, opcoes: OpcoesSincronizacao = {}): Promise<void> {
   const atual = emAndamento.get(conexaoId);
   if (atual) return atual;
   // Roda dentro do perfil financeiro dono da conexão, para o que for criado (contas, lançamentos) cair nele.
   const execucao = prisma.conexaoBancaria
     .findFirst({ where: { id: conexaoId }, select: { perfilId: true } })
     .then((conexao) =>
-      conexao ? comPerfil(conexao.perfilId, () => executar(conexaoId, opcoes.pedirAtualizacao ?? false)) : undefined
+      conexao ? comPerfil(conexao.perfilId, () => executar(conexaoId, opcoes)) : undefined
     )
     .finally(() => emAndamento.delete(conexaoId));
   emAndamento.set(conexaoId, execucao);

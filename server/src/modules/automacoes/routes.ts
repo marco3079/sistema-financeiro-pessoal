@@ -209,6 +209,13 @@ router.post(
   asyncHandler(async (req, res) => {
     const id = idParam(req);
     const automacao = await garantirExiste(id);
+    if (automacao.acao === 'CATEGORIA') {
+      // A categoria que a pessoa trocou à mão depois da automação fica: o lançamento só deixa de ser dela.
+      await prisma.transacao.updateMany({
+        where: { automacaoId: id, NOT: { categoriaId: automacao.categoriaId } },
+        data: { automacaoId: null },
+      });
+    }
     const desfeitos = await prisma.transacao.updateMany({
       where: { automacaoId: id },
       data: dadosDoDesfazer(automacao.acao),
