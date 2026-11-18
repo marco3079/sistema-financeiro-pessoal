@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useDados } from '../../lib/useDados';
-import { Abas, Aviso, Carregando, Pagina, Selecao } from '../../ui';
+import { Abas, Aviso, Botao, Carregando, Pagina, Selecao } from '../../ui';
 import { Vazio } from '../../ui/financas';
 import { AbaAnalises } from './AbaAnalises';
 import { AbaProventos } from './AbaProventos';
 import { AbaRelatorio } from './AbaRelatorio';
 import { AbaResumo } from './AbaResumo';
+import { AtualizarB3 } from './AtualizarB3';
 import type { CarteiraDTO, ClasseCarteira } from './tipos';
 import './carteira.css';
 
@@ -31,9 +32,12 @@ const PERIODOS = [
 export function Carteira() {
   const [aba, setAba] = useState<Aba>('resumo');
   const [meses, setMeses] = useState('24');
+  const [mesesProventos, setMesesProventos] = useState('24');
   const [classe, setClasse] = useState<'TODAS' | ClasseCarteira>('TODAS');
+  const [atualizandoB3, setAtualizandoB3] = useState(false);
+  const [versaoProventos, setVersaoProventos] = useState(0);
   const daCarteira = aba !== 'proventos';
-  const { dados, carregando, erro } = useDados<CarteiraDTO>(
+  const { dados, carregando, erro, recarregar } = useDados<CarteiraDTO>(
     daCarteira ? `/carteira?meses=${meses}${classe === 'TODAS' ? '' : '&classe=' + classe}` : null
   );
 
@@ -41,9 +45,23 @@ export function Carteira() {
     <Pagina
       titulo="Carteira"
       acoes={
-        daCarteira ? <Selecao rotulo="Período" valor={meses} aoMudar={setMeses} opcoes={PERIODOS} /> : undefined
+        <div className="cart-acoes">
+          {daCarteira && <Selecao rotulo="Período" valor={meses} aoMudar={setMeses} opcoes={PERIODOS} />}
+          <Botao variante="secundario" aoClicar={() => setAtualizandoB3(true)}>
+            Atualizar pela B3
+          </Botao>
+        </div>
       }
     >
+      <AtualizarB3
+        aberto={atualizandoB3}
+        meses={daCarteira ? meses : mesesProventos}
+        aoFechar={() => setAtualizandoB3(false)}
+        aoConcluir={() => {
+          recarregar();
+          setVersaoProventos((v) => v + 1);
+        }}
+      />
       <Abas abas={ABAS} ativa={aba} aoMudar={(id) => setAba(ABAS.find((a) => a.id === id)?.id ?? 'resumo')} />
 
       {daCarteira && erro && <Aviso tipo="erro">{erro}</Aviso>}
@@ -72,7 +90,7 @@ export function Carteira() {
           {aba === 'relatorio' && <AbaRelatorio dados={dados} />}
         </div>
       )}
-      {aba === 'proventos' && <AbaProventos />}
+      {aba === 'proventos' && <AbaProventos meses={mesesProventos} aoMudarMeses={setMesesProventos} versao={versaoProventos} />}
     </Pagina>
   );
 }

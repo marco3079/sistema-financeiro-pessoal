@@ -78,6 +78,8 @@ function registrarAtividade(req: Request, res: Response, next: NextFunction): vo
       caminho.startsWith('/api/') &&
       !caminho.startsWith('/api/drive/') &&
       !caminho.startsWith('/api/atualizacao') &&
+      // Andamento da automação da B3 (o script avisa a cada poucos segundos): não muda dado nenhum.
+      !caminho.startsWith('/api/b3/automacao') &&
       // As chamadas de IA chegam em /api/mcp e gravam pelas rotas normais, que já avisam o Drive.
       !caminho.startsWith('/api/mcp') &&
       // Trocar ou redefinir a senha altera dados e precisa viajar; entrar, sair e pedir o e-mail de recuperação, não.
@@ -130,6 +132,8 @@ export function criarApp() {
   app.use(cors());
   // A importação manda o texto do arquivo (ou as abas da planilha da B3): precisa de um corpo maior.
   app.use('/api/importacao', express.json({ limit: '12mb' }));
+  // A automação da B3 manda a planilha de movimentação exportada (em base64).
+  app.use('/api/b3/automacao', express.json({ limit: '12mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(registrarAtividade);
   iniciarLimpezaDeLogs();

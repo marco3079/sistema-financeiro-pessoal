@@ -230,6 +230,11 @@ if ($Restaurar -ne "") {
 # Sem parametros: atualiza agora.
 Write-Host "Atualizando o sistema..."
 if (Atualizar-ComRegistro) {
+  # Link financas-b3:// do botao "Atualizar pela B3" (so no usuario do Windows; falhar aqui nao desfaz a atualizacao).
+  $registrarB3 = Join-Path $Raiz "ferramentas\b3\registrar-b3.ps1"
+  if (Test-Path -LiteralPath $registrarB3) {
+    try { & $registrarB3 -Silencioso } catch { Write-Host "Aviso: nao foi possivel registrar o link financas-b3:// ($($_.Exception.Message))." }
+  }
   Write-Host ((Get-Content -LiteralPath $ArquivoEstado -Raw -Encoding utf8 | ConvertFrom-Json).mensagem)
   exit 0
 } else {

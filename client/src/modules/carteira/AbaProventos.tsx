@@ -74,10 +74,11 @@ function classes(...nomes: (string | false | null | undefined)[]): string {
   return nomes.filter(Boolean).join(' ');
 }
 
-export function AbaProventos() {
+// O período fica na página Carteira: o botão "Atualizar pela B3" (no topo da página) usa o mesmo período.
+// `versao` muda depois de uma importação e faz a aba buscar os proventos de novo.
+export function AbaProventos({ meses, aoMudarMeses, versao }: { meses: string; aoMudarMeses: (meses: string) => void; versao: number }) {
   const [visao, setVisao] = useState<Visao>('resumo');
-  const [meses, setMeses] = useState('24');
-  const { dados, carregando, erro } = useDados<ProventosDTO>('/carteira/proventos?meses=' + meses);
+  const { dados, carregando, erro } = useDados<ProventosDTO>(`/carteira/proventos?meses=${meses}${versao > 0 ? `&v=${versao}` : ''}`);
 
   const vazio = dados !== null && dados.porAtivo.length === 0 && dados.agenda.itens.length === 0;
 
@@ -89,7 +90,7 @@ export function AbaProventos() {
           ativa={visao}
           aoMudar={(id) => setVisao(id === 'agenda' ? 'agenda' : 'resumo')}
         />
-        {visao === 'resumo' && <Selecao rotulo="Período" valor={meses} aoMudar={setMeses} opcoes={PERIODOS} />}
+        {visao === 'resumo' && <Selecao rotulo="Período" valor={meses} aoMudar={aoMudarMeses} opcoes={PERIODOS} />}
       </div>
 
       {erro && <Aviso tipo="erro">{erro}</Aviso>}

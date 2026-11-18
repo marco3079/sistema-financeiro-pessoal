@@ -290,6 +290,18 @@ if (-not $prontoApi) {
     exit 5
 }
 
+# Link financas-b3:// do botao "Atualizar pela B3" (Carteira): registrado no usuario do Windows a cada
+# instalacao ou atualizacao. So grava em HKCU\Software\Classes\financas-b3; falhar aqui nao impede o sistema.
+$registrarB3 = Join-Path $PSScriptRoot 'ferramentas\b3\registrar-b3.ps1'
+if (Test-Path -LiteralPath $registrarB3) {
+    try {
+        & $registrarB3 -Silencioso
+        Write-Host 'Link financas-b3:// registrado (botao "Atualizar pela B3" da Carteira).'
+    } catch {
+        Write-Host ('Aviso: nao foi possivel registrar o link financas-b3:// (' + $_.Exception.Message + ').')
+    }
+}
+
 # Quadro final
 if ($envCriadoAgora -or $adminSenhaExistente -eq '' -or $adminSenhaExistente -eq 'demo1234') {
     $linhaSenha = 'Senha:          demo1234 (padrao; troque em "Meu perfil")'
