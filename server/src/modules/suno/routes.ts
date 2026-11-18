@@ -310,7 +310,14 @@ router.get(
         const alvo = a.alocacao !== null && base > 0 ? (a.alocacao / 100) * base : null;
         const comprar = /compra/i.test(a.vies ?? '');
         const situacao: Situacao = meu ? 'TEM' : comprar ? 'COMPRAR' : 'AGUARDAR';
+        // Só os números do retorno: o preço de hoje e a quantidade continuam os da Suno e os de cima.
+        const p = meu ? posicao(meu) : null;
         return {
+          valorAplicado: p?.valorAplicado ?? 0,
+          retorno: p?.retorno ?? null,
+          retornoPct: p?.retornoPct ?? null,
+          proventos: p?.proventos ?? 0,
+          retornoComProventosPct: p?.retornoComProventosPct ?? null,
           ...a,
           situacao,
           acimaDoTeto: a.precoAtual !== null && a.precoTeto !== null && a.precoAtual > a.precoTeto,

@@ -30,6 +30,11 @@ interface LinhaSuno {
   investimentoId: number | null;
   minhaAlocacao: number | null;
   diferenca: number | null;
+  valorAplicado: number;
+  retorno: number | null;
+  retornoPct: number | null;
+  proventos: number;
+  retornoComProventosPct: number | null;
 }
 
 // Sua posição num ativo (calculada no servidor a partir dos seus investimentos e proventos).
@@ -118,7 +123,9 @@ function Percentual({ valor }: { valor: number | null }) {
 }
 
 // Colunas da sua posição: retorno sem e com proventos, proventos recebidos e saldo.
-function colunasDeRetorno<T extends MinhaPosicao>(): ColunaTabela<T>[] {
+type ComRetorno = Pick<MinhaPosicao, 'saldo' | 'valorAplicado' | 'retorno' | 'retornoPct' | 'proventos' | 'retornoComProventosPct'>;
+
+function colunasDeRetorno<T extends ComRetorno>(): ColunaTabela<T>[] {
   return [
     {
       titulo: 'Seu retorno',
@@ -138,7 +145,10 @@ function colunasDeRetorno<T extends MinhaPosicao>(): ColunaTabela<T>[] {
     {
       titulo: 'Seu saldo',
       alinhar: 'direita',
-      celula: (p) => (
+      celula: (p) =>
+        p.saldo <= 0 ? (
+          '—'
+        ) : (
         <span className="suno-ativo suno-direita">
           <span>{formatarReais(p.saldo)}</span>
           <span className="fin-suave suno-pequeno">aplicado {formatarReais(p.valorAplicado)}</span>
@@ -355,7 +365,7 @@ function DetalheCarteira({ carteira: c }: { carteira: CarteiraSuno }) {
     { titulo: 'DY esperado', alinhar: 'direita', celula: (l) => pct(l.dyEsperado) },
     { titulo: 'Alocação Suno', alinhar: 'direita', celula: (l) => pct(l.alocacao) },
     { titulo: 'Sua alocação', alinhar: 'direita', celula: (l) => (l.situacao === 'TEM' ? pct(l.minhaAlocacao) : '—') },
-    { titulo: 'Seu saldo', alinhar: 'direita', celula: (l) => (l.saldo > 0 ? formatarReais(l.saldo) : '—') },
+    ...colunasDeRetorno<LinhaSuno>(),
     {
       titulo: 'Para a alocação Suno',
       alinhar: 'direita',
