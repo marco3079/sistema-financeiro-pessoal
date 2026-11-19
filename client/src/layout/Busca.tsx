@@ -20,7 +20,7 @@ const ESPERA_MS = 300;
 const MINIMO = 2;
 
 // Campo de busca do topo. Mostra as telas do menu cujo rótulo bate com o texto e, depois, os resultados da API.
-export function Busca({ telas }: { telas: RotaModulo[] }) {
+export function Busca({ telas, autoFoco = false }: { telas: RotaModulo[]; autoFoco?: boolean }) {
   const navigate = useNavigate();
   const [texto, setTexto] = useState('');
   const [aberto, setAberto] = useState(false);
@@ -28,6 +28,12 @@ export function Busca({ telas }: { telas: RotaModulo[] }) {
   const [carregando, setCarregando] = useState(false);
   const [ativo, setAtivo] = useState(-1);
   const raiz = useRef<HTMLDivElement>(null);
+  const entrada = useRef<HTMLInputElement>(null);
+
+  // No celular a busca abre por um botão: o campo já recebe o foco (e o teclado sobe).
+  useEffect(() => {
+    if (autoFoco) entrada.current?.focus();
+  }, [autoFoco]);
 
   const termo = texto.trim();
   const buscando = termo.length >= MINIMO;
@@ -136,6 +142,7 @@ export function Busca({ telas }: { telas: RotaModulo[] }) {
       <div className="casca-busca-campo">
         <Icone nome="busca" tamanho={20} className="casca-busca-icone" />
         <input
+          ref={entrada}
           type="text"
           className="casca-busca-entrada"
           placeholder="Buscar por contas, lançamentos, telas..."

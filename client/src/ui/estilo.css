@@ -912,3 +912,277 @@ textarea.campo-controle {
   background: var(--cor-primaria-suave);
   color: var(--cor-primaria);
 }
+
+/* =====================================================================
+ * Celular com cara de aplicativo (Kinvo, Mercado Pago, iFood)
+ * Tudo abaixo vale só para telas estreitas; o computador não muda.
+ * ===================================================================== */
+
+/* Filtros recolhíveis: o botão só existe no celular. */
+.filtros-recolhiveis {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.filtros-alternar {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .filtros-alternar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 40px;
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--cor-borda);
+    border-radius: 999px;
+    background: var(--cor-superficie);
+    color: var(--cor-texto);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .filtros-alternar-ativo {
+    border-color: var(--cor-primaria);
+    color: var(--cor-primaria);
+  }
+
+  .filtros-contagem {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--cor-primaria);
+    color: var(--cor-sobre-primaria);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .filtros-seta {
+    transition: transform 0.15s;
+  }
+
+  .filtros-seta-aberta {
+    transform: rotate(180deg);
+  }
+
+  /* O invólucro some do layout: botão "Filtros" e ação principal ficam lado a lado,
+     e os filtros abertos ocupam a linha de baixo inteira. */
+  .barra-ferramentas > .filtros-recolhiveis {
+    display: contents;
+  }
+
+  .filtros-recolhiveis > .filtros {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .filtros-recolhiveis .filtros-fechados {
+    display: none;
+  }
+
+  /* Barra com filtros recolhidos: botão "Filtros" e ação principal na mesma linha. */
+  .barra-ferramentas {
+    align-items: center;
+  }
+
+  /* Abas como "chips" que rolam de lado, sem barra de rolagem e com encaixe. */
+  .abas {
+    gap: 0.5rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    padding-right: 28px;
+  }
+
+  .abas::-webkit-scrollbar {
+    display: none;
+  }
+
+  .aba {
+    flex: none;
+    scroll-snap-align: start;
+    min-height: 40px;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--cor-borda);
+    background: var(--cor-superficie);
+  }
+
+  .aba.aba-ativa {
+    border-color: var(--cor-primaria);
+    background: var(--cor-primaria);
+    color: var(--cor-sobre-primaria);
+  }
+
+  .segmentado {
+    scrollbar-width: none;
+  }
+
+  .segmentado::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Cartão da tabela: rótulo à esquerda e valor à direita, numa linha só. */
+  .tabela-cartoes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .tabela-cartao {
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+  }
+
+  .tabela-par {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+  }
+
+  .tabela-par + .tabela-par {
+    border-top: 1px dashed var(--cor-borda);
+  }
+
+  .tabela-par-titulo {
+    flex: 0 0 auto;
+    max-width: 45%;
+  }
+
+  .tabela-par-titulo::after {
+    content: '';
+  }
+
+  .tabela-par-valor {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+  }
+
+  .tabela-par-acoes {
+    justify-content: flex-end;
+  }
+
+  /* Lista estilo extrato: um bloco só, linhas separadas por fio. */
+  .tabela-lista-app {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    overflow: hidden;
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+  }
+
+  .tabela-lista-item {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 60px;
+    padding: 0.65rem 0.5rem 0.65rem 1rem;
+  }
+
+  .tabela-lista-item + .tabela-lista-item {
+    border-top: 1px solid var(--cor-borda);
+  }
+
+  .tabela-lista-item.clicavel:active {
+    background: var(--cor-superficie-2);
+  }
+
+  .tabela-lista-conteudo {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .tabela-lista-acoes {
+    flex: none;
+  }
+
+  /* Modal do celular: título fixo no alto enquanto o formulário rola. */
+  .modal-cabecalho {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--cor-superficie);
+  }
+
+  .modal-corpo {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+
+  .pagina-cabecalho h1 {
+    font-size: 1.45rem;
+  }
+}
+
+/* Linha de lista estilo aplicativo: título e detalhes à esquerda, valor à direita. */
+.item-app {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.item-app-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.item-app-titulo {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.item-app-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.item-app-valor {
+  flex: none;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Filtros em duas colunas no celular (ocupam metade da altura). */
+@media (max-width: 519px) {
+  .filtros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .barra-ferramentas > .botao {
+    width: auto;
+    margin-left: auto;
+  }
+}
+
+/* Resumo com número ímpar de cartões: o último ocupa a linha toda (sem buraco ao lado). */
+@media (max-width: 560px) {
+  .resumo > .resumo-item:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}

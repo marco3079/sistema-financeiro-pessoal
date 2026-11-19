@@ -11,7 +11,7 @@ import {
   queryString,
 } from '../../lib/financas';
 import type { CategoriaDTO, ContaDTO, TransacaoDTO } from '../../lib/financas';
-import { Aviso, Botao, Campo, Carregando, MenuAcoes, Modal, Pagina, Selecao, Selo, Tabela } from '../../ui';
+import { Aviso, Botao, Campo, Carregando, FiltrosRecolhiveis, MenuAcoes, Modal, Pagina, Selecao, Selo, Tabela } from '../../ui';
 import type { AcaoMenu } from '../../ui';
 import { NomeComCor, ResumoItem, SeletorMes, SeloOrigem, Valor } from '../../ui/financas';
 import { FormLancamento } from './FormLancamento';
@@ -123,7 +123,7 @@ export function Lancamentos() {
       }
     >
       <div className="barra-ferramentas">
-        <div className="filtros">
+        <FiltrosRecolhiveis ativos={[contaId, categoriaId, tipo, busca.trim()].filter(Boolean).length}>
           <Selecao rotulo="Conta" valor={contaId} aoMudar={filtrar(setContaId)} opcoes={opcoesContas} vazio="Todas" />
           <Selecao
             rotulo="Categoria"
@@ -134,7 +134,7 @@ export function Lancamentos() {
           />
           <Selecao rotulo="Tipo" valor={tipo} aoMudar={filtrar(setTipo)} opcoes={TIPOS_TRANSACAO} vazio="Todos" />
           <Campo rotulo="Buscar na descrição" valor={busca} aoMudar={filtrar(setBusca)} />
-        </div>
+        </FiltrosRecolhiveis>
         <Botao aoClicar={() => setNovo(true)}>Novo lançamento</Botao>
       </div>
 
@@ -180,6 +180,27 @@ export function Lancamentos() {
           dados={dados.itens}
           vazio="Nenhum lançamento neste período."
           aoClicarLinha={(t) => setEditando(t)}
+          itemCelular={(t) => (
+            <div className="item-app">
+              <div className="item-app-texto">
+                <span className="item-app-titulo">{t.descricao}</span>
+                <span className="item-app-sub">
+                  {formatarDia(t.data)} · {t.contaNome}
+                  {t.categoriaNome ? ' · ' + t.categoriaNome : ''}
+                </span>
+                {(t.parcela !== null || t.pendente || t.transferencia) && (
+                  <span className="item-app-sub">
+                    {t.parcela !== null && t.totalParcelas !== null && `Parcela ${t.parcela} de ${t.totalParcelas}`}
+                    {t.pendente && ' Pendente'}
+                    {t.transferencia && ' Transferência'}
+                  </span>
+                )}
+              </div>
+              <span className="item-app-valor">
+                <Valor valor={t.valor} sentido={t.tipo === 'RECEITA' ? 'entrada' : 'saida'} />
+              </span>
+            </div>
+          )}
           colunas={[
             { titulo: 'Data', celula: (t) => formatarDia(t.data) },
             {

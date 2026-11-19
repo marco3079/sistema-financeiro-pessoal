@@ -705,7 +705,8 @@
 }
 
 .casca-celular .casca-principal {
-  padding: 7.5rem 1rem calc(var(--altura-barra-inferior) + env(safe-area-inset-bottom));
+  padding: calc(3.5rem + 1rem + env(safe-area-inset-top)) 1rem
+    calc(var(--altura-barra-inferior) + 1.25rem + env(safe-area-inset-bottom));
 }
 
 /* Barra inferior */
@@ -834,3 +835,97 @@
   cursor: pointer;
 }
 
+
+/* ---------- Celular com cara de aplicativo ---------- */
+
+/* Topo compacto: a busca abre por um botão (lupa) e desce por cima do conteúdo. */
+.casca-topo-celular {
+  padding-top: env(safe-area-inset-top);
+  background: color-mix(in srgb, var(--cor-superficie) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.casca-topo-celular-busca {
+  animation: casca-descer 0.15s ease-out;
+}
+
+@keyframes casca-descer {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.casca-botao-ativo {
+  border-color: var(--cor-primaria);
+  color: var(--cor-primaria);
+  background: var(--cor-primaria-suave);
+}
+
+/* Celular estreito: o nome do portal sai e sobra espaço para o seletor de perfil. */
+@media (max-width: 479px) {
+  .casca-topo-celular-nome {
+    display: none;
+  }
+}
+
+.casca-gaveta-cabecalho .casca-marca-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Barra inferior: ícone dentro de uma "pílula" que acende na tela atual. */
+.casca-inferior {
+  background: color-mix(in srgb, var(--cor-superficie) 94%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.casca-inferior-item {
+  justify-content: flex-end;
+  padding-bottom: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.casca-inferior-pilula {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+
+.casca-inferior-item.casca-ativo .casca-inferior-pilula {
+  background: var(--cor-primaria-suave);
+}
+
+
+/* Botão "+" do meio: redondo, em destaque e um pouco acima da barra. */
+
+.casca-inferior-mais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
+  border-radius: 50%;
+  background: var(--gradiente-primario);
+  color: var(--cor-sobre-primaria);
+  box-shadow: var(--sombra-primaria);
+  border: 4px solid var(--cor-fundo);
+}
+
+.casca-inferior-destaque:active .casca-inferior-mais {
+  transform: scale(0.95);
+}

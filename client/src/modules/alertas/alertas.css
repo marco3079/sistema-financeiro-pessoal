@@ -64,3 +64,12 @@
   font-size: 0.875rem;
   margin: 1rem 0 0;
 }
+
+@media (max-width: 899px) {
+  .alertas-ver {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--altura-toque);
+    margin-top: 0.25rem;
+  }
+}

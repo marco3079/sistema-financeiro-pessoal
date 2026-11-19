@@ -181,12 +181,16 @@ export function Tabela<T>({
   chave,
   vazio,
   aoClicarLinha,
+  itemCelular,
 }: {
   colunas: ColunaTabela<T>[];
   dados: T[];
   chave: (item: T) => string | number;
   vazio?: string;
   aoClicarLinha?: (item: T) => void;
+  // No celular, desenha cada registro como uma linha de lista de aplicativo (estilo extrato)
+  // em vez do cartão com todos os pares rótulo/valor. A coluna de ações continua à direita.
+  itemCelular?: (item: T) => ReactNode;
 }) {
   if (dados.length === 0) {
     return <p className="tabela-vazia">{vazio ?? 'Nenhum registro encontrado.'}</p>;
@@ -229,6 +233,26 @@ export function Tabela<T>({
           </tbody>
         </table>
       </div>
+      {itemCelular ? (
+        <ul className="tabela-cartoes tabela-lista-app">
+          {dados.map((item) => (
+            <li
+              key={chave(item)}
+              className={aoClicarLinha ? 'tabela-lista-item clicavel' : 'tabela-lista-item'}
+              onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
+            >
+              <div className="tabela-lista-conteudo">{itemCelular(item)}</div>
+              {colunas
+                .filter((c) => c.acoes)
+                .map((c) => (
+                  <div className="tabela-lista-acoes" key={c.titulo} onClick={naoPropagar}>
+                    {c.celula(item)}
+                  </div>
+                ))}
+            </li>
+          ))}
+        </ul>
+      ) : (
       <ul className="tabela-cartoes">
         {dados.map((item) => (
           <li
@@ -251,7 +275,33 @@ export function Tabela<T>({
           </li>
         ))}
       </ul>
+      )}
     </>
+  );
+}
+
+// ---------- Filtros recolhíveis (celular) ----------
+
+// No celular os filtros ficam escondidos atrás de um botão "Filtros" (como nos aplicativos de banco);
+// no computador o botão some e os filtros aparecem sempre. `ativos` mostra quantos filtros estão em uso.
+export function FiltrosRecolhiveis({ ativos = 0, children }: { ativos?: number; children: ReactNode }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className="filtros-recolhiveis">
+      <button
+        type="button"
+        className={ativos > 0 ? 'filtros-alternar filtros-alternar-ativo' : 'filtros-alternar'}
+        aria-expanded={aberto}
+        onClick={() => setAberto((a) => !a)}
+      >
+        <span>Filtros</span>
+        {ativos > 0 && <span className="filtros-contagem">{ativos}</span>}
+        <span className={aberto ? 'filtros-seta filtros-seta-aberta' : 'filtros-seta'} aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      <div className={aberto ? 'filtros' : 'filtros filtros-fechados'}>{children}</div>
+    </div>
   );
 }
 

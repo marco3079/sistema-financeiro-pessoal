@@ -858,3 +858,53 @@
   opacity: 0.75;
   font-size: 0.75rem;
 }
+
+/* Celular: "Ver todos" com área de toque do tamanho de um dedo. */
+@media (max-width: 899px) {
+  .painel-ver-todos {
+    min-height: var(--altura-toque);
+    padding: 0 0.25rem;
+  }
+}
+
+/* Celular (estilo aplicativo): o primeiro indicador (patrimônio) em destaque na largura toda
+   e os demais em grade 2 x 2, compactos. */
+@media (max-width: 520px) {
+  .painel-indicadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .painel-indicador:first-child,
+  .painel-indicador:last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
+
+  .painel-indicador:not(:first-child) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .painel-indicador:not(:first-child) .painel-indicador-icone {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .painel-indicador:not(:first-child) .painel-indicador-valor {
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+  }
+
+  .painel-indicador:not(:first-child) .painel-indicador-rotulo {
+    font-size: 0.78rem;
+  }
+
+  .painel-indicador:not(:first-child) .painel-variacao {
+    top: 12px;
+    bottom: auto;
+    right: 12px;
+  }
+}

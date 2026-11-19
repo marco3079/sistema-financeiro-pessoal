@@ -95,3 +95,10 @@
 .cart-acoes > .botao {
   height: var(--altura-toque);
 }
+
+/* Celular: período e botão da B3 alinhados à esquerda, sem recuo quando quebram de linha. */
+@media (max-width: 719px) {
+  .cart-acoes {
+    justify-content: flex-start;
+  }
+}

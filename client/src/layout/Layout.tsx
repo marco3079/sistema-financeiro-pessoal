@@ -63,11 +63,25 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
   const { nivel } = useAcessoPerfil();
   const { plataforma, logoSrc } = usePlataforma();
   const [gavetaAberta, setGavetaAberta] = useState(false);
+  const [buscaAberta, setBuscaAberta] = useState(false);
   const estreita = useTelaEstreita();
   const local = useLocation();
   useEffect(() => {
     setGavetaAberta(false);
+    setBuscaAberta(false);
   }, [local.pathname]);
+
+  // Celular: ao tocar numa aba (ou item de controle segmentado) que está meio escondida na faixa
+  // que rola de lado, ela desliza para o centro, como nos aplicativos.
+  useEffect(() => {
+    if (!estreita) return;
+    function tocou(e: MouseEvent) {
+      const alvo = e.target instanceof Element ? e.target.closest('.aba, .segmentado-item') : null;
+      if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+    document.addEventListener('click', tocou);
+    return () => document.removeEventListener('click', tocou);
+  }, [estreita]);
 
   useEffect(() => {
     if (!gavetaAberta) return;
@@ -86,6 +100,26 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
   const leitor = nivel === 'LEITURA';
   const grupos = agrupar(menu);
   const principais = menu.slice(0, 4);
+  // Lançar rápido vira o botão "+" do meio da barra inferior (como o botão central dos aplicativos).
+  const rotaDestaque = principais.find((r) => r.caminho.endsWith('/rapido'));
+  const comuns = principais.filter((r) => r !== rotaDestaque);
+  const metade = Math.ceil(comuns.length / 2);
+
+  function itemInferior(r: RotaModulo) {
+    return (
+      <NavLink
+        key={r.caminho}
+        to={r.caminho}
+        end={r.caminho === raizPortal}
+        className={({ isActive }) => (isActive ? 'casca-inferior-item casca-ativo' : 'casca-inferior-item')}
+      >
+        <span className="casca-inferior-pilula">
+          <Icone nome={r.icone} tamanho={22} className="casca-inferior-icone" />
+        </span>
+        <span className="casca-inferior-rotulo">{r.rotulo}</span>
+      </NavLink>
+    );
+  }
 
   function itemMenu(r: RotaModulo) {
     return (
@@ -142,8 +176,16 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
             <div className="casca-topo-celular-acoes">
               <SeletorPerfil />
               <BotaoAtualizar />
+              <button
+                type="button"
+                className={buscaAberta ? 'casca-botao-redondo casca-botao-ativo' : 'casca-botao-redondo'}
+                aria-label={buscaAberta ? 'Fechar a busca' : 'Buscar'}
+                aria-expanded={buscaAberta}
+                onClick={() => setBuscaAberta((b) => !b)}
+              >
+                <Icone nome={buscaAberta ? 'fechar' : 'busca'} tamanho={20} />
+              </button>
               <Notificacoes raiz={raizPortal} />
-              <BotaoTema />
               <button
                 type="button"
                 className="casca-botao-redondo"
@@ -154,9 +196,11 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
               </button>
             </div>
           </div>
-          <div className="casca-topo-celular-busca">
-            <Busca telas={telas} />
-          </div>
+          {buscaAberta && (
+            <div className="casca-topo-celular-busca">
+              <Busca telas={telas} autoFoco />
+            </div>
+          )}
         </header>
       )}
 
@@ -185,19 +229,26 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
 
       {estreita && (
         <nav className="casca-inferior" aria-label="Menu rápido">
-          {principais.map((r) => (
+          {(rotaDestaque ? comuns.slice(0, metade) : principais).map(itemInferior)}
+          {rotaDestaque && (
             <NavLink
-              key={r.caminho}
-              to={r.caminho}
-              end={r.caminho === raizPortal}
-              className={({ isActive }) => (isActive ? 'casca-inferior-item casca-ativo' : 'casca-inferior-item')}
+              to={rotaDestaque.caminho}
+              className={({ isActive }) =>
+                isActive ? 'casca-inferior-item casca-inferior-destaque casca-ativo' : 'casca-inferior-item casca-inferior-destaque'
+              }
+              aria-label={rotaDestaque.rotulo}
             >
-              <Icone nome={r.icone} tamanho={22} className="casca-inferior-icone" />
-              <span className="casca-inferior-rotulo">{r.rotulo}</span>
+              <span className="casca-inferior-mais">
+                <Icone nome="somar" tamanho={26} />
+              </span>
+              <span className="casca-inferior-rotulo">Lançar</span>
             </NavLink>
-          ))}
+          )}
+          {rotaDestaque && comuns.slice(metade).map(itemInferior)}
           <button type="button" className="casca-inferior-item" onClick={() => setGavetaAberta(true)}>
-            <Icone nome="mais" tamanho={22} className="casca-inferior-icone" />
+            <span className="casca-inferior-pilula">
+              <Icone nome="mais" tamanho={22} className="casca-inferior-icone" />
+            </span>
             <span className="casca-inferior-rotulo">Mais</span>
           </button>
         </nav>
@@ -217,6 +268,7 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
                 <strong className="casca-marca-nome">{plataforma.nome}</strong>
                 <span className="casca-marca-portal">{portal}</span>
               </div>
+              <BotaoTema />
               <button
                 type="button"
                 className="casca-botao-redondo"
