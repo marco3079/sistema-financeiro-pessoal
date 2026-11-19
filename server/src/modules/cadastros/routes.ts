@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { permitir } from '../../lib/auth';
-import { esquecerVinculosLeitor } from '../../lib/perfil';
+import { esquecerAcessos } from '../../lib/perfil';
 import { emailHabilitado, enderecoDoSite, enfileirarEmail, lerConfiguracao } from '../../lib/email';
 import { criarTokenSenha } from '../../lib/tokens-senha';
 import { validarImagem } from '../../lib/imagem';
@@ -41,10 +41,47 @@ function avisarBoasVindas(usuario: { id: number; nome: string; email: string }):
   })().catch(() => undefined);
 }
 
-// Remove senhaHash de qualquer registro de usuário antes de responder.
-function semSenha<U extends { senhaHash: string }>(usuario: U): Omit<U, 'senhaHash'> {
-  const { senhaHash, ...resto } = usuario;
+// Remove a senha e os segredos da verificação em duas etapas antes de responder (fica só totpAtivo).
+type UsuarioComSegredos = {
+  senhaHash: string;
+  totpSegredoCifrado?: string | null;
+  totpRecuperacao?: string | null;
+  perfilFinanceiroId?: number | null;
+};
+function semSenha<U extends UsuarioComSegredos>(
+  usuario: U
+): Omit<U, 'senhaHash' | 'totpSegredoCifrado' | 'totpRecuperacao' | 'perfilFinanceiroId'> {
+  const { senhaHash, totpSegredoCifrado, totpRecuperacao, perfilFinanceiroId, ...resto } = usuario;
   return resto;
+}
+
+// Acessos do membro: perfil financeiro e nível. Titulares acessam todos e não têm linhas.
+type AcessoInformado = { perfilFinanceiroId: number; nivel: 'LEITURA' | 'EDICAO' };
+
+async function acessosPorUsuario(ids: number[]): Promise<Map<number, AcessoInformado[]>> {
+  const linhas = await prisma.acessoPerfil.findMany({
+    where: { usuarioId: { in: ids } },
+    orderBy: { perfilFinanceiroId: 'asc' },
+  });
+  const mapa = new Map<number, AcessoInformado[]>();
+  for (const l of linhas) {
+    const lista = mapa.get(l.usuarioId) ?? [];
+    lista.push({ perfilFinanceiroId: l.perfilFinanceiroId, nivel: l.nivel });
+    mapa.set(l.usuarioId, lista);
+  }
+  return mapa;
+}
+
+// Grava a lista completa de acessos do membro (substitui a anterior). Titular: apaga as linhas.
+async function gravarAcessos(usuarioId: number, perfil: 'TITULAR' | 'LEITOR', acessos: AcessoInformado[]): Promise<void> {
+  await prisma.$transaction([
+    prisma.acessoPerfil.deleteMany({ where: { usuarioId } }),
+    ...(perfil === 'LEITOR' && acessos.length > 0
+      ? [prisma.acessoPerfil.createMany({ data: acessos.map((a) => ({ ...a, usuarioId })), skipDuplicates: true })]
+      : []),
+    prisma.usuario.update({ where: { id: usuarioId }, data: { perfilFinanceiroId: null }, select: { id: true } }),
+  ]);
+  esquecerAcessos();
 }
 
 function textoBusca(valor: unknown): string {
@@ -66,12 +103,18 @@ async function garantirEmailLivre(email: string, ignorarUsuarioId?: number): Pro
 const senhaSchema = z.string().min(6, 'A senha deve ter pelo menos 6 caracteres');
 const textoOpcional = z.string().nullable().optional();
 const perfilSchema = z.enum(['TITULAR', 'LEITOR']);
+const acessoSchema = z.object({
+  perfilFinanceiroId: z.number().int().positive(),
+  nivel: z.enum(['LEITURA', 'EDICAO']),
+});
 
 const usuarioCriarSchema = z.object({
   nome: z.string().trim().min(1, 'Nome obrigatório'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
   senha: senhaSchema,
   perfil: perfilSchema,
+  // Membro: perfis que ele acessa e com que nível. O campo antigo (um perfil, leitura) ainda é aceito.
+  acessos: z.array(acessoSchema).max(50).optional(),
   perfilFinanceiroId: z.number().int().positive().nullable().optional(),
 });
 
@@ -81,20 +124,28 @@ const usuarioAtualizarSchema = z.object({
   telefone: textoOpcional,
   ativo: z.boolean().optional(),
   perfil: perfilSchema.optional(),
+  acessos: z.array(acessoSchema).max(50).optional(),
   perfilFinanceiroId: z.number().int().positive().nullable().optional(),
 });
 
-// Para LEITOR, o perfil financeiro é obrigatório e precisa existir. Para TITULAR, não há vínculo.
-async function garantirVinculoDoLeitor(perfil: 'TITULAR' | 'LEITOR', perfilFinanceiroId: number | null | undefined): Promise<number | null> {
-  if (perfil !== 'LEITOR') return null;
-  if (perfilFinanceiroId === null || perfilFinanceiroId === undefined) {
-    throw new HttpError(400, 'Escolha o perfil financeiro que o leitor pode ver');
+// Membro (LEITOR): precisa de pelo menos um perfil, e todos precisam existir. Titular: nenhum (acessa todos).
+async function conferirAcessos(
+  perfil: 'TITULAR' | 'LEITOR',
+  acessos: AcessoInformado[] | undefined,
+  perfilFinanceiroId: number | null | undefined
+): Promise<AcessoInformado[]> {
+  if (perfil !== 'LEITOR') return [];
+  let lista = acessos;
+  if (lista === undefined && perfilFinanceiroId) lista = [{ perfilFinanceiroId, nivel: 'LEITURA' }];
+  const unicos = new Map((lista ?? []).map((a) => [a.perfilFinanceiroId, a]));
+  if (unicos.size === 0) {
+    throw new HttpError(400, 'Escolha pelo menos um perfil financeiro que o membro pode acessar');
   }
-  const existe = await prisma.perfilFinanceiro.findUnique({ where: { id: perfilFinanceiroId }, select: { id: true } });
-  if (!existe) {
+  const existentes = await prisma.perfilFinanceiro.count({ where: { id: { in: [...unicos.keys()] } } });
+  if (existentes !== unicos.size) {
     throw new HttpError(400, 'Perfil financeiro não encontrado');
   }
-  return perfilFinanceiroId;
+  return [...unicos.values()];
 }
 
 const usuarioFiltroSchema = z.object({
@@ -130,7 +181,8 @@ router.get(
       },
       orderBy: { nome: 'asc' },
     });
-    res.json(usuarios.map((u) => semSenha(u)));
+    const acessos = await acessosPorUsuario(usuarios.map((u) => u.id));
+    res.json(usuarios.map((u) => ({ ...semSenha(u), acessos: acessos.get(u.id) ?? [] })));
   })
 );
 
@@ -140,7 +192,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const dados = validar(usuarioCriarSchema, req.body);
     await garantirEmailLivre(dados.email);
-    const vinculo = await garantirVinculoDoLeitor(dados.perfil, dados.perfilFinanceiroId);
+    const acessos = await conferirAcessos(dados.perfil, dados.acessos, dados.perfilFinanceiroId);
     const senhaHash = await bcrypt.hash(dados.senha, 10);
     const usuario = await prisma.usuario.create({
       data: {
@@ -148,11 +200,11 @@ router.post(
         email: dados.email,
         senhaHash,
         perfil: dados.perfil,
-        perfilFinanceiroId: vinculo,
       },
     });
+    await gravarAcessos(usuario.id, usuario.perfil, acessos);
     avisarBoasVindas(usuario);
-    res.status(201).json(semSenha(usuario));
+    res.status(201).json({ ...semSenha(usuario), acessos });
   })
 );
 
@@ -185,10 +237,10 @@ router.put(
         throw new HttpError(400, 'É preciso manter pelo menos um titular ativo');
       }
     }
-    const vinculo = await garantirVinculoDoLeitor(
-      novoPerfil,
-      dados.perfilFinanceiroId !== undefined ? dados.perfilFinanceiroId : existente.perfilFinanceiroId
-    );
+    // Acessos: só mudam quando vierem na requisição ou quando o papel mudar.
+    const mudaAcessos =
+      dados.acessos !== undefined || dados.perfilFinanceiroId !== undefined || novoPerfil !== existente.perfil;
+    const acessos = mudaAcessos ? await conferirAcessos(novoPerfil, dados.acessos, dados.perfilFinanceiroId) : null;
     if (dados.ativo === false && existente.ativo) {
       if (id === req.usuario.id) {
         throw new HttpError(400, 'Você não pode desativar a própria conta');
@@ -211,11 +263,12 @@ router.put(
         telefone: dados.telefone,
         ativo: dados.ativo,
         perfil: dados.perfil,
-        perfilFinanceiroId: vinculo,
       },
     });
-    esquecerVinculosLeitor();
-    res.json(semSenha(usuario));
+    if (acessos) await gravarAcessos(id, usuario.perfil, acessos);
+    esquecerAcessos();
+    const lista = (await acessosPorUsuario([id])).get(id) ?? [];
+    res.json({ ...semSenha(usuario), acessos: lista });
   })
 );
 

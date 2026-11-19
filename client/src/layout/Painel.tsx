@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { usePodeEditar } from '../lib/acessoPerfil';
 import { useAuth } from '../lib/auth';
 import { formatarDia, formatarReais, hojeISO, mesAtual } from '../lib/financas';
 import { useDados } from '../lib/useDados';
@@ -201,7 +202,8 @@ function CartaoBloco({ titulo, icone, carregando, erro, verTodos, children }: Ca
 
 export function Painel() {
   const { usuario } = useAuth();
-  const leitor = usuario?.perfil === 'LEITOR';
+  // Sem nível de edição no perfil em uso: some com os atalhos de lançar dados.
+  const leitor = !usePodeEditar();
   const resumo = useDados<RespostaResumo>('/painel/resumo');
   const [mesCorrente] = useState<string>(() => mesAtual());
   const agenda = useDados<RespostaAgenda>(`/agenda?mes=${mesCorrente}`);

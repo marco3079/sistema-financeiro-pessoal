@@ -7,7 +7,10 @@ import { caminhoDoPerfil, Layout } from './layout/Layout';
 import { Login } from './layout/Login';
 import { EsqueciSenha } from './layout/EsqueciSenha';
 import { RedefinirSenha } from './layout/RedefinirSenha';
-import { Pagina } from './ui';
+import { DesbloquearPerfil, SemPerfil } from './layout/DesbloquearPerfil';
+import { Carregando, Pagina } from './ui';
+import { AcessoPerfilProvider, useAcessoPerfil } from './lib/acessoPerfil';
+import type { NivelPerfil } from './lib/perfilFinanceiro';
 import type { RotaModulo } from './lib/rotas';
 import type { Perfil } from './lib/tipos';
 
@@ -20,21 +23,16 @@ const ROTAS: RotaModulo[] = Object.values(modulos)
   .flatMap((m) => m.rotas)
   .sort((a, b) => (a.ordem ?? 100) - (b.ordem ?? 100));
 
-// Telas que o LEITOR (somente leitura) não abre nem vê no menu. O servidor também recusa as consultas delas.
+// Telas que o membro (LEITOR) não abre nem vê no menu, qualquer que seja o nível. O servidor também recusa as consultas delas.
 const CAMINHOS_SO_TITULAR = [
   "/app/usuarios",
   "/app/configuracoes",
   "/app/logs",
   "/app/atividades",
-  "/app/perfis",
   "/app/ia",
   "/app/drive",
   "/app/atualizacao",
-  "/app/seguranca",
   "/app/entrada",
-  "/app/importar",
-  "/app/rapido",
-  "/app/regras",
   "/app/automacoes",
   "/app/cupom",
   "/app/avisos",
@@ -42,27 +40,54 @@ const CAMINHOS_SO_TITULAR = [
   "/app/central/configuracoes",
 ];
 
-// Uma rota vale para o perfil se o módulo a libera para TITULAR e, no caso do LEITOR, ela não está na lista acima.
-function rotaLiberada(rota: RotaModulo, perfil: Perfil): boolean {
-  if (!rota.perfis.includes('TITULAR')) return rota.perfis.includes(perfil);
-  if (perfil === 'TITULAR') return true;
-  return !CAMINHOS_SO_TITULAR.some((c) => rota.caminho === c || rota.caminho.startsWith(c + '/'));
+// Telas de lançar dados: o membro só abre com nível Edição no perfil em uso.
+const CAMINHOS_DE_EDICAO = ["/app/importar", "/app/rapido", "/app/regras"];
+
+function casa(caminho: string, lista: string[]): boolean {
+  return lista.some((c) => caminho === c || caminho.startsWith(c + '/'));
 }
 
-function LayoutDoPerfil() {
+// Uma rota vale para o usuário se o módulo a libera para TITULAR e, no caso do membro, ela não está nas listas acima
+// (as de edição valem com nível Edição).
+function rotaLiberada(rota: RotaModulo, perfil: Perfil, nivel: NivelPerfil | null): boolean {
+  if (!rota.perfis.includes('TITULAR')) return rota.perfis.includes(perfil);
+  if (perfil === 'TITULAR') return true;
+  if (casa(rota.caminho, CAMINHOS_SO_TITULAR)) return false;
+  return nivel === 'EDICAO' || !casa(rota.caminho, CAMINHOS_DE_EDICAO);
+}
+
+function CascaDoPerfil() {
   const { usuario } = useAuth();
+  const { perfis, atual, nivel, erro, recarregar } = useAcessoPerfil();
   if (!usuario) return <Navigate to="/login" replace />;
-  const liberadas = ROTAS.filter((r) => rotaLiberada(r, usuario.perfil));
+  // Primeira carga da lista de perfis: nada na tela por um instante (evita mostrar dados de um perfil bloqueado).
+  if (!perfis && !erro) return <Carregando />;
+  if (perfis && perfis.length === 0) return <SemPerfil />;
+  if (atual?.bloqueado) {
+    return <DesbloquearPerfil perfil={atual} outros={(perfis ?? []).filter((p) => p.id !== atual.id)} aoDesbloquear={recarregar} />;
+  }
+  const liberadas = ROTAS.filter((r) => rotaLiberada(r, usuario.perfil, nivel));
   const menu = liberadas.filter((r) => r.menu !== false);
   // A busca do topo também acha as telas que saíram do menu (menos as que dependem de um item, como a ficha do ativo).
   const telas = liberadas.filter((r) => !r.caminho.includes(':'));
   return <Layout menu={menu} telas={telas} />;
 }
 
-function RotaProtegida({ rota, children }: { rota: RotaModulo; children: ReactNode }) {
+function LayoutDoPerfil() {
   const { usuario } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
-  if (!rotaLiberada(rota, usuario.perfil)) {
+  return (
+    <AcessoPerfilProvider key={usuario.id}>
+      <CascaDoPerfil />
+    </AcessoPerfilProvider>
+  );
+}
+
+function RotaProtegida({ rota, children }: { rota: RotaModulo; children: ReactNode }) {
+  const { usuario } = useAuth();
+  const { nivel } = useAcessoPerfil();
+  if (!usuario) return <Navigate to="/login" replace />;
+  if (!rotaLiberada(rota, usuario.perfil, nivel)) {
     return <Navigate to={caminhoDoPerfil(usuario.perfil)} replace />;
   }
   return <>{children}</>;

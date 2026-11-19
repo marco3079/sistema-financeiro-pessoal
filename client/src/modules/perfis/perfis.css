@@ -46,3 +46,66 @@
   align-items: center;
   gap: 0.5rem;
 }
+
+.perfis-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.25rem 0 0.75rem;
+}
+
+.perfis-selos:empty {
+  display: none;
+}
+
+/* Lista de acessos de um perfil: quem à esquerda, nível à direita (empilha no celular). */
+.perfis-acessos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.perfis-acesso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.perfis-acesso:first-child {
+  border-top: none;
+}
+
+.perfis-acesso-quem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.perfis-acesso-quem span {
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.perfis-acesso-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.perfis-acesso-nivel {
+  flex: 0 1 220px;
+  min-width: 180px;
+}
+
+.perfis-acesso-nivel .campo {
+  margin: 0;
+}

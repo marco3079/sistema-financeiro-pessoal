@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api } from './api';
+import { esquecerDesbloqueios } from './perfilFinanceiro';
 import { lerPerfil } from './tipos';
 import type { Perfil, PerfilReal, UsuarioLogado } from './tipos';
 
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const resposta = { token: dados.token, usuario: dados.usuario };
     const usuarioNormalizado = normalizarUsuario(resposta.usuario);
+    esquecerDesbloqueios();
     localStorage.setItem(CHAVE_TOKEN, resposta.token);
     localStorage.setItem(CHAVE_USUARIO, JSON.stringify(usuarioNormalizado));
     setUsuario(usuarioNormalizado);
@@ -117,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.post('/auth/sair').catch(() => undefined);
     localStorage.removeItem(CHAVE_TOKEN);
     localStorage.removeItem(CHAVE_USUARIO);
+    esquecerDesbloqueios();
     fotoBuscadaPara.current = null;
     setUsuario(null);
   }

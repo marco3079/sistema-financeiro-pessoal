@@ -2,7 +2,8 @@ export type Perfil = 'TITULAR' | 'LEITOR';
 
 const PERFIS_VALIDOS: Perfil[] = ['TITULAR', 'LEITOR'];
 
-// Perfil vindo da API ou do navegador. O servidor é quem decide o acesso; LEITOR só consulta.
+// Perfil vindo da API ou do navegador. O servidor é quem decide o acesso; LEITOR (membro) só vê os perfis
+// financeiros liberados para ele, com o nível de cada um.
 export function lerPerfil(valor: unknown): Perfil {
   return PERFIS_VALIDOS.includes(valor as Perfil) ? (valor as Perfil) : 'TITULAR';
 }
@@ -15,7 +16,7 @@ export const RAIZ_DO_PERFIL: Record<Perfil, string> = {
 
 export const NOME_DO_PERFIL: Record<Perfil, string> = {
   TITULAR: 'Painel pessoal',
-  LEITOR: 'Somente leitura',
+  LEITOR: 'Membro',
 };
 
 // Mantido por compatibilidade com as telas herdadas: o perfil verdadeiro é o próprio perfil.
@@ -32,7 +33,7 @@ export interface UsuarioLogado {
 
 export const PERFIS: { valor: Perfil; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
-  { valor: 'LEITOR', rotulo: 'Somente leitura' },
+  { valor: 'LEITOR', rotulo: 'Membro' },
 ];
 
 export function rotuloPerfil(valor: string): string {

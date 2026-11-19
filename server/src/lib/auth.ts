@@ -6,6 +6,8 @@ import type { Perfil } from '@prisma/client';
 export interface UsuarioToken {
   id: number;
   perfil: Perfil;
+  // Fim do login (segundos desde a época, campo exp do JWT). Só nas requisições autenticadas.
+  expira?: number;
 }
 
 declare global {
@@ -46,16 +48,15 @@ export function gerarToken(u: UsuarioToken): string {
   return jwt.sign({ id: u.id, perfil: u.perfil }, segredo(), { expiresIn: '12h' });
 }
 
-// Usuário LEITOR: só consulta. Métodos de escrita são bloqueados, exceto sair e trocar a própria senha.
-const METODOS_DE_LEITURA = ['GET', 'HEAD', 'OPTIONS'];
-const ESCRITA_PERMITIDA_AO_LEITOR = ['/api/auth/sair', '/api/auth/trocar-senha'];
-// Áreas que o LEITOR não consulta (GET). As rotas de escrita dessas áreas já caem na regra de leitura.
-const AREAS_FECHADAS_AO_LEITOR = [
+// Usuário LEITOR (membro): vê só os perfis financeiros liberados para ele (AcessoPerfil). As escritas dependem
+// do nível no perfil da requisição e são conferidas em lib/perfil.ts (escolherPerfil), que já sabe o perfil.
+export const METODOS_DE_LEITURA = ['GET', 'HEAD', 'OPTIONS'];
+// Áreas de administração que o membro não abre (nem consulta, nem altera), qualquer que seja o nível.
+export const AREAS_FECHADAS_AO_LEITOR = [
   '/api/usuarios',
   '/api/mcp',
   '/api/drive',
   '/api/atualizacao',
-  '/api/seguranca',
   '/api/logs',
   '/api/configuracoes',
   '/api/entrada',
@@ -65,7 +66,7 @@ const AREAS_FECHADAS_AO_LEITOR = [
   '/api/bancos',
 ];
 
-function caminhoDaRequisicao(req: Request): string {
+export function caminhoDaRequisicao(req: Request): string {
   // O Express roteia sem diferenciar maiúsculas e aceita barras repetidas; a comparação precisa do caminho normalizado.
   const bruto = req.originalUrl || req.url || '';
   let caminho = bruto.split('?')[0].toLowerCase().replace(/\/{2,}/g, '/');
@@ -78,17 +79,8 @@ function caminhoDaRequisicao(req: Request): string {
   return caminho;
 }
 
-function pertenceA(caminho: string, area: string): boolean {
+export function pertenceA(caminho: string, area: string): boolean {
   return caminho === area || caminho.startsWith(area + '/');
-}
-
-// Devolve true quando o LEITOR não pode fazer esta requisição.
-function bloqueadoParaLeitor(req: Request): boolean {
-  const caminho = caminhoDaRequisicao(req);
-  if (!METODOS_DE_LEITURA.includes(req.method)) {
-    return !ESCRITA_PERMITIDA_AO_LEITOR.includes(caminho);
-  }
-  return AREAS_FECHADAS_AO_LEITOR.some((area) => pertenceA(caminho, area));
 }
 
 export const autenticar: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
@@ -105,17 +97,17 @@ export const autenticar: RequestHandler = (req: Request, res: Response, next: Ne
       res.status(401).json({ erro: 'Não autenticado' });
       return;
     }
-    req.usuario = { id: payload.id, perfil };
+    req.usuario = { id: payload.id, perfil, expira: typeof payload.exp === 'number' ? payload.exp : undefined };
   } catch {
     res.status(401).json({ erro: 'Não autenticado' });
     return;
   }
-  if (req.usuario.perfil === 'LEITOR' && bloqueadoParaLeitor(req)) {
-    const mensagem = METODOS_DE_LEITURA.includes(req.method)
-      ? 'Sem permissão'
-      : 'Este acesso é só de leitura';
-    res.status(403).json({ erro: mensagem });
-    return;
+  if (req.usuario.perfil === 'LEITOR') {
+    const caminho = caminhoDaRequisicao(req);
+    if (AREAS_FECHADAS_AO_LEITOR.some((area) => pertenceA(caminho, area))) {
+      res.status(403).json({ erro: 'Sem permissão' });
+      return;
+    }
   }
   next();
 };

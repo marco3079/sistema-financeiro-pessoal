@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { useDados } from '../../lib/useDados';
@@ -303,6 +304,25 @@ function AtividadeRecente({ itens }: { itens: PerfilCompletoDTO['atividadeRecent
 
 // ---------- Dados e segurança ----------
 
+// Verificação em duas etapas (TOTP): situação e atalho para a tela Segurança, onde se ativa e desativa.
+function CartaoDuasEtapas() {
+  const { dados } = useDados<{ ativo: boolean; codigosDeRecuperacaoRestantes: number }>('/seguranca/2fa');
+  return (
+    <Cartao titulo="Verificação em duas etapas">
+      <p className="perfil-nota">
+        {dados?.ativo
+          ? 'Ativa: o login pede o código do aplicativo autenticador. Restam ' +
+            dados.codigosDeRecuperacaoRestantes +
+            ' códigos de recuperação.'
+          : 'Desligada. Com ela, o login pede também um código do aplicativo autenticador (Google Authenticator, Microsoft Authenticator, Authy).'}
+      </p>
+      <Link className={dados?.ativo ? 'botao botao-secundario' : 'botao botao-primario'} to="/app/seguranca">
+        {dados?.ativo ? 'Gerenciar' : 'Ativar'}
+      </Link>
+    </Cartao>
+  );
+}
+
 function DadosESeguranca({
   dados,
   aoSalvo,
@@ -342,6 +362,8 @@ function DadosESeguranca({
         <Cartao>
           <FormTrocarSenha />
         </Cartao>
+
+        <CartaoDuasEtapas />
 
         <CartaoAparencia />
       </div>

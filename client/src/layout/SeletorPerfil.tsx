@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatarReais } from '../lib/financas';
+import { useAcessoPerfil } from '../lib/acessoPerfil';
 import { trocarDePerfil } from '../lib/perfilFinanceiro';
-import type { PerfilDTO } from '../lib/perfilFinanceiro';
-import { useDados } from '../lib/useDados';
 import { PontoCor } from '../ui/financas';
 import { Icone } from '../ui/icones';
 import './seletor-perfil.css';
@@ -11,7 +10,7 @@ import './seletor-perfil.css';
 // Seletor de perfil financeiro no topo: mostra o perfil atual e troca de perfil pelo menu suspenso.
 export function SeletorPerfil() {
   const navigate = useNavigate();
-  const { dados } = useDados<PerfilDTO[]>('/perfis');
+  const { perfis: dados } = useAcessoPerfil();
   const [aberto, setAberto] = useState(false);
   const area = useRef<HTMLDivElement>(null);
   const botao = useRef<HTMLButtonElement>(null);
@@ -78,7 +77,12 @@ export function SeletorPerfil() {
             >
               <PontoCor cor={p.cor} />
               <span className="seletor-perfil-item-nome">{p.nome}</span>
-              <span className="seletor-perfil-item-valor">{formatarReais(p.patrimonio)}</span>
+              {p.protegido && (
+                <span className="seletor-perfil-cadeado" title="Protegido por senha" aria-label="Protegido por senha">
+                  <Icone nome="cadeado" tamanho={14} />
+                </span>
+              )}
+              <span className="seletor-perfil-item-valor">{p.patrimonio === null ? '' : formatarReais(p.patrimonio)}</span>
               {p.atual && (
                 <span className="seletor-perfil-visto" aria-hidden="true">
                   <Icone nome="visto" tamanho={16} />

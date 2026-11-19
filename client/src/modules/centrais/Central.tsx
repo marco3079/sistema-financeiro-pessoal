@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
+import { useAcessoPerfil } from '../../lib/acessoPerfil';
 import { Pagina } from '../../ui';
 import { Vazio } from '../../ui/financas';
 import { atalhoLiberado } from './atalhos';
@@ -9,7 +10,8 @@ import './centrais.css';
 // Página de atalhos. Mostra só as telas que o perfil do usuário pode abrir.
 export function Central({ titulo, texto, atalhos }: { titulo: string; texto: string; atalhos: Atalho[] }) {
   const { usuario } = useAuth();
-  const visiveis = usuario ? atalhos.filter((a) => atalhoLiberado(a.caminho, usuario.perfil)) : [];
+  const { nivel } = useAcessoPerfil();
+  const visiveis = usuario ? atalhos.filter((a) => atalhoLiberado(a.caminho, usuario.perfil, nivel)) : [];
 
   return (
     <Pagina titulo={titulo}>

@@ -22,20 +22,84 @@ import type { AcaoMenu } from '../../ui';
 import { Icone } from '../../ui/icones';
 import type { NomeIcone } from '../../ui/icones';
 import { mensagemErro, queryString, rotuloPerfil } from './tipos';
-import type { UsuarioDTO } from './tipos';
+import type { AcessoUsuarioDTO, UsuarioDTO } from './tipos';
 import { FichaUsuario, SeloPerfilUsuario } from './FichaUsuario';
 
 // Filtro de perfil da tela (rótulos em português; TI é perfil próprio).
 const PERFIS_FILTRO: { valor: string; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
-  { valor: 'LEITOR', rotulo: 'Somente leitura' },
+  { valor: 'LEITOR', rotulo: 'Membro' },
 ];
 
 // Tipos de acesso que se criam por esta tela.
 const TIPOS_DE_ACESSO: { valor: string; rotulo: string }[] = [
-  { valor: 'TITULAR', rotulo: 'Titular' },
-  { valor: 'LEITOR', rotulo: 'Somente leitura' },
+  { valor: 'TITULAR', rotulo: 'Titular (todos os perfis, administra o sistema)' },
+  { valor: 'LEITOR', rotulo: 'Membro (só os perfis liberados)' },
 ];
+
+// ---------- Acessos do membro aos perfis financeiros ----------
+
+type MapaAcessos = Record<number, '' | 'LEITURA' | 'EDICAO'>;
+
+const OPCOES_NIVEL = [
+  { valor: 'LEITURA', rotulo: 'Somente leitura' },
+  { valor: 'EDICAO', rotulo: 'Edição' },
+];
+
+function mapaDe(acessos: AcessoUsuarioDTO[] | undefined): MapaAcessos {
+  const mapa: MapaAcessos = {};
+  for (const a of acessos ?? []) mapa[a.perfilFinanceiroId] = a.nivel;
+  return mapa;
+}
+
+function listaDe(mapa: MapaAcessos): AcessoUsuarioDTO[] {
+  return Object.entries(mapa)
+    .filter(([, nivel]) => nivel !== '')
+    .map(([id, nivel]) => ({ perfilFinanceiroId: Number(id), nivel: nivel as 'LEITURA' | 'EDICAO' }));
+}
+
+// Um seletor por perfil financeiro: sem acesso, somente leitura ou edição.
+function EditorAcessos({
+  perfis,
+  valor,
+  aoMudar,
+}: {
+  perfis: PerfilDTO[];
+  valor: MapaAcessos;
+  aoMudar: (v: MapaAcessos) => void;
+}) {
+  return (
+    <fieldset className="usuarios-acessos">
+      <legend>Perfis financeiros que pode acessar</legend>
+      {perfis.map((p) => (
+        <Selecao
+          key={p.id}
+          rotulo={p.nome}
+          valor={valor[p.id] ?? ''}
+          vazio="Sem acesso"
+          opcoes={OPCOES_NIVEL}
+          aoMudar={(v) => aoMudar({ ...valor, [p.id]: v as MapaAcessos[number] })}
+        />
+      ))}
+      <p className="usuarios-ajuda">
+        Edição permite lançar e alterar os dados do perfil e também gerenciar os acessos e a senha dele.
+      </p>
+    </fieldset>
+  );
+}
+
+// Resumo dos acessos para a tabela.
+function textoAcessos(u: UsuarioDTO, perfis: PerfilDTO[] | null): string {
+  if (u.perfil === 'TITULAR') return 'Todos os perfis';
+  const lista = u.acessos ?? [];
+  if (lista.length === 0) return 'Nenhum perfil';
+  return lista
+    .map((a) => {
+      const nome = perfis?.find((p) => p.id === a.perfilFinanceiroId)?.nome ?? 'Perfil ' + a.perfilFinanceiroId;
+      return nome + (a.nivel === 'EDICAO' ? ' (edição)' : ' (leitura)');
+    })
+    .join(', ');
+}
 
 // ---------- Criar usuário ----------
 
@@ -44,7 +108,7 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [perfil, setPerfil] = useState('TITULAR');
-  const [perfilFinanceiro, setPerfilFinanceiro] = useState('');
+  const [acessos, setAcessos] = useState<MapaAcessos>({});
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const { dados: perfisFinanceiros } = useDados<PerfilDTO[]>('/perfis');
@@ -52,8 +116,8 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
   async function salvar(e: FormEvent) {
     e.preventDefault();
     setErro(null);
-    if (perfil === 'LEITOR' && perfilFinanceiro === '') {
-      setErro('Escolha o perfil financeiro que o leitor pode ver');
+    if (perfil === 'LEITOR' && listaDe(acessos).length === 0) {
+      setErro('Escolha pelo menos um perfil financeiro que o membro pode acessar');
       return;
     }
     setOcupado(true);
@@ -63,7 +127,7 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
         email: email.trim(),
         senha,
         perfil,
-        perfilFinanceiroId: perfil === 'LEITOR' ? Number(perfilFinanceiro) : null,
+        acessos: perfil === 'LEITOR' ? listaDe(acessos) : [],
       });
       aoConcluir();
     } catch (err) {
@@ -92,20 +156,7 @@ function FormNovoUsuario({ aoConcluir }: { aoConcluir: () => void }) {
         obrigatorio
       />
       {perfil === 'LEITOR' && (
-        <Selecao
-          rotulo="Perfil financeiro que pode ver"
-          valor={perfilFinanceiro}
-          aoMudar={setPerfilFinanceiro}
-          opcoes={(perfisFinanceiros ?? []).map((p) => ({ valor: String(p.id), rotulo: p.nome }))}
-          vazio="Escolha um perfil"
-          obrigatorio
-        />
-      )}
-      <p className="usuarios-ajuda">
-        Professores e alunos são criados nas telas Professores e Alunos.
-      </p>
-      {perfil === 'LEITOR' && (
-        <p className="usuarios-ajuda">Quem tem acesso somente leitura vê os dados do perfil escolhido e não altera nada.</p>
+        <EditorAcessos perfis={perfisFinanceiros ?? []} valor={acessos} aoMudar={setAcessos} />
       )}
       <div className="pagina-acoes">
         <Botao tipo="submit" desabilitado={ocupado}>
@@ -129,6 +180,32 @@ function DetalheUsuario({
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
+  const [papel, setPapel] = useState(usuario.perfil);
+  const [acessos, setAcessos] = useState<MapaAcessos>(() => mapaDe(usuario.acessos));
+  const { dados: perfisFinanceiros } = useDados<PerfilDTO[]>('/perfis');
+
+  async function salvarAcessos(e: FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    setSucesso(null);
+    if (papel === 'LEITOR' && listaDe(acessos).length === 0) {
+      setErro('Escolha pelo menos um perfil financeiro que o membro pode acessar');
+      return;
+    }
+    setOcupado(true);
+    try {
+      const atualizado = await api.put<UsuarioDTO>('/usuarios/' + usuario.id, {
+        perfil: papel,
+        acessos: papel === 'LEITOR' ? listaDe(acessos) : [],
+      });
+      aoAtualizado(atualizado);
+      setSucesso('Acessos salvos.');
+    } catch (err) {
+      setErro(mensagemErro(err));
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   async function alternarAtivo() {
     const proximo = !usuario.ativo;
@@ -175,6 +252,9 @@ function DetalheUsuario({
       <p>
         <strong>Situação:</strong> {usuario.ativo ? 'Ativo' : 'Inativo'}
       </p>
+      <p>
+        <strong>Verificação em duas etapas:</strong> {usuario.totpAtivo ? 'ativa' : 'desligada'}
+      </p>
       <div className="pagina-acoes">
         <Botao
           variante={usuario.ativo ? 'perigo' : 'primario'}
@@ -184,6 +264,19 @@ function DetalheUsuario({
           {usuario.ativo ? 'Desativar' : 'Ativar'}
         </Botao>
       </div>
+
+      <form onSubmit={salvarAcessos}>
+        <h3 className="cartao-titulo">Papel e acessos</h3>
+        <Selecao rotulo="Papel" valor={papel} aoMudar={setPapel} opcoes={TIPOS_DE_ACESSO} obrigatorio />
+        {papel === 'LEITOR' && (
+          <EditorAcessos perfis={perfisFinanceiros ?? []} valor={acessos} aoMudar={setAcessos} />
+        )}
+        <div className="pagina-acoes">
+          <Botao tipo="submit" desabilitado={ocupado}>
+            Salvar acessos
+          </Botao>
+        </div>
+      </form>
 
       <form onSubmit={redefinir}>
         <h3 className="cartao-titulo">Redefinir senha</h3>
@@ -240,6 +333,7 @@ export function Usuarios() {
   const [ficha, setFicha] = useState<number | null>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const { usuario } = useAuth();
+  const { dados: perfisFinanceiros } = useDados<PerfilDTO[]>('/perfis');
   const { dados, carregando, erro, recarregar } = useDados<UsuarioDTO[]>(
     `/usuarios${queryString({ perfil, busca: busca.trim() })}`
   );
@@ -259,7 +353,7 @@ export function Usuarios() {
   function acoesDo(u: UsuarioDTO): AcaoMenu[] {
     const acoes: AcaoMenu[] = [
       { rotulo: 'Ver ficha', icone: 'perfil', aoClicar: () => setFicha(u.id) },
-      { rotulo: 'Editar', icone: 'lapis', aoClicar: () => setEditando(u) },
+      { rotulo: 'Editar acessos', icone: 'lapis', aoClicar: () => setEditando(u) },
       { rotulo: 'Redefinir senha', icone: 'cadeado', aoClicar: () => setEditando(u) },
     ];
     if (u.id !== usuario?.id) {
@@ -333,7 +427,12 @@ export function Usuarios() {
                 </span>
               ),
             },
-            { titulo: 'Perfil', celula: (u) => <SeloPerfilUsuario perfil={u.perfil} /> },
+            { titulo: 'Papel', celula: (u) => <SeloPerfilUsuario perfil={u.perfil} /> },
+            { titulo: 'Perfis financeiros', celula: (u) => textoAcessos(u, perfisFinanceiros) },
+            {
+              titulo: 'Duas etapas',
+              celula: (u) => (u.totpAtivo ? <Selo cor="verde">ATIVA</Selo> : <Selo cor="cinza">DESLIGADA</Selo>),
+            },
             { titulo: 'Telefone', celula: (u) => u.telefone ?? '—' },
             { titulo: 'Cadastro', celula: (u) => formatarData(u.criadoEm) },
             {

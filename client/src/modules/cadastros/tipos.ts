@@ -9,13 +9,20 @@ export interface UsuarioDTO {
   cpf: string | null;
   telefone: string | null;
   criadoEm: string;
+  totpAtivo?: boolean; // verificação em duas etapas ligada
+  acessos?: AcessoUsuarioDTO[]; // membro: perfis financeiros liberados (titular: vazio, acessa todos)
+}
+
+export interface AcessoUsuarioDTO {
+  perfilFinanceiroId: number;
+  nivel: 'LEITURA' | 'EDICAO';
 }
 
 export type PerfilMeu = UsuarioDTO;
 
 export const PERFIS: { valor: string; rotulo: string }[] = [
   { valor: 'TITULAR', rotulo: 'Titular' },
-  { valor: 'LEITOR', rotulo: 'Somente leitura' },
+  { valor: 'LEITOR', rotulo: 'Membro' },
 ];
 
 export function rotuloPerfil(valor: string): string {

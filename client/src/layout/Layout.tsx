@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAcessoPerfil } from '../lib/acessoPerfil';
 import { useAuth } from '../lib/auth';
 import { usePlataforma } from '../lib/plataforma';
 import type { RotaModulo } from '../lib/rotas';
@@ -59,6 +60,7 @@ export function BotaoTema() {
 
 export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[] }) {
   const { usuario, sair } = useAuth();
+  const { nivel } = useAcessoPerfil();
   const { plataforma, logoSrc } = usePlataforma();
   const [gavetaAberta, setGavetaAberta] = useState(false);
   const estreita = useTelaEstreita();
@@ -80,7 +82,8 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
 
   const raizPortal = caminhoDoPerfil(usuario.perfil);
   const portal = nomePortal(usuario.perfil);
-  const leitor = usuario.perfil === 'LEITOR';
+  // Membro com nível Leitura no perfil em uso: o topo avisa que é só consulta.
+  const leitor = nivel === 'LEITURA';
   const grupos = agrupar(menu);
   const principais = menu.slice(0, 4);
 
@@ -137,7 +140,7 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
             <span className="casca-topo-celular-nome">{portal}</span>
             {leitor && <Selo cor="azul">Somente leitura</Selo>}
             <div className="casca-topo-celular-acoes">
-              {!leitor && <SeletorPerfil />}
+              <SeletorPerfil />
               <BotaoAtualizar />
               <Notificacoes raiz={raizPortal} />
               <BotaoTema />
@@ -164,7 +167,7 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
               <Busca telas={telas} />
               {leitor && <Selo cor="azul">Somente leitura</Selo>}
               <div className="casca-topo-acoes">
-                {!leitor && <SeletorPerfil />}
+                <SeletorPerfil />
                 <BotaoAtualizar />
                 <BotaoCelular />
                 <Notificacoes raiz={raizPortal} />

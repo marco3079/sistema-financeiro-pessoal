@@ -103,3 +103,9 @@
   margin: 0.35rem 0.25rem;
   background: var(--cor-borda);
 }
+
+/* Perfil com senha: cadeado pequeno ao lado do nome. */
+.seletor-perfil-cadeado {
+  display: inline-flex;
+  color: var(--cor-texto-suave);
+}

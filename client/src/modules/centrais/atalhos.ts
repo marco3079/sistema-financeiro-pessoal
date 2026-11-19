@@ -1,3 +1,4 @@
+import type { NivelPerfil } from '../../lib/perfilFinanceiro';
 import type { Perfil } from '../../lib/tipos';
 
 export interface Atalho {
@@ -6,32 +7,33 @@ export interface Atalho {
   texto: string; // uma linha de explicação
 }
 
-// Cópia do filtro de App.tsx (CAMINHOS_SO_TITULAR): telas que o LEITOR não abre.
+// Cópia do filtro de App.tsx (CAMINHOS_SO_TITULAR e CAMINHOS_DE_EDICAO): telas que o membro não abre.
 // Se a lista mudar lá, mude aqui também.
 const CAMINHOS_SO_TITULAR = [
   '/app/usuarios',
   '/app/configuracoes',
   '/app/logs',
   '/app/atividades',
-  '/app/perfis',
   '/app/ia',
   '/app/drive',
   '/app/atualizacao',
-  '/app/seguranca',
   '/app/entrada',
-  '/app/importar',
-  '/app/rapido',
-  '/app/regras',
   '/app/automacoes',
   '/app/cupom',
   '/app/avisos',
   '/app/conexoes',
 ];
+const CAMINHOS_DE_EDICAO = ['/app/importar', '/app/rapido', '/app/regras'];
 
-// Uma central só mostra atalho para tela que o perfil pode abrir.
-export function atalhoLiberado(caminho: string, perfil: Perfil): boolean {
+function casa(caminho: string, lista: string[]): boolean {
+  return lista.some((c) => caminho === c || caminho.startsWith(c + '/'));
+}
+
+// Uma central só mostra atalho para tela que o usuário pode abrir (nível do membro no perfil em uso).
+export function atalhoLiberado(caminho: string, perfil: Perfil, nivel: NivelPerfil | null = null): boolean {
   if (perfil === 'TITULAR') return true;
-  return !CAMINHOS_SO_TITULAR.some((c) => caminho === c || caminho.startsWith(c + '/'));
+  if (casa(caminho, CAMINHOS_SO_TITULAR)) return false;
+  return nivel === 'EDICAO' || !casa(caminho, CAMINHOS_DE_EDICAO);
 }
 
 export const ATALHOS_INVESTIMENTOS: Atalho[] = [

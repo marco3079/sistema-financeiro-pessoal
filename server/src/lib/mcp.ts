@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prismaSemPerfil as db } from './prisma';
 import { segredoDoServidor } from './auth';
-import { idsDosPerfis } from './perfil';
+import { gerarDesbloqueio, idsDosPerfis } from './perfil';
 
 export const VERSOES_DO_PROTOCOLO = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const LIMITE_DE_TEXTO = 60000;
@@ -52,10 +52,18 @@ export async function buscarChave(chave: string): Promise<ChaveAtiva | null> {
 
 class ErroDaFerramenta extends Error {}
 
-async function tokenInterno(): Promise<string> {
+// Login interno de 2 minutos e, se o perfil da chave tiver senha, o desbloqueio dele: a chave já é de um perfil só
+// e foi criada por um titular, então não pede a senha do perfil.
+async function cabecalhosInternos(perfilId: number): Promise<Record<string, string>> {
   const usuario = await db.usuario.findFirst({ where: { ativo: true, perfil: 'TITULAR' }, orderBy: { id: 'asc' }, select: { id: true, perfil: true } });
   if (!usuario) throw new ErroDaFerramenta('Nenhum usuário ativo no sistema.');
-  return jwt.sign({ id: usuario.id, perfil: usuario.perfil }, segredoDoServidor(), { expiresIn: '2m' });
+  const token = jwt.sign({ id: usuario.id, perfil: usuario.perfil }, segredoDoServidor(), { expiresIn: '2m' });
+  const desbloqueio = gerarDesbloqueio({ id: usuario.id, perfil: usuario.perfil, expira: Math.floor(Date.now() / 1000) + 120 }, perfilId);
+  return {
+    Authorization: `Bearer ${token}`,
+    'X-Perfil': String(perfilId),
+    ...(desbloqueio ? { 'X-Perfil-Desbloqueio': desbloqueio } : {}),
+  };
 }
 
 async function api(chave: ChaveAtiva, metodo: 'GET' | 'POST' | 'PUT', caminho: string, corpo?: unknown): Promise<unknown> {
@@ -63,8 +71,7 @@ async function api(chave: ChaveAtiva, metodo: 'GET' | 'POST' | 'PUT', caminho: s
   const resposta = await fetch(`http://127.0.0.1:${porta}/api${caminho}`, {
     method: metodo,
     headers: {
-      Authorization: `Bearer ${await tokenInterno()}`,
-      'X-Perfil': String(chave.perfilId),
+      ...(await cabecalhosInternos(chave.perfilId)),
       'User-Agent': `MCP (${chave.nome.slice(0, 40)})`,
       ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },

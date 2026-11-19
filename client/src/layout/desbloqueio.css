@@ -1,0 +1,116 @@
+/* Tela de senha do perfil financeiro. Classes com prefixo desbloqueio-. Cores só por variáveis de estilo.css. */
+
+.desbloqueio {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.desbloqueio-tema {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.desbloqueio-cartao {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.desbloqueio-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  font-weight: 600;
+}
+
+.desbloqueio-marca img {
+  border-radius: 22%;
+  object-fit: contain;
+}
+
+.desbloqueio-icone {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  margin-bottom: 0.75rem;
+}
+
+.desbloqueio-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  font-size: 1.35rem;
+}
+
+.desbloqueio-apoio {
+  margin: 0 0 1rem;
+  color: var(--cor-texto-suave);
+}
+
+.desbloqueio-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.desbloqueio-outros {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.desbloqueio-outros-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.desbloqueio-outro {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: var(--altura-toque);
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: var(--raio-pequeno);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desbloqueio-outro span {
+  flex: 1;
+}
+
+.desbloqueio-outro:hover,
+.desbloqueio-outro:focus-visible {
+  background: var(--cor-primaria-suave);
+}
+
+.desbloqueio-conta {
+  margin: 1.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}

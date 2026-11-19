@@ -20,8 +20,14 @@ datasource db {
 
 // Perfil único: o titular das finanças (e quem ele convidar) vê e altera tudo.
 enum Perfil {
-  TITULAR
-  LEITOR // só consulta
+  TITULAR // administrador: vê e gerencia todos os perfis financeiros
+  LEITOR // membro: só os perfis liberados em AcessoPerfil, com o nível de cada um
+}
+
+// Nível do membro (LEITOR) em um perfil financeiro.
+enum NivelAcesso {
+  LEITURA // só consulta
+  EDICAO // consulta e altera os dados; também gerencia os acessos e a senha do perfil
 }
 
 enum Origem {
@@ -88,7 +94,7 @@ model Usuario {
   totpAtivo          Boolean  @default(false)
   totpSegredoCifrado String? // segredo base32 cifrado (lib/cripto)
   totpRecuperacao    String? // JSON com os hashes sha256 dos códigos de recuperação ainda não usados
-  // Usuário LEITOR: só enxerga este perfil financeiro (null = todos).
+  // Vínculo antigo do LEITOR (um perfil só). Passado para AcessoPerfil na primeira consulta; não use mais.
   perfilFinanceiroId Int?
   perfil             Perfil   @default(TITULAR)
   ativo              Boolean  @default(true)
@@ -96,6 +102,21 @@ model Usuario {
   telefone           String?
   foto               String? // endereço http(s) ou data URL (imagem reduzida enviada pelo usuário)
   criadoEm           DateTime @default(now())
+
+  acessos AcessoPerfil[]
+}
+
+// Perfis financeiros que um membro (LEITOR) acessa e com que nível. Titulares acessam todos e não aparecem aqui.
+model AcessoPerfil {
+  usuarioId          Int
+  perfilFinanceiroId Int
+  nivel              NivelAcesso      @default(LEITURA)
+  criadoEm           DateTime         @default(now())
+  usuario            Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  perfilFinanceiro   PerfilFinanceiro @relation(fields: [perfilFinanceiroId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, perfilFinanceiroId])
+  @@index([perfilFinanceiroId])
 }
 
 // ---------- Open Finance (Pluggy) ----------
@@ -417,6 +438,10 @@ model PerfilFinanceiro {
   pluggyClientId            String?
   pluggyClientSecretCifrado String?
   pluggySandbox             Boolean @default(false)
+  // Senha opcional do perfil (bcrypt). Com ela, todo usuário precisa desbloquear o perfil uma vez por login.
+  senhaHash String?
+
+  acessos AcessoPerfil[]
 }
 
 // ===== Índices de referência (Selic, IPCA, Ibovespa, IFIX) =====
