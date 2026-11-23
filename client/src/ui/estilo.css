@@ -514,10 +514,11 @@ textarea.campo-controle {
 }
 
 /* ===== Abas ===== */
+/* No computador as abas quebram de linha quando não cabem (sem barra de rolagem); no celular rolam de lado. */
 .abas {
   display: flex;
-  gap: 0.4rem;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4rem;
   margin-bottom: 1rem;
   max-width: 100%;
 }
@@ -993,6 +994,8 @@ textarea.campo-controle {
 
   /* Abas como "chips" que rolam de lado, sem barra de rolagem e com encaixe. */
   .abas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 0.5rem;
     scroll-snap-type: x proximity;
     scrollbar-width: none;

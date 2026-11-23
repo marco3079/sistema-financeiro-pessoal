@@ -154,3 +154,27 @@ p.notif-suave {
   font-size: 1.3rem;
   cursor: pointer;
 }
+
+/* Botão de teste no painel do sino. */
+.notif-teste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.notif-teste-ok,
+.notif-teste-erro {
+  margin: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.notif-teste-ok {
+  color: var(--cor-verde);
+}
+
+.notif-teste-erro {
+  color: var(--cor-perigo);
+}

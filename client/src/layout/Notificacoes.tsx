@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TesteNotificacao } from './TesteNotificacao';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDados } from '../lib/useDados';
 import { Icone } from '../ui/icones';
@@ -116,6 +117,7 @@ export function Notificacoes({ raiz }: { raiz: string }) {
               </li>
             ))}
           </ul>
+          <TesteNotificacao />
         </div>
       )}
     </div>

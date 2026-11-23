@@ -929,3 +929,15 @@
 .casca-inferior-destaque:active .casca-inferior-mais {
   transform: scale(0.95);
 }
+
+/* No celular o sino não é o último botão do topo: o painel de avisos ocupa a largura da tela em vez de sair pela borda. */
+.casca-celular .casca-painel-avisos {
+  position: fixed;
+  top: 3.75rem;
+  left: 1rem;
+  right: 1rem;
+  width: auto;
+  max-width: none;
+  max-height: calc(100dvh - 9rem);
+  overflow-y: auto;
+}
