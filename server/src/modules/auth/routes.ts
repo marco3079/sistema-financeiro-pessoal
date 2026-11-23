@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler, HttpError, validar } from '../../lib/erros';
 import { gerarToken, UsuarioToken } from '../../lib/auth';
+import { avisarNovoAcesso } from '../../lib/notificacoes';
 import { registrarLog } from '../../lib/log';
 import { emailHabilitado, enderecoDoSite, enfileirarEmail, lerConfiguracao } from '../../lib/email';
 import { consultarTokenSenha, consumirTokenSenha, criarTokenSenha } from '../../lib/tokens-senha';
@@ -200,6 +201,7 @@ publico.post(
       ip: contexto.ip,
       navegador: contexto.navegador,
     });
+    avisarNovoAcesso(dados.id, contexto.navegador ?? null);
     res.json({ token, usuario: dados });
   })
 );

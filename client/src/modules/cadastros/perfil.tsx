@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { api } from '../../lib/api';
 import { useDados } from '../../lib/useDados';
 import { Abas, Aviso, Avatar, Botao, Campo, Carregando, Cartao, Pagina, formatarData } from '../../ui';
+import { CartaoNotificacoes } from './CartaoNotificacoes';
 import { Icone } from '../../ui/icones';
 import type { NomeIcone } from '../../ui/icones';
 import { useTema } from '../../lib/tema';
@@ -364,6 +365,8 @@ function DadosESeguranca({
         </Cartao>
 
         <CartaoDuasEtapas />
+
+        <CartaoNotificacoes />
 
         <CartaoAparencia />
       </div>

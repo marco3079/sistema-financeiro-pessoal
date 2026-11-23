@@ -15,6 +15,7 @@ import { FichaAtivoProvider } from './FichaAtivo';
 import { agrupar } from './grupos';
 import { MenuUsuario } from './MenuUsuario';
 import { Notificacoes } from './Notificacoes';
+import { ConviteNotificacoes } from './ConviteNotificacoes';
 import { SeletorPerfil } from './SeletorPerfil';
 import { Selo } from '../ui';
 import './casca.css';
@@ -221,6 +222,7 @@ export function Layout({ menu, telas }: { menu: RotaModulo[]; telas: RotaModulo[
             </header>
           )}
           {/* Clicar no código de um ativo, em qualquer tela, abre a ficha dele. */}
+          <ConviteNotificacoes />
           <FichaAtivoProvider>
             <Outlet />
           </FichaAtivoProvider>

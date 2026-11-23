@@ -674,6 +674,10 @@ model ConfiguracaoPlataforma {
   avisosEmail           String? // e-mail que recebe os avisos
   avisosAtivos          Boolean @default(false)
 
+  // Notificações no celular (Web Push): par de chaves VAPID do servidor, gerado no primeiro uso.
+  vapidPublica        String?
+  vapidPrivadaCifrada String? // AES-256-GCM; nunca sai pela API
+
   atualizadoEm DateTime @updatedAt
 }
 
@@ -729,4 +733,39 @@ model ConfigIrpf {
 
   @@unique([perfilId, ano])
   @@index([perfilId])
+}
+
+// ---------- Notificações no celular (Web Push) ----------
+
+// Um aparelho (navegador) inscrito para receber notificações de um usuário.
+model InscricaoPush {
+  id        Int       @id @default(autoincrement())
+  usuarioId Int
+  endpoint  String    @unique
+  p256dh    String
+  auth      String
+  aparelho  String? // descrição curta do navegador, para a pessoa reconhecer o aparelho
+  criadoEm  DateTime  @default(now())
+  usadoEm   DateTime?
+
+  @@index([usuarioId])
+}
+
+// Preferências de notificação de cada usuário. Sem linha = tudo ligado e sem horário de silêncio.
+model PreferenciaNotificacao {
+  usuarioId      Int     @id
+  desligados     String  @default("") // tipos desligados, separados por vírgula (ver lib/notificacoes.ts)
+  silencioAtivo  Boolean @default(false)
+  silencioInicio Int     @default(22) // hora (0-23): dentro do intervalo as notificações chegam sem som
+  silencioFim    Int     @default(7)
+}
+
+// Cada notificação já gerada para um perfil financeiro: a mesma chave não sai duas vezes.
+model NotificacaoEnviada {
+  id        Int      @id @default(autoincrement())
+  perfilId  Int
+  chave     String
+  enviadaEm DateTime @default(now())
+
+  @@unique([perfilId, chave])
 }
