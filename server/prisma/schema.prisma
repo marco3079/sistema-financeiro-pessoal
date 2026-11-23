@@ -200,6 +200,10 @@ model Categoria {
   // Reforma tributária: como os gastos desta categoria são tributados pela CBS/IBS (lib/reformaTributaria).
   // null = o sistema escolhe pelo nome da categoria.
   tratamentoTributario String?
+  // Área Impostos: tipo de gasto para estimar os tributos de hoje (lib/impostos) e a alíquota escolhida pela pessoa
+  // (% do preço final). null = o sistema escolhe pelo nome / usa a alíquota média do tipo.
+  tipoImposto          String?
+  aliquotaImposto      Decimal? @db.Decimal(5, 2)
 
   transacoes Transacao[]
   orcamento  Orcamento?

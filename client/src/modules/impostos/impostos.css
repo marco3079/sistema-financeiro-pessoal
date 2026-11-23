@@ -1,0 +1,373 @@
+/* Área Impostos: só variáveis de cor de estilo.css; cores de categoria e tributo entram por style. */
+
+.imp-ano .campo {
+  margin: 0;
+  min-width: 7rem;
+}
+
+.imp-abas .abas {
+  white-space: nowrap;
+}
+
+.imp-periodo {
+  margin: -0.25rem 0 0.75rem;
+}
+
+.imp-grade-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.imp-grade-2 > .cartao {
+  margin: 0;
+}
+
+.resumo + .imp-grade-2,
+.imp-grade-2 + .cartao,
+.resumo + .cartao,
+.cartao + .cartao {
+  margin-top: 1rem;
+}
+
+.imp-nota {
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 1rem 0 0;
+}
+
+.imp-nota .selo {
+  margin-right: 0.25rem;
+}
+
+.imp-ponto {
+  display: inline-block;
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+}
+
+.imp-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.imp-link {
+  margin-top: 0.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cor-primaria);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.imp-link:hover {
+  text-decoration: underline;
+}
+
+/* Direto x indireto */
+.imp-barra-dupla {
+  display: flex;
+  height: 0.9rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--cor-superficie-2);
+  margin-bottom: 0.75rem;
+}
+
+.imp-pares {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.imp-pares > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.imp-pares > div:last-child {
+  border-bottom: none;
+}
+
+.imp-pares dt {
+  color: var(--cor-texto-suave);
+}
+
+.imp-pares dd {
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Ranking de categorias */
+.imp-ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.imp-ranking li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem 0.75rem;
+}
+
+.imp-ranking-nome {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.imp-ranking-valor {
+  font-weight: 600;
+}
+
+.imp-ranking-barra {
+  grid-column: 1 / -1;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  overflow: hidden;
+}
+
+.imp-ranking-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+/* Glossário dos tributos */
+.imp-glossario {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.imp-glossario li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+/* Tabela editável */
+.imp-select {
+  min-width: 13rem;
+  max-width: 100%;
+}
+
+.imp-aliquota {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.imp-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.imp-pior {
+  color: var(--cor-perigo);
+}
+
+.imp-melhor {
+  color: var(--cor-sucesso);
+}
+
+.imp-valor-celular {
+  white-space: nowrap;
+}
+
+/* Dias trabalhados */
+.imp-dias {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.imp-dias p {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.imp-dias-numero {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 50%;
+  background: var(--cor-laranja-suave);
+  color: var(--cor-laranja);
+}
+
+.imp-dias-numero strong {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.imp-linha-ano {
+  position: relative;
+  height: 1rem;
+  margin-top: 1.25rem;
+  border-radius: 999px;
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+}
+
+.imp-linha-ano-voce {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--cor-laranja);
+}
+
+.imp-linha-ano-marca {
+  position: absolute;
+  top: -0.35rem;
+  bottom: -0.35rem;
+  width: 2px;
+  background: var(--cor-texto);
+}
+
+.imp-linha-ano-legenda {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  text-align: center;
+}
+
+/* Calendário */
+.imp-calendario {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.imp-calendario h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+.imp-calendario ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.imp-evento {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  background: var(--cor-superficie);
+}
+
+.imp-evento-passado {
+  opacity: 0.6;
+}
+
+.imp-evento-dia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  border: 2px solid;
+  font-weight: 700;
+}
+
+.imp-evento-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.imp-evento-valor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .imp-dias {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .imp-dias-numero {
+    width: 6rem;
+    height: 6rem;
+  }
+
+  .imp-evento {
+    grid-template-columns: auto 1fr;
+  }
+
+  .imp-evento-valor {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .imp-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .imp-linha-ano-legenda span:nth-child(2) {
+    flex: 1;
+  }
+}
+
+.imp-composicao {
+  display: flex;
+  width: 8rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--cor-superficie-2);
+}
+
+.imp-select {
+  min-width: 11rem;
+}
