@@ -5,7 +5,7 @@ import { usePodeEditar } from '../lib/acessoPerfil';
 import { useAuth } from '../lib/auth';
 import { formatarDia, formatarReais, hojeISO, mesAtual } from '../lib/financas';
 import { useDados } from '../lib/useDados';
-import { Aviso, Carregando } from '../ui';
+import { Aviso, Carregando, Escolha } from '../ui';
 import { Icone } from '../ui/icones';
 import type { NomeIcone } from '../ui/icones';
 import { GraficoLinha } from './GraficoLinha';
@@ -375,19 +375,14 @@ export function Painel() {
             <header className="painel-cartao-cabecalho">
               <Icone nome="grafico" tamanho={20} className="painel-cartao-icone" />
               <h2 className="painel-cartao-titulo">Patrimônio por Mês</h2>
-              <select
+              <Escolha
                 className="painel-seletor"
-                aria-label="Período do gráfico"
-                value={periodo}
-                disabled={!dados}
-                onChange={(e) => setPeriodo(Number(e.target.value))}
-              >
-                {PERIODOS.map((p) => (
-                  <option key={p.valor} value={p.valor}>
-                    {p.rotulo}
-                  </option>
-                ))}
-              </select>
+                rotuloAcessivel="Período do gráfico"
+                valor={String(periodo)}
+                desabilitado={!dados}
+                aoMudar={(v) => setPeriodo(Number(v))}
+                opcoes={PERIODOS.map((p) => ({ valor: String(p.valor), rotulo: p.rotulo }))}
+              />
             </header>
             {resumo.carregando && !dados && <Carregando />}
             {dados &&

@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import './estilo.css';
+import { Escolha } from './escolha';
+
+export { Escolha, FolhaDeBaixo, useCelular } from './escolha';
+export type { OpcaoEscolha } from './escolha';
 
 // ---------- Formatação ----------
 
@@ -147,7 +151,10 @@ export function Aviso({
 export function Carregando() {
   return (
     <div className="carregando" role="status" aria-live="polite">
-      Carregando...
+      <span className="tabela-oculto-visual">Carregando...</span>
+      <span className="esqueleto esqueleto-1" aria-hidden="true" />
+      <span className="esqueleto esqueleto-2" aria-hidden="true" />
+      <span className="esqueleto esqueleto-3" aria-hidden="true" />
     </div>
   );
 }
@@ -193,7 +200,20 @@ export function Tabela<T>({
   itemCelular?: (item: T) => ReactNode;
 }) {
   if (dados.length === 0) {
-    return <p className="tabela-vazia">{vazio ?? 'Nenhum registro encontrado.'}</p>;
+    return (
+      <p className="tabela-vazia">
+        <svg className="tabela-vazia-icone" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M4 13h4l1.5 2.5h5L16 13h4M5.5 6h13L21 13v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span>{vazio ?? 'Nenhum registro encontrado.'}</span>
+      </p>
+    );
   }
 
   // No cartão, a coluna de ações vai para o fim e aparece sem rótulo.
@@ -430,19 +450,14 @@ export function Selecao({
         {rotulo}
         {obrigatorio && ' *'}
       </span>
-      <select
-        className="campo-controle"
-        value={valor}
-        required={obrigatorio}
-        onChange={(e) => aoMudar(e.target.value)}
-      >
-        <option value="">{vazio ?? 'Selecione'}</option>
-        {opcoes.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.rotulo}
-          </option>
-        ))}
-      </select>
+      <Escolha
+        valor={valor}
+        aoMudar={aoMudar}
+        opcoes={opcoes}
+        vazio={vazio ?? 'Selecione'}
+        titulo={rotulo}
+        obrigatorio={obrigatorio}
+      />
     </label>
   );
 }
@@ -510,8 +525,18 @@ export function Abas({
   ativa: string;
   aoMudar: (id: string) => void;
 }) {
+  // Mantém a aba escolhida visível quando as abas rolam de lado (celular), sem mexer na rolagem da página.
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const n = nav.current;
+    const el = n?.querySelector<HTMLElement>('.aba-ativa');
+    if (!n || !el || n.scrollWidth <= n.clientWidth) return;
+    const alvo = el.offsetLeft - (n.clientWidth - el.offsetWidth) / 2;
+    n.scrollTo({ left: Math.max(0, alvo), behavior: 'smooth' });
+  }, [ativa]);
+
   return (
-    <nav className="abas" role="tablist">
+    <nav className="abas" role="tablist" ref={nav}>
       {abas.map((a) => (
         <button
           key={a.id}

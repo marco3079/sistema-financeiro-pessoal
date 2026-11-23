@@ -1186,3 +1186,222 @@ textarea.campo-controle {
     grid-column: 1 / -1;
   }
 }
+
+/* =====================================================================
+ * Mais cara de aplicativo (vale para todos; o que é só do celular está no @media)
+ * ===================================================================== */
+
+/* Sem o "flash" azul do toque e com resposta visual ao apertar. */
+button,
+a,
+.clicavel {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.botao {
+  transition: transform 0.08s ease, background 0.15s, box-shadow 0.15s;
+}
+
+.botao:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Abas: referência para calcular a rolagem até a aba ativa. */
+.abas {
+  position: relative;
+}
+
+/* Carregando: barras "esqueleto" que pulsam no lugar do conteúdo. */
+.carregando {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 0;
+  text-align: left;
+}
+
+.esqueleto {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--cor-superficie-2) 0%,
+    color-mix(in srgb, var(--cor-borda) 80%, var(--cor-superficie)) 50%,
+    var(--cor-superficie-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: esqueleto-brilho 1.2s ease-in-out infinite;
+}
+
+.esqueleto-1 {
+  width: 70%;
+  height: 18px;
+}
+
+.esqueleto-2 {
+  width: 92%;
+}
+
+.esqueleto-3 {
+  width: 55%;
+}
+
+@keyframes esqueleto-brilho {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto {
+    animation: none;
+  }
+}
+
+/* Estado vazio: ícone e texto centralizados. */
+.tabela-vazia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.tabela-vazia-icone {
+  color: var(--cor-borda);
+}
+
+/* Ações dos menus de três pontos e dos perfis dentro da folha de baixo (celular). */
+.acoes-folha,
+.seletor-perfil-folha {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.5rem 0.75rem;
+  overflow-y: auto;
+}
+
+.acoes-folha-item {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.acoes-folha-item svg {
+  flex: none;
+  color: var(--cor-primaria);
+}
+
+.acoes-folha-item:active {
+  background: var(--cor-superficie-2);
+}
+
+.acoes-folha-item.acoes-item-perigo,
+.acoes-folha-item.acoes-item-perigo svg {
+  color: var(--cor-perigo);
+}
+
+.seletor-perfil-folha .seletor-perfil-item {
+  min-height: 52px;
+  font-size: 1rem;
+}
+
+@media (max-width: 719px) {
+  /* Cabeçalho compacto: título e ações curtas na mesma linha; ações longas descem inteiras. */
+  .pagina-cabecalho {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 0.75rem;
+  }
+
+  .pagina-cabecalho h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .pagina-acoes {
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
+
+  /* Modal vira folha de baixo: cantos arredondados no alto, sobe do pé da tela. */
+  .modal-fundo {
+    align-items: flex-end;
+    background: rgba(2, 6, 23, 0.55);
+  }
+
+  .modal {
+    height: auto;
+    max-height: 94dvh;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 40px rgba(2, 6, 23, 0.35);
+    animation: folha-sobe 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .modal-cabecalho {
+    border-radius: 20px 20px 0 0;
+    padding-top: 1.1rem;
+  }
+
+  /* Alça da folha, acima do título. */
+  .modal-cabecalho::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    margin-left: -20px;
+    border-radius: 999px;
+    background: var(--cor-borda);
+  }
+
+  .modal-fechar {
+    border-color: transparent;
+    background: var(--cor-superficie-2);
+    border-radius: 50%;
+  }
+
+  /* Botões de salvar/cancelar no fim do formulário: largos, fáceis de alcançar. */
+  .modal-corpo form > .pagina-acoes:last-child,
+  .modal-corpo > .pagina-acoes:last-child {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 0.75rem 0 calc(0.25rem + env(safe-area-inset-bottom));
+    background: var(--cor-superficie);
+  }
+
+  .modal-corpo form > .pagina-acoes:last-child .botao,
+  .modal-corpo > .pagina-acoes:last-child .botao {
+    flex: 1 1 0;
+  }
+
+  .tabela-vazia {
+    padding: 2rem 1rem;
+    border: 1px dashed var(--cor-borda);
+    border-radius: var(--raio);
+  }
+}
+
+@media (max-width: 719px) and (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+  }
+}

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatarReais } from '../lib/financas';
 import { useAcessoPerfil } from '../lib/acessoPerfil';
 import { trocarDePerfil } from '../lib/perfilFinanceiro';
 import { PontoCor } from '../ui/financas';
 import { Icone } from '../ui/icones';
+import { FolhaDeBaixo, useCelular } from '../ui/escolha';
 import './seletor-perfil.css';
 
 // Seletor de perfil financeiro no topo: mostra o perfil atual e troca de perfil pelo menu suspenso.
@@ -14,10 +16,12 @@ export function SeletorPerfil() {
   const [aberto, setAberto] = useState(false);
   const area = useRef<HTMLDivElement>(null);
   const botao = useRef<HTMLButtonElement>(null);
+  // No celular a lista de perfis abre numa folha de baixo.
+  const celular = useCelular();
 
   // Clique fora e Esc fecham o menu (mesmo padrão de MenuUsuario).
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto || celular) return;
     function fora(e: MouseEvent) {
       if (area.current && !area.current.contains(e.target as Node)) setAberto(false);
     }
@@ -33,7 +37,7 @@ export function SeletorPerfil() {
       document.removeEventListener('mousedown', fora);
       document.removeEventListener('keydown', tecla);
     };
-  }, [aberto]);
+  }, [aberto, celular]);
 
   if (!dados) return null;
   const atual = dados.find((p) => p.atual) ?? dados[0];
@@ -62,7 +66,7 @@ export function SeletorPerfil() {
       </button>
 
       {aberto && (
-        <div className="seletor-perfil-menu" role="menu" aria-label="Perfis financeiros">
+        <MenuOuFolha celular={celular} aoFechar={() => setAberto(false)}>
           {dados.map((p) => (
             <button
               key={p.id}
@@ -95,8 +99,34 @@ export function SeletorPerfil() {
             <Icone nome="usuarios" tamanho={18} />
             <span className="seletor-perfil-item-nome">Gerenciar perfis</span>
           </button>
-        </div>
+        </MenuOuFolha>
       )}
     </div>
+  );
+}
+
+// Computador: menu suspenso abaixo do botão. Celular: a mesma lista numa folha de baixo.
+function MenuOuFolha({
+  celular,
+  aoFechar,
+  children,
+}: {
+  celular: boolean;
+  aoFechar: () => void;
+  children: ReactNode;
+}) {
+  if (!celular) {
+    return (
+      <div className="seletor-perfil-menu" role="menu" aria-label="Perfis financeiros">
+        {children}
+      </div>
+    );
+  }
+  return (
+    <FolhaDeBaixo aberta titulo="Perfis financeiros" aoFechar={aoFechar}>
+      <div className="seletor-perfil-folha" role="menu" aria-label="Perfis financeiros">
+        {children}
+      </div>
+    </FolhaDeBaixo>
   );
 }

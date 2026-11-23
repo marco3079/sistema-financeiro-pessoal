@@ -1,0 +1,290 @@
+/* ===== Seletores: mesma cara em todo aparelho e nos dois temas ===== */
+
+/* Seta própria (a do sistema muda de aparelho para aparelho e some no tema escuro do Windows). */
+select,
+.escolha-botao {
+  -webkit-appearance: none;
+  appearance: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* Especificidade maior de propósito: vários campos usam o atalho `background:`, que apagaria a seta. */
+select[class],
+select:not([class]),
+.escolha-botao.escolha-botao {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 16px 16px;
+  padding-right: 2.2rem;
+}
+
+select:disabled,
+.escolha-botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Lista aberta do <select> no computador: cores do tema (no escuro vinha branca). */
+select option {
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+/* Botão do celular com a mesma aparência do campo. */
+.escolha {
+  position: relative;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.escolha-botao {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  line-height: 1.25;
+}
+
+.escolha-botao:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+.escolha-texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.escolha-texto-vazio {
+  color: var(--cor-texto-suave);
+}
+
+/* <select> escondido só para a validação de "obrigatório" (o aviso do navegador aparece sobre o botão). */
+.escolha-nativa-oculta {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===== Folha de baixo (bottom sheet) ===== */
+.folha-fundo {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.55);
+  animation: folha-fundo-entra 0.18s ease-out;
+}
+
+.folha {
+  width: 100%;
+  max-width: 560px;
+  max-height: min(80dvh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -12px 40px rgba(2, 6, 23, 0.35);
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: folha-sobe 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.folha-alca {
+  width: 40px;
+  height: 4px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: var(--cor-borda);
+  flex: none;
+}
+
+.folha-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+  flex: none;
+}
+
+.folha-cabecalho h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folha-fechar {
+  min-height: var(--altura-toque);
+  padding: 0 0.9rem;
+  border: 0;
+  background: transparent;
+  color: var(--cor-primaria);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  flex: none;
+}
+
+.folha-corpo {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.folha-busca {
+  margin: 0 1rem 0.5rem;
+  width: auto;
+}
+
+.folha-opcoes {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.5rem 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.folha-opcao {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folha-opcao:active,
+.folha-opcao:hover {
+  background: var(--cor-superficie-2);
+}
+
+.folha-opcao:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: -2px;
+}
+
+.folha-opcao-marcada {
+  background: var(--cor-primaria-suave);
+  color: var(--cor-primaria);
+  font-weight: 600;
+}
+
+.folha-opcao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Nomes longos (ex.: nome completo do banco) quebram em até duas linhas em vez de sumir. */
+.folha-opcao-rotulo {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.folha-opcao-vazia {
+  color: var(--cor-texto-suave);
+}
+
+.folha-opcao-marcada .folha-opcao-vazia {
+  color: inherit;
+}
+
+.folha-opcao-detalhe {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  font-weight: 400;
+}
+
+.folha-opcao-visto {
+  flex: none;
+}
+
+.folha-nada {
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--cor-texto-suave);
+}
+
+@keyframes folha-sobe {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes folha-fundo-entra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folha,
+  .folha-fundo {
+    animation: none;
+  }
+}
+
+/* Garante o espaço da seta mesmo quando a classe do campo define outro padding. */
+select[class].painel-seletor,
+.escolha-botao.painel-seletor {
+  padding-right: 2rem;
+  background-position: right 0.6rem center;
+}
+
+/* Cartão da tabela no celular: campo de escolha ocupa a linha inteira, embaixo do rótulo. */
+@media (max-width: 719px) {
+  .tabela-par:has(> .tabela-par-valor > .escolha) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  .tabela-par:has(> .tabela-par-valor > .escolha) .tabela-par-titulo {
+    max-width: none;
+  }
+
+  .tabela-par-valor > .escolha .escolha-botao {
+    min-width: 0;
+    width: 100%;
+  }
+}

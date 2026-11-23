@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { mensagemErro } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
-import { Abas, Aviso, Botao, Campo, Cartao, Carregando, Pagina, Selecao, Tabela, formatarMoeda } from '../../ui';
+import { Abas, Aviso, Botao, Campo, Cartao, Carregando, Escolha, Pagina, Selecao, Tabela, formatarMoeda } from '../../ui';
 import './tributos.css';
 
 // Reforma Tributária do Consumo (CBS, IBS e Imposto Seletivo): quanto dos seus gastos vira esses tributos e um
@@ -157,18 +157,14 @@ function SeusGastos({ aliquotas }: { aliquotas: AliquotasDTO }) {
                     l.categoriaId === null ? (
                       <span className="fin-suave">Alíquota cheia</span>
                     ) : (
-                      <select
+                      <Escolha
                         className="campo-controle trib-select"
-                        value={l.tratamento}
-                        aria-label={`Tratamento de ${l.nome}`}
-                        onChange={(e) => void trocarTratamento(l, e.target.value)}
-                      >
-                        {aliquotas.tratamentos.map((t) => (
-                          <option key={t.id} value={t.id} title={t.exemplo}>
-                            {t.rotulo}
-                          </option>
-                        ))}
-                      </select>
+                        valor={l.tratamento}
+                        rotuloAcessivel={`Tratamento de ${l.nome}`}
+                        titulo={`Tratamento na reforma: ${l.nome}`}
+                        aoMudar={(v) => void trocarTratamento(l, v)}
+                        opcoes={aliquotas.tratamentos.map((t) => ({ valor: t.id, rotulo: t.rotulo, detalhe: t.exemplo }))}
+                      />
                     ),
                 },
                 { titulo: 'Alíquota', alinhar: 'direita', celula: (l) => pct(l.aliquotaEfetiva) },

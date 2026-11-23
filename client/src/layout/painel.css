@@ -305,9 +305,15 @@
   text-decoration: underline;
 }
 
-.painel-seletor {
+.painel-seletor,
+.painel-cartao-cabecalho > .escolha {
   margin-left: auto;
-  padding: 6px 12px;
+}
+
+.painel-seletor {
+  min-height: 36px;
+  padding: 6px 2rem 6px 12px;
+  background-position: right 0.6rem center;
   font: inherit;
   font-size: 0.85rem;
   color: var(--cor-texto);

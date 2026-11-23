@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Icone } from '../../ui/icones';
+import { FolhaDeBaixo, useCelular } from '../../ui/escolha';
 import './fichas.css';
 import type { NomeIcone } from '../../ui/icones';
 
@@ -19,10 +20,12 @@ export function MenuAcoes({ acoes, rotulo }: { acoes: AcaoMenu[]; rotulo: string
   const area = useRef<HTMLDivElement>(null);
   const botao = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  // No celular as ações abrem numa folha de baixo (alvo grande, ao alcance do polegar).
+  const celular = useCelular();
 
   // Posiciona o menu logo após abrir (antes de pintar): embaixo do botão, ou em cima se faltar espaço.
   useLayoutEffect(() => {
-    if (!aberto || !botao.current || !menu.current) return;
+    if (celular || !aberto || !botao.current || !menu.current) return;
     const r = botao.current.getBoundingClientRect();
     const altura = menu.current.offsetHeight;
     const largura = document.documentElement.clientWidth;
@@ -31,7 +34,7 @@ export function MenuAcoes({ acoes, rotulo }: { acoes: AcaoMenu[]; rotulo: string
     const top = cabe ? r.bottom + espaco : Math.max(8, r.top - espaco - altura);
     const right = Math.max(8, largura - r.right);
     setPosicao({ top, right });
-  }, [aberto]);
+  }, [aberto, celular]);
 
   // Foco no primeiro item ao abrir.
   useEffect(() => {
@@ -41,7 +44,7 @@ export function MenuAcoes({ acoes, rotulo }: { acoes: AcaoMenu[]; rotulo: string
 
   // Fecha com clique fora, Escape, rolagem ou redimensionamento; listeners só enquanto aberto.
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto || celular) return;
 
     function fechar(devolverFoco: boolean) {
       setAberto(false);
@@ -67,7 +70,7 @@ export function MenuAcoes({ acoes, rotulo }: { acoes: AcaoMenu[]; rotulo: string
       window.removeEventListener('scroll', mudouTela, true);
       window.removeEventListener('resize', mudouTela);
     };
-  }, [aberto]);
+  }, [aberto, celular]);
 
   // Setas sobem e descem entre os itens; Tab fecha o menu e devolve o foco ao botão.
   function teclasDoMenu(e: ReactKeyboardEvent<HTMLDivElement>) {
@@ -109,7 +112,33 @@ export function MenuAcoes({ acoes, rotulo }: { acoes: AcaoMenu[]; rotulo: string
         <Icone nome="mais" tamanho={18} />
       </button>
 
-      {aberto && (
+      {celular && (
+        <FolhaDeBaixo
+          aberta={aberto}
+          titulo={rotulo}
+          aoFechar={() => {
+            setAberto(false);
+            botao.current?.focus();
+          }}
+        >
+          <div role="menu" aria-label={rotulo} className="acoes-folha" ref={menu}>
+            {acoes.map((acao) => (
+              <button
+                key={acao.rotulo}
+                type="button"
+                role="menuitem"
+                className={acao.perigo ? 'acoes-folha-item acoes-item-perigo' : 'acoes-folha-item'}
+                onClick={() => escolher(acao)}
+              >
+                {acao.icone && <Icone nome={acao.icone} tamanho={20} />}
+                <span>{acao.rotulo}</span>
+              </button>
+            ))}
+          </div>
+        </FolhaDeBaixo>
+      )}
+
+      {aberto && !celular && (
         <div
           ref={menu}
           role="menu"
