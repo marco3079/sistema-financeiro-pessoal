@@ -204,6 +204,8 @@ model Categoria {
   // (% do preço final). null = o sistema escolhe pelo nome / usa a alíquota média do tipo.
   tipoImposto          String?
   aliquotaImposto      Decimal? @db.Decimal(5, 2)
+  // IRPF: se os gastos da categoria abatem no IR (SAUDE, EDUCACAO, PREVIDENCIA ou NAO). null = palpite pelo nome.
+  dedutivelIr          String?
 
   transacoes Transacao[]
   orcamento  Orcamento?
@@ -709,4 +711,22 @@ model EmailEnviado {
   criadoEm DateTime    @default(now())
 
   @@index([criadoEm])
+}
+
+// Área Impostos > IRPF: dados que o sistema não enxerga (renda bruta, IR retido, INSS, dependentes), por perfil e ano.
+// Campo vazio = o sistema estima (renda bruta = receitas lançadas; o resto, zero).
+model ConfigIrpf {
+  id          Int      @id @default(autoincrement())
+  perfilId    Int      @default(1)
+  ano         Int
+  rendaBruta  Decimal? @db.Decimal(14, 2)
+  irRetido    Decimal? @db.Decimal(14, 2)
+  inss        Decimal? @db.Decimal(14, 2)
+  dependentes Int      @default(0)
+  // Meta: no máximo este valor de imposto indireto (estimado) no ano.
+  metaIndireto Decimal? @db.Decimal(14, 2)
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([perfilId, ano])
+  @@index([perfilId])
 }

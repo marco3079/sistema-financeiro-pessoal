@@ -49,9 +49,13 @@ async function listarCarteiras(pagina) {
       const url = new URL(a.getAttribute('href'), location.href);
       const slug = url.pathname.replace(/^\/carteiras\//, '').replace(/\/.*$/, '');
       if (!/^[a-z0-9-]+$/.test(slug) || vistas.has(slug)) continue;
-      // O texto do cartão começa com "há X dias" e depois o nome da carteira.
+      // O texto do cartão começa com a data da última atualização ("há X dias", "hoje", "ontem"...) e
+      // depois o nome da carteira. Prefere um título do cartão; senão, a primeira linha que não seja data.
+      const ehData = (t) =>
+        /^(há\s|hoje|ontem|agora|atualizad|\d{1,2}[/.-]\d{1,2}|\d+\s*(min|h|d|dia|hora|semana|m[eê]s))/i.test(t);
       const partes = a.innerText.split('\n').map((t) => t.trim()).filter(Boolean);
-      const nome = partes.find((t) => !/^há /i.test(t)) ?? slug;
+      const titulo = [...a.querySelectorAll('h1, h2, h3, h4, h5, h6')].map(textoDe).find((t) => t && !ehData(t));
+      const nome = titulo ?? partes.find((t) => !ehData(t) && !/rentabilidade/i.test(t)) ?? slug;
       vistas.set(slug, { slug, nome, url: `${url.origin}/carteiras/${slug}` });
     }
     return [...vistas.values()];

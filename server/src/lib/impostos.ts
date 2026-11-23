@@ -155,3 +155,148 @@ export function ultimoDiaUtil(ano: number, mesIndice: number): Date {
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
   return d;
 }
+
+// ---------- IRPF (declaração anual) ----------
+//
+// Tabela progressiva anual: a mensal da Lei 15.191/2025 (isenção até R$ 2.428,80/mês) vezes 12, vigente em 2026.
+// Redução da Lei 15.270/2025 (a partir do ano-calendário 2026): rendimentos tributáveis até R$ 60 mil no ano ficam
+// sem imposto; de R$ 60 mil a R$ 88,2 mil a redução diminui em linha reta. Fontes: Receita Federal (tabelas do IRPF)
+// e as leis citadas. Para anos anteriores a 2026 a simulação usa a mesma tabela, sem a redução (aproximação).
+
+export const IRPF = {
+  faixas: [
+    { ate: 29145.6, aliquota: 0, deducao: 0 },
+    { ate: 33919.8, aliquota: 0.075, deducao: 2185.92 },
+    { ate: 45012.6, aliquota: 0.15, deducao: 4729.92 },
+    { ate: 55976.16, aliquota: 0.225, deducao: 8105.88 },
+    { ate: Infinity, aliquota: 0.275, deducao: 10904.76 },
+  ],
+  porDependente: 2275.08,
+  limiteEducacao: 3561.5, // por pessoa (titular e cada dependente)
+  descontoSimplificado: 0.2,
+  tetoSimplificado: 16754.34,
+  limitePrevidencia: 0.12, // PGBL e previdência complementar: até 12% da renda tributável
+  reducao: { isentoAte: 60000, ate: 88200, constante: 8429.73, fator: 0.095575, desdeAno: 2026 },
+  fonte: 'Receita Federal; Lei 15.191/2025 (tabela) e Lei 15.270/2025 (redução até R$ 5 mil por mês)',
+} as const;
+
+function impostoDaTabela(base: number): { imposto: number; aliquota: number } {
+  const faixa = IRPF.faixas.find((f) => base <= f.ate) ?? IRPF.faixas[IRPF.faixas.length - 1];
+  return { imposto: Math.max(0, base * faixa.aliquota - faixa.deducao), aliquota: faixa.aliquota };
+}
+
+function reducaoLei15270(rendimentos: number, ano: number): number {
+  const r = IRPF.reducao;
+  if (ano < r.desdeAno || rendimentos > r.ate) return 0;
+  if (rendimentos <= r.isentoAte) return Infinity; // zera o imposto
+  return Math.max(0, r.constante - r.fator * rendimentos);
+}
+
+// Imposto devido sobre a base, já com a redução da Lei 15.270 (que olha os rendimentos tributáveis, não a base).
+export function impostoAnual(base: number, rendimentos: number, ano: number): { imposto: number; aliquota: number; reducao: number } {
+  const { imposto, aliquota } = impostoDaTabela(Math.max(0, base));
+  const reducao = Math.min(imposto, reducaoLei15270(rendimentos, ano));
+  return { imposto: imposto - reducao, aliquota, reducao };
+}
+
+export const TIPOS_DEDUTIVEL = {
+  SAUDE: 'Saúde',
+  EDUCACAO: 'Educação',
+  PREVIDENCIA: 'Previdência (PGBL/INSS próprio)',
+  NAO: 'Não abate',
+} as const;
+
+export type TipoDedutivel = keyof typeof TIPOS_DEDUTIVEL;
+
+export function ehTipoDedutivel(v: unknown): v is TipoDedutivel {
+  return typeof v === 'string' && v in TIPOS_DEDUTIVEL;
+}
+
+// Palpite: médicos, exames, plano, dentista, psicólogo e terapias abatem; remédio comprado na farmácia, academia e
+// estética não. Escola e faculdade abatem (cursos livres e idiomas não, mas pelo nome não dá para separar).
+export function dedutivelPeloNome(nome: string, tipo: TipoImposto): TipoDedutivel {
+  const n = semAcento(nome);
+  if (/previd|pgbl/.test(n)) return 'PREVIDENCIA';
+  if (/(idioma|ingles|curso livre|autoescola)/.test(n)) return 'NAO';
+  if (tipo === 'SAUDE') return /(pilates|academia|massag|drenagem)/.test(n) ? 'NAO' : 'SAUDE';
+  if (tipo === 'EDUCACAO') return 'EDUCACAO';
+  return 'NAO';
+}
+
+// ---------- Estabelecimentos ----------
+
+// Nome do lugar a partir da descrição do lançamento: tira parcelas, códigos de maquininha e números.
+export function nomeDoEstabelecimento(descricao: string): string {
+  let d = descricao;
+  if (d.includes('|')) d = d.split('|').slice(1).join(' ');
+  d = semAcento(d)
+    .replace(/\(iof\)/g, ' ')
+    .replace(/\b\d+\s*\/\s*\d+\b/g, ' ') // parcelas 2/10
+    .replace(/\b(parcela|parc)\b.*$/g, ' ')
+    .replace(/^(mp|pg|pm|ec|ifd|pag|pagseguro|merpago|mercadopago|sumup|stone|cielo|ton|picpay|ppro|dl|iz|ebn|pay)\s*\*+\s*/g, ' ')
+    .replace(/\*/g, ' ')
+    .replace(/\bs\.?a\b\.?/g, ' ')
+    .replace(/[^a-z\s.]/g, ' ')
+    .replace(
+      /\b(compra|pagamento|pix|debito|credito|cartao|no|na|em|de|do|da|dos|das|transferencia|enviada|enviado|pelo|para|ltda|eireli|me|comercio|servicos|brasil|trip)\b/g,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Tira palavras repetidas ou cortadas ('uber uber trip', 'mercadolivre mercadol').
+  const palavras: string[] = [];
+  for (const p of d.split(' ').filter((x) => x.length > 1 && x !== '.')) {
+    if (palavras.some((q) => q.startsWith(p) || p.startsWith(q))) continue;
+    palavras.push(p);
+    if (palavras.length === 3) break;
+  }
+  const nome = palavras.join(' ');
+  return nome ? nome.replace(/\b\w/g, (l) => l.toUpperCase()) : 'Sem descrição';
+}
+
+// ---------- Combustível, IOF e tarifas ----------
+
+export function ehCombustivel(descricao: string): boolean {
+  return /\b(posto|combustive(l|is)|gasolina|etanol|shell|ipiranga|petrobras|br mania|auto posto|ale combustiveis)\b/.test(semAcento(descricao));
+}
+
+export const TIPOS_IOF = {
+  INTERNACIONAL: 'Compras internacionais',
+  CAMBIO: 'Câmbio e remessas',
+  CREDITO: 'Crédito, empréstimo e financiamento',
+  ROTATIVO: 'Rotativo e parcelamento da fatura',
+  INVESTIMENTO: 'Resgate de aplicações',
+} as const;
+
+export type TipoIof = keyof typeof TIPOS_IOF;
+
+export function tipoDoIof(descricao: string): TipoIof {
+  const d = semAcento(descricao);
+  if (/(rotativo|atraso|parcelamento|parcelado|\biofv\b|saque|cheque especial|limite)/.test(d)) return 'ROTATIVO';
+  if (/(resgate|fundo|aplicacao)/.test(d)) return 'INVESTIMENTO';
+  if (/(cambio|remessa|wise|conversao|moeda em especie)/.test(d)) return 'CAMBIO';
+  if (/(emprestimo|financiamento|credito pessoal|consignado|cdc)/.test(d)) return 'CREDITO';
+  return 'INTERNACIONAL';
+}
+
+// Tarifas e pacotes bancários (sem anuidade, juros e multas, que a pessoa preferiu deixar de fora).
+export function ehTarifaBancaria(descricao: string): boolean {
+  const d = semAcento(descricao);
+  if (/(anuidade|juros|multa|mora)/.test(d)) return false;
+  return /\b(tarifa|tarifas|pacote de servicos|cesta de servicos|cesta|manutencao de conta|tar\.?\s|taxa de saque|taxa ted|tarifa ted|tarifa doc|servicos bancarios)/.test(d);
+}
+
+// ---------- Renda fixa e fundos ----------
+
+// IR regressivo da renda fixa e dos fundos (Lei 11.033/2004), pelo prazo da aplicação em dias.
+export function aliquotaRegressiva(dias: number): number {
+  if (dias <= 180) return 22.5;
+  if (dias <= 360) return 20;
+  if (dias <= 720) return 17.5;
+  return 15;
+}
+
+// LCI, LCA, CRI, CRA, poupança e debêntures incentivadas são isentas para pessoa física.
+export function rendaFixaIsenta(texto: string): boolean {
+  return /\b(lci|lca|cri|cra|poupanca|debenture incentivada|incentivada|lig)\b/.test(semAcento(texto));
+}

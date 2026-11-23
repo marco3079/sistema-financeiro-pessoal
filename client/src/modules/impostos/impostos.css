@@ -371,3 +371,262 @@
 .imp-select {
   min-width: 11rem;
 }
+
+/* Restituição */
+.imp-veredito {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--raio);
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  margin-bottom: 1rem;
+}
+
+.imp-veredito > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.imp-veredito strong {
+  font-size: 1.6rem;
+}
+
+.imp-veredito-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+.imp-veredito-icone {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+}
+
+.imp-veredito-bom .imp-veredito-icone {
+  background: var(--cor-verde-suave);
+  color: var(--cor-verde);
+}
+
+.imp-veredito-bom strong:first-of-type {
+  color: var(--cor-verde);
+}
+
+.imp-veredito-ruim .imp-veredito-icone {
+  background: var(--cor-laranja-suave);
+  color: var(--cor-laranja);
+}
+
+.imp-veredito-ruim > div > strong {
+  color: var(--cor-laranja);
+}
+
+.imp-veredito .fin-suave strong {
+  font-size: inherit;
+  color: inherit;
+}
+
+.imp-conta {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+}
+
+.imp-linha-conta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.imp-linha-conta dt {
+  color: var(--cor-texto-suave);
+}
+
+.imp-linha-conta dd {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.imp-linha-conta-forte {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--cor-borda);
+  font-weight: 700;
+}
+
+.imp-linha-conta-forte dt {
+  color: var(--cor-texto);
+}
+
+.imp-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.imp-tabela-ir {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+}
+
+.imp-tabela-ir th,
+.imp-tabela-ir td {
+  padding: 0.35rem 0.25rem;
+  text-align: right;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.imp-tabela-ir th:first-child,
+.imp-tabela-ir td:first-child {
+  text-align: left;
+}
+
+.imp-tabela-ir th {
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+}
+
+/* Onde economizar */
+.imp-sugestoes {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.imp-sugestao {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.imp-sugestao-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 12px;
+}
+
+.imp-sugestao-texto p {
+  margin: 0.25rem 0 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.imp-sugestao-valor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 0.15rem;
+}
+
+.imp-sugestao-valor strong {
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .imp-veredito {
+    align-items: flex-start;
+  }
+
+  .imp-veredito strong {
+    font-size: 1.3rem;
+  }
+
+  .imp-sugestao {
+    grid-template-columns: auto 1fr;
+  }
+
+  .imp-sugestao-valor {
+    grid-column: 2;
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+.imp-selo-modelo {
+  margin-bottom: 0.25rem;
+}
+
+/* Impostômetro e meta */
+.imp-impostometro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.imp-impostometro strong {
+  font-size: 2rem;
+  line-height: 1.15;
+  color: var(--cor-perigo);
+  font-variant-numeric: tabular-nums;
+}
+
+.imp-impostometro-projecao {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--cor-superficie-2);
+}
+
+.imp-impostometro-projecao strong {
+  font-size: 1.15rem;
+}
+
+.imp-meta-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.imp-meta-form .campo {
+  margin: 0;
+  flex: 1 1 11rem;
+}
+
+.imp-meta-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.imp-meta-linha strong {
+  font-size: 1.4rem;
+}
+
+.imp-pares-compacto {
+  margin-top: 0.75rem;
+}
+
+.imp-simulacao-total {
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--cor-superficie-2);
+}

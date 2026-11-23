@@ -1,9 +1,0 @@
-{
-  "name": "financas-b3",
-  "private": true,
-  "description": "Traz a planilha de movimentação da Área do Investidor da B3 para o sistema financeiro pessoal, com o login da pessoa.",
-  "type": "module",
-  "dependencies": {
-    "playwright-core": "1.65.1"
-  }
-}

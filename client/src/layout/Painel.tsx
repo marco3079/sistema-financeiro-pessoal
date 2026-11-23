@@ -57,6 +57,10 @@ interface LancamentoRecente {
 
 // ---------- Contratos de GET /api/agenda, /api/fluxo e /api/alertas ----------
 
+interface RespostaVencimentosImpostos {
+  vencimentos: { data: string; titulo: string; valor: number | null; diasFaltando: number }[];
+}
+
 interface ItemAgendaPainel {
   chave: string;
   descricao: string;
@@ -209,6 +213,8 @@ export function Painel() {
   const agenda = useDados<RespostaAgenda>(`/agenda?mes=${mesCorrente}`);
   const fluxo = useDados<RespostaFluxo>('/fluxo?meses=3');
   const alertas = useDados<RespostaAlertas>('/alertas');
+  // Impostos que vencem nos próximos 7 dias (IPVA, IPTU, DARF, IRPF), da área Impostos.
+  const impostos = useDados<RespostaVencimentosImpostos>('/impostos/vencimentos?dias=7');
   const [agora, setAgora] = useState<Date>(() => new Date());
   const [periodo, setPeriodo] = useState<number>(6);
 
@@ -236,6 +242,7 @@ export function Painel() {
   const proximos = agenda.dados?.itens.filter((i) => i.situacao !== 'PAGA').slice(0, 5) ?? [];
   const listaAlertas = alertas.dados?.alertas ?? [];
   const semAlertas = alertas.dados !== null && listaAlertas.length === 0;
+  const vencimentosImpostos = impostos.dados?.vencimentos ?? [];
 
   return (
     <section className="painel">
@@ -363,6 +370,30 @@ export function Painel() {
                 </ul>
               </>
             )}
+          </CartaoBloco>
+        )}
+
+        {vencimentosImpostos.length > 0 && (
+          <CartaoBloco titulo="Impostos a vencer" icone="calendario" verTodos="/app/impostos" carregando={false} erro={null}>
+            <ul className="painel-avisos-lista">
+              {vencimentosImpostos.slice(0, 3).map((v, i) => (
+                <li key={`${v.data}-${i}`} className="painel-aviso">
+                  <span className={`painel-aviso-marca painel-cor-${v.diasFaltando <= 2 ? 'laranja' : 'roxo'}`}>
+                    <span className="painel-aviso-bolinha" />
+                  </span>
+                  <div className="painel-aviso-texto">
+                    <span className="painel-aviso-titulo">
+                      {v.titulo}
+                      {v.valor !== null ? ` · ${formatarReais(v.valor)}` : ''}
+                    </span>
+                    <span className="painel-aviso-corpo">
+                      {v.diasFaltando === 0 ? 'Vence hoje' : v.diasFaltando === 1 ? 'Vence amanhã' : `Vence em ${v.diasFaltando} dias`} ·{' '}
+                      {v.data.slice(8, 10)}/{v.data.slice(5, 7)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </CartaoBloco>
         )}
       </div>

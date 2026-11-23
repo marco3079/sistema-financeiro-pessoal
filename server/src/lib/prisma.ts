@@ -29,6 +29,7 @@ const MODELOS_DO_PERFIL = new Set([
   'AvisoEnviado',
   'CarteiraSuno',
   'AssinaturaSuno',
+  'ConfigIrpf',
 ]);
 
 const contexto = new AsyncLocalStorage<{ perfilId: number }>();

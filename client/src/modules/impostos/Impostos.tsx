@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { formatarDia, formatarReais, mensagemErro, rotuloMes } from '../../lib/financas';
 import { useDados } from '../../lib/useDados';
-import { Abas, Aviso, Cartao, Carregando, Pagina, Selecao, Selo, Tabela } from '../../ui';
+import { Abas, Aviso, Cartao, Carregando, Escolha, Pagina, Selecao, Selo, Tabela } from '../../ui';
 import { ResumoItem, Rosca } from '../../ui/financas';
 import { GraficoBarras } from '../../ui/graficos';
 import {
@@ -18,6 +18,8 @@ import {
   type TiposDTO,
   type TipoGastoDTO,
 } from './tipos';
+import { Dedutiveis, Economia, Estabelecimentos, Restituicao } from './AbasIrpf';
+import { BlocosVisaoGeral, ControleDarf, IofTarifas, MediaBrasileira, RendaFixa, SimulacaoVenda } from './AbasExtras';
 import './impostos.css';
 
 // Área Impostos: quanto do que você gasta é imposto (direto e indireto), em várias abas.
@@ -45,7 +47,7 @@ function AvisoEstimativa() {
 
 // ---------- Visão geral ----------
 
-function VisaoGeral({ dados, irAba }: { dados: ResumoDTO; irAba: (id: string) => void }) {
+function VisaoGeral({ dados, irAba, recarregar }: { dados: ResumoDTO; irAba: (id: string) => void; recarregar: () => void }) {
   const t = dados.totais;
   const top = dados.categorias.filter((c) => c.imposto > 0).slice(0, 6);
   const maiorTop = Math.max(1, ...top.map((c) => c.imposto));
@@ -150,6 +152,7 @@ function VisaoGeral({ dados, irAba }: { dados: ResumoDTO; irAba: (id: string) =>
           que não têm imposto embutido). Dê uma categoria a eles em Lançamentos para entrarem na conta.
         </Aviso>
       )}
+      <BlocosVisaoGeral dados={dados} recarregar={recarregar} />
       <AvisoEstimativa />
     </>
   );
@@ -280,18 +283,14 @@ function Indiretos({ dados, recarregar }: { dados: ResumoDTO; recarregar: () => 
               titulo: 'Tipo de gasto',
               celula: (l) =>
                 tipos.dados ? (
-                  <select
+                  <Escolha
                     className="campo-controle imp-select"
-                    value={l.tipo}
-                    aria-label={`Tipo de gasto de ${l.nome}`}
-                    onChange={(e) => void salvar(l, { tipo: e.target.value })}
-                  >
-                    {tipos.dados.tipos.map((x) => (
-                      <option key={x.id} value={x.id} title={x.exemplo}>
-                        {x.rotulo}
-                      </option>
-                    ))}
-                  </select>
+                    valor={l.tipo}
+                    rotuloAcessivel={`Tipo de gasto de ${l.nome}`}
+                    titulo={`Tipo de gasto: ${l.nome}`}
+                    aoMudar={(v) => void salvar(l, { tipo: v })}
+                    opcoes={tipos.dados.tipos.map((x) => ({ valor: x.id, rotulo: x.rotulo, detalhe: x.exemplo }))}
+                  />
                 ) : (
                   rotuloTipo(l.tipo)
                 ),
@@ -420,7 +419,6 @@ function Investimentos({ dados }: { dados: ResumoDTO }) {
   if (ir.erro) return <Aviso tipo="erro">{ir.erro}</Aviso>;
   if (!ir.dados) return <Carregando />;
   const i = ir.dados;
-  const mesesComImposto = i.imposto.meses.filter((m) => m.imposto > 0);
   const proventos = i.totais.proventos;
   return (
     <>
@@ -455,25 +453,9 @@ function Investimentos({ dados }: { dados: ResumoDTO }) {
         </Cartao>
       </div>
 
-      <Cartao titulo="DARF por mês">
-        <Tabela
-          chave={(m) => `${m.mes}-${m.classe}`}
-          dados={i.imposto.meses}
-          vazio={`Nenhuma venda com resultado em ${dados.ano}.`}
-          colunas={[
-            { titulo: 'Mês', celula: (m) => rotuloMes(m.mes) },
-            { titulo: 'Classe', celula: (m) => m.classe },
-            { titulo: 'Resultado', alinhar: 'direita', celula: (m) => formatarReais(m.resultado) },
-            { titulo: 'Prejuízo usado', alinhar: 'direita', celula: (m) => formatarReais(m.prejuizoCompensado) },
-            { titulo: 'Alíquota', alinhar: 'direita', celula: (m) => pct(m.aliquota * 100) },
-            { titulo: 'DARF', alinhar: 'direita', celula: (m) => <strong>{formatarReais(m.imposto)}</strong> },
-            { titulo: 'Vencimento', celula: (m) => (m.imposto > 0 ? formatarDia(vencimentoDarf(m.mes)) : '—') },
-          ]}
-        />
-        {mesesComImposto.length > 0 && (
-          <p className="fin-suave">O DARF (código 6015) vence no último dia útil do mês seguinte à venda.</p>
-        )}
-      </Cartao>
+      <ControleDarf ir={i} dados={dados} />
+      <SimulacaoVenda ir={i} />
+      <RendaFixa />
       {i.incompletos.length > 0 && (
         <Aviso tipo="info">
           Alguns ativos ficaram fora do cálculo porque o histórico está incompleto:{' '}
@@ -694,9 +676,15 @@ const ABAS = [
   { id: 'geral', rotulo: 'Visão geral' },
   { id: 'indiretos', rotulo: 'Indiretos' },
   { id: 'diretos', rotulo: 'Diretos' },
+  { id: 'iof', rotulo: 'IOF e tarifas' },
+  { id: 'estabelecimentos', rotulo: 'Estabelecimentos' },
+  { id: 'economia', rotulo: 'Onde economizar' },
+  { id: 'restituicao', rotulo: 'Restituição (IRPF)' },
+  { id: 'dedutiveis', rotulo: 'Despesas dedutíveis' },
   { id: 'investimentos', rotulo: 'Investimentos' },
   { id: 'reforma', rotulo: 'Antes x depois da reforma' },
   { id: 'dias', rotulo: 'Dias trabalhados' },
+  { id: 'media', rotulo: 'Comparar com a média' },
   { id: 'calendario', rotulo: 'Calendário' },
 ];
 
@@ -736,9 +724,15 @@ export function Impostos() {
           De {formatarDia(dados.periodo.de)} a {formatarDia(dados.periodo.ate)} (ano em andamento).
         </p>
       )}
-      {dados && aba === 'geral' && <VisaoGeral dados={dados} irAba={setAba} />}
+      {dados && aba === 'geral' && <VisaoGeral dados={dados} irAba={setAba} recarregar={recarregar} />}
       {dados && aba === 'indiretos' && <Indiretos dados={dados} recarregar={recarregar} />}
       {dados && aba === 'diretos' && <Diretos dados={dados} />}
+      {dados && aba === 'iof' && <IofTarifas ano={dados.ano} />}
+      {dados && aba === 'media' && <MediaBrasileira dados={dados} />}
+      {dados && aba === 'estabelecimentos' && <Estabelecimentos ano={dados.ano} />}
+      {dados && aba === 'economia' && <Economia resumo={dados} />}
+      {dados && aba === 'restituicao' && <Restituicao ano={dados.ano} />}
+      {dados && aba === 'dedutiveis' && <Dedutiveis ano={dados.ano} />}
       {dados && aba === 'investimentos' && <Investimentos dados={dados} />}
       {dados && aba === 'reforma' && <Reforma dados={dados} />}
       {dados && aba === 'dias' && <Dias dados={dados} />}

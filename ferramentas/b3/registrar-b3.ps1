@@ -31,5 +31,5 @@ Set-Item -LiteralPath "$Chave\shell\open\command" -Value $Comando
 
 if ($Silencioso) { return }
 Write-Host 'Pronto: o link financas-b3:// abre o script da B3 deste computador.'
-Write-Host 'No sistema, va em Carteira > Proventos e clique em "Atualizar pela B3".'
+Write-Host 'No sistema, va em Carteira e clique em "Atualizar pela B3" (no alto da pagina).'
 Write-Host 'Na primeira vez o navegador pergunta se pode abrir o PowerShell: confirme.'

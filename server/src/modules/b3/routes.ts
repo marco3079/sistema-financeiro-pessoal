@@ -7,10 +7,12 @@ import { perfilAtual } from '../../lib/prisma';
 
 // Automação da B3: traz a planilha de movimentação da Área do Investidor com o login da própria pessoa.
 //
-// 1. A tela (Carteira > Proventos) cria uma tarefa com o período escolhido e recebe um link financas-b3://.
+// 1. A tela (topo da Carteira) cria uma tarefa com o período escolhido e recebe um link financas-b3://.
 // 2. O link abre o script ferramentas/b3 no computador (registrado no Windows pelo registrar-b3.ps1). O script
 //    abre uma janela limpa do Chrome na B3, e a pessoa faz o login nela. A senha nunca passa pelo sistema.
-// 3. O script filtra o período em Movimentação, exporta o XLSX e manda o arquivo para cá. O andamento chega
+//    A B3 bloqueia navegadores controlados por automação, então o Chrome é o normal: a pessoa filtra o período
+//    em Movimentação e baixa em Excel, e o script só vigia a pasta de downloads do perfil temporário.
+// 3. O script manda o XLSX baixado para cá e fecha a janela. O andamento chega
 //    pelas rotas públicas abaixo, autenticadas com a senha de uso único desta tarefa (não serve para mais nada).
 // 4. A tela lê o arquivo e mostra a mesma prévia da Importação (PreviaB3). Quem grava é /importacao/b3/confirmar,
 //    no perfil financeiro da tarefa, e o que já foi importado não se repete.
@@ -75,9 +77,13 @@ function conferirPrazos() {
   if (tarefa.arquivo && agora - tarefa.arquivo.recebidoEm > VALIDADE_ARQUIVO_MS) tarefa.arquivo = null;
 }
 
+// Pasta do projeto no computador (do instalar.ps1): a tela monta o comando de registrar o link com o caminho.
+const PASTA_DO_PROJETO = (process.env.PASTA_DO_PROJETO ?? '').trim() || null;
+
 function paraTela(t: Tarefa | null) {
-  if (!t) return { etapa: 'NENHUMA' as const };
+  if (!t) return { etapa: 'NENHUMA' as const, pasta: PASTA_DO_PROJETO };
   return {
+    pasta: PASTA_DO_PROJETO,
     id: t.id,
     etapa: t.etapa,
     mensagem: t.mensagem,
@@ -85,7 +91,14 @@ function paraTela(t: Tarefa | null) {
     de: t.de,
     ate: t.ate,
     arquivo: t.arquivo ? { nome: t.arquivo.nome, tamanho: t.arquivo.conteudo.length } : null,
+    // Enquanto o script não deu sinal, a tela pode abrir o link de novo (inclusive depois de fechar o popup).
+    link: t.etapa === 'AGUARDANDO_SCRIPT' ? linkDaTarefa(t) : null,
   };
+}
+
+function linkDaTarefa(t: Tarefa): string {
+  const parametros = new URLSearchParams({ id: t.id, token: t.token, de: t.de, ate: t.ate });
+  return `financas-b3://iniciar/?${parametros.toString()}`;
 }
 
 // Tarefa do perfil financeiro da requisição (a de outro perfil não aparece).
@@ -188,8 +201,7 @@ router.post(
       arquivo: null,
     };
     mudar(tarefa, 'AGUARDANDO_SCRIPT', 'Abrindo o script da B3 no computador...');
-    const parametros = new URLSearchParams({ id: tarefa.id, token: tarefa.token, de, ate });
-    res.status(201).json({ ...paraTela(tarefa), link: `financas-b3://iniciar/?${parametros.toString()}` });
+    res.status(201).json(paraTela(tarefa));
   })
 );
 

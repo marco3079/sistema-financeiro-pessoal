@@ -7,8 +7,9 @@ import { lerArquivo } from '../importar/lerArquivo';
 import type { Planilha } from '../importar/tipos';
 
 // Popup "Atualizar pela B3": o botão cria a tarefa com o período escolhido e abre o link financas-b3://, que
-// liga o script ferramentas/b3 neste computador. O script abre uma janela limpa do Chrome na Área do Investidor,
-// a pessoa entra na conta dela, e o script exporta a movimentação do período e manda o XLSX para a API.
+// liga o script ferramentas/b3 neste computador. O script abre uma janela limpa do Chrome normal (a B3 bloqueia
+// navegador controlado por robô) em Movimentação; a pessoa entra na conta, filtra o período mostrado aqui e baixa
+// em Excel, e o script pega o arquivo da pasta de downloads da janela e manda o XLSX para a API.
 // O popup acompanha o andamento e, quando o arquivo chega, mostra a mesma prévia da Importação (PreviaB3).
 // A senha da B3 nunca passa pelo sistema.
 
@@ -32,14 +33,21 @@ interface EstadoB3 {
   de?: string;
   ate?: string;
   arquivo?: { nome: string; tamanho: number } | null;
-  link?: string;
+  link?: string | null;
+  pasta?: string | null; // pasta do projeto no computador (do instalar.ps1)
 }
 
 const EM_ANDAMENTO: Etapa[] = ['AGUARDANDO_SCRIPT', 'ABRINDO', 'LOGIN', 'BAIXANDO', 'AGUARDANDO_VOCE'];
 const INTERVALO_MS = 2000;
-const DICA_REGISTRO_MS = 15000;
+const DICA_REGISTRO_MS = 8000;
 const PRIMEIRO_DIA_B3 = '2019-11-01';
-const COMANDO_REGISTRO = 'powershell -ExecutionPolicy Bypass -File ferramentas\\b3\\registrar-b3.ps1';
+// Comando que registra o link no Windows: com o caminho completo, quando a API sabe a pasta do projeto.
+function comandoRegistro(pasta: string | null | undefined): string {
+  const script = pasta
+    ? `"${pasta.replace(/[\\/]+$/, '')}\\ferramentas\\b3\\registrar-b3.ps1"`
+    : 'ferramentas\\b3\\registrar-b3.ps1';
+  return `powershell -ExecutionPolicy Bypass -File ${script}`;
+}
 
 function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -77,7 +85,6 @@ export function AtualizarB3({
   const [estado, setEstado] = useState<EstadoB3 | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const [link, setLink] = useState<string | null>(null);
   const [mostrarDica, setMostrarDica] = useState(false);
   const [planilha, setPlanilha] = useState<{ nome: string; planilhas: Planilha[] } | null>(null);
   const [lendo, setLendo] = useState(false);
@@ -151,10 +158,7 @@ export function AtualizarB3({
     try {
       const e = await api.post<EstadoB3>('/b3/automacao', periodo);
       setEstado(e);
-      if (e.link) {
-        setLink(e.link);
-        abrirLink(e.link);
-      }
+      if (e.link) abrirLink(e.link);
     } catch (e) {
       setErro(mensagemErro(e));
     } finally {
@@ -174,7 +178,6 @@ export function AtualizarB3({
     setPlanilha(null);
     if (mensagem) setSucesso(mensagem);
     setEstado(null);
-    setLink(null);
     await api.post<EstadoB3>('/b3/automacao/concluir', { importada }).catch(() => undefined);
     if (importada) aoConcluir();
   }
@@ -182,7 +185,6 @@ export function AtualizarB3({
   function fechar() {
     if (!andando && estado?.etapa !== 'PRONTA') {
       setEstado(null);
-      setLink(null);
     }
     aoFechar();
   }
@@ -204,10 +206,14 @@ export function AtualizarB3({
               fica salvo.
             </p>
             <p>
-              Depois do login, a automação abre <strong>Extratos &gt; Movimentação</strong>, filtra de{' '}
+              A janela já abre em <strong>Extratos &gt; Movimentação</strong>. Depois do login, filtre de{' '}
               <strong>{formatarDia(periodo.de)}</strong> a <strong>{formatarDia(periodo.ate)}</strong> (o período escolhido
-              na tela), exporta em Excel e traz o arquivo para a prévia da importação. O que já foi importado não se
-              repete.
+              na tela) e baixe em Excel. A planilha vem sozinha para a prévia da importação, e a janela fecha. O que já
+              foi importado não se repete.
+            </p>
+            <p className="fin-suave">
+              A B3 bloqueia navegadores controlados por robô, por isso o filtro e o download são feitos por você na
+              janela.
             </p>
             <div className="pagina-acoes">
               <Botao variante="texto" aoClicar={fechar}>
@@ -235,20 +241,31 @@ export function AtualizarB3({
             )}
 
             {estado.etapa === 'AGUARDANDO_VOCE' && (
-              <Aviso tipo="info">Termine na janela do Chrome: assim que a planilha baixar, ela aparece aqui.</Aviso>
+              <Aviso tipo="info">
+                <ol className="b3auto-passos">
+                  <li>Na janela do Chrome, entre na sua conta da B3.</li>
+                  <li>
+                    Em <strong>Extratos &gt; Movimentação</strong>, filtre de <strong>{formatarDia(estado.de ?? '')}</strong>{' '}
+                    a <strong>{formatarDia(estado.ate ?? '')}</strong>.
+                  </li>
+                  <li>
+                    Clique para baixar em <strong>Excel</strong>. A planilha aparece aqui sozinha.
+                  </li>
+                </ol>
+              </Aviso>
             )}
 
             {estado.etapa === 'AGUARDANDO_SCRIPT' && mostrarDica && (
               <Aviso tipo="info">
                 <span>
-                  O Chrome não abriu? O instalador (instalar.ps1) registra o link no Windows. Se este computador ainda
-                  não rodou o instalador desta versão, rode na pasta do sistema, no PowerShell:
+                  O Chrome não abriu? Clique em <strong>Abrir o Chrome</strong> abaixo. Se o navegador perguntar se pode
+                  abrir o Windows PowerShell, clique em <strong>Abrir</strong>.
                 </span>
-                <code className="b3auto-codigo">{COMANDO_REGISTRO}</code>
                 <span>
-                  Depois clique em <strong>Abrir de novo</strong>. Se o navegador perguntar se pode abrir o PowerShell,
-                  confirme.
+                  Se nada acontecer, o link ainda não foi registrado neste computador. O instalador (instalar.ps1) faz
+                  isso, ou rode no PowerShell:
                 </span>
+                <code className="b3auto-codigo">{comandoRegistro(estado.pasta)}</code>
               </Aviso>
             )}
 
@@ -264,10 +281,11 @@ export function AtualizarB3({
             )}
 
             <div className="pagina-acoes">
-              {estado.etapa === 'AGUARDANDO_SCRIPT' && link && (
-                <Botao variante="secundario" aoClicar={() => abrirLink(link)}>
-                  Abrir de novo
-                </Botao>
+              {estado.etapa === 'AGUARDANDO_SCRIPT' && estado.link && (
+                // Link de verdade, clicado pela pessoa: o navegador sempre aceita abrir o programa por ele.
+                <a className="botao botao-secundario" href={estado.link}>
+                  Abrir o Chrome
+                </a>
               )}
               {andando && (
                 <Botao variante="texto" aoClicar={cancelar}>

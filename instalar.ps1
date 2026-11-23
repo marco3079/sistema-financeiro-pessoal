@@ -73,6 +73,24 @@ function Ler-Variavel {
     return ''
 }
 
+# Grava (ou troca) uma variavel do .env sem mexer nas outras linhas.
+function Gravar-Variavel {
+    param([string]$Arquivo, [string]$Nome, [string]$Valor)
+    $linhas = [System.Collections.Generic.List[string]]::new()
+    $achou = $false
+    foreach ($linha in [System.IO.File]::ReadAllLines($Arquivo)) {
+        if ($linha -match ('^\s*' + $Nome + '\s*=')) {
+            $linhas.Add($Nome + '=' + $Valor)
+            $achou = $true
+        } else {
+            $linhas.Add($linha)
+        }
+    }
+    if (-not $achou) { $linhas.Add($Nome + '=' + $Valor) }
+    $conteudo = [string]::Join("`n", $linhas) + "`n"
+    [System.IO.File]::WriteAllText($Arquivo, $conteudo, (New-Object System.Text.UTF8Encoding($false)))
+}
+
 function Porta-Ocupada {
     param([int]$Porta)
     try {
@@ -258,6 +276,15 @@ try {
     }
 } catch {
     Write-Host 'Aviso: nao foi possivel remover a tarefa antiga FinancasPessoais-Atualizador. Rode: atualizar.ps1 -Desinstalar'
+}
+
+# Pasta do projeto neste computador: a tela mostra comandos com o caminho completo (ex.: registrar o link da B3).
+try {
+    if ((Ler-Variavel $arquivoEnv 'PASTA_DO_PROJETO') -ne $PSScriptRoot) {
+        Gravar-Variavel -Arquivo $arquivoEnv -Nome 'PASTA_DO_PROJETO' -Valor $PSScriptRoot
+    }
+} catch {
+    Write-Host 'Aviso: nao foi possivel gravar PASTA_DO_PROJETO no .env.'
 }
 
 # [6/6] Subir os conteineres e esperar a API

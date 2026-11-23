@@ -228,6 +228,125 @@ interface ItemIncompleto {
   motivo: string;
 }
 
+// Apuração do ano (vendas, posições, proventos e imposto estimado). Também usada pela área Impostos.
+export async function dadosDoIr(ano: number) {
+  // Os movimentos vão até 31/12 do ano: a posição e o custo médio dependem de todo o histórico anterior.
+  const fimDoAno = new Date(Date.UTC(ano + 1, 0, 1));
+
+  const [investimentos, datas, eventosBanco] = await Promise.all([
+    prisma.investimento.findMany({
+      where: { tipo: { in: ['ACAO', 'FII', 'ETF'] } },
+      include: { movimentos: { where: { data: { lt: fimDoAno } } } },
+      orderBy: { nome: 'asc' },
+    }),
+    prisma.movimentoInvestimento.findMany({ distinct: ['data'], select: { data: true }, orderBy: { data: 'asc' } }),
+    prisma.eventoAtivo.findMany({
+      where: { data: { lt: fimDoAno } },
+      select: { investimentoId: true, data: true, fator: true },
+      orderBy: [{ data: 'asc' }, { id: 'asc' }],
+    }),
+  ]);
+
+  const eventosPorAtivo = new Map<number, EventoApuracao[]>();
+  for (const e of eventosBanco) {
+    const lista = eventosPorAtivo.get(e.investimentoId) ?? [];
+    lista.push({ data: e.data, fator: e.fator });
+    eventosPorAtivo.set(e.investimentoId, lista);
+  }
+
+  const anos = Array.from(new Set(datas.map((d) => d.data.getUTCFullYear()))).sort((a, b) => a - b);
+
+  const vendas: Venda[] = [];
+  const todasVendas: Venda[] = [];
+  const posicoes: ItemPosicao[] = [];
+  const proventos: ItemProvento[] = [];
+  const incompletos: ItemIncompleto[] = [];
+
+  for (const inv of investimentos) {
+    const classe = classeDoTipo(inv.tipo);
+    const codigo = (inv.codigo ?? '').trim();
+    if (classe === null || !CODIGO_BOLSA.test(codigo)) continue;
+
+    const totalProventos = arredondar(
+      inv.movimentos
+        .filter((m) => m.tipo === 'RENDIMENTO' && m.data.getUTCFullYear() === ano)
+        .reduce((soma, m) => soma + num(m.valor), 0)
+    );
+    if (totalProventos > 0) {
+      proventos.push({ id: inv.id, codigo, nome: inv.nome, total: totalProventos });
+    }
+
+    const apuracao = apurar(inv.movimentos, eventosPorAtivo.get(inv.id) ?? [], classe);
+    if (apuracao.motivo !== null) {
+      incompletos.push({ codigo, motivo: apuracao.motivo });
+      continue;
+    }
+
+    for (const venda of apuracao.vendas) {
+      todasVendas.push(venda);
+      if (venda.ano === ano) vendas.push(venda);
+    }
+
+    if (apuracao.quantidade > TOLERANCIA) {
+      posicoes.push({
+        id: inv.id,
+        codigo,
+        nome: inv.nome,
+        tipo: inv.tipo,
+        quantidade: Math.round(apuracao.quantidade * 1e8) / 1e8,
+        custoTotal: arredondar(apuracao.custoTotal),
+        custoMedio: arredondar(apuracao.custoTotal / apuracao.quantidade),
+      });
+    }
+  }
+
+  // Vendas agrupadas por mês e classe.
+  const porMes = new Map<string, Map<Classe, { vendas: number; resultado: number }>>();
+  for (const v of vendas) {
+    let porClasse = porMes.get(v.mes);
+    if (!porClasse) {
+      porClasse = new Map();
+      porMes.set(v.mes, porClasse);
+    }
+    const acumulado = porClasse.get(v.classe) ?? { vendas: 0, resultado: 0 };
+    acumulado.vendas += v.valor;
+    acumulado.resultado += v.resultado;
+    porClasse.set(v.classe, acumulado);
+  }
+
+  const meses = Array.from(porMes.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([mes, porClasse]) => {
+      const classes = ORDEM_CLASSES.flatMap((classe) => {
+        const acumulado = porClasse.get(classe);
+        return acumulado
+          ? [{ classe, vendas: arredondar(acumulado.vendas), resultado: arredondar(acumulado.resultado) }]
+          : [];
+      });
+      const vendasAcoes = arredondar(porClasse.get('ACOES')?.vendas ?? 0);
+      return { mes, classes, vendasAcoes, isentoAcoes: vendasAcoes > 0 && vendasAcoes <= LIMITE_ISENCAO_ACOES };
+    });
+
+  posicoes.sort((a, b) => a.codigo.localeCompare(b.codigo));
+  proventos.sort((a, b) => a.codigo.localeCompare(b.codigo));
+  incompletos.sort((a, b) => a.codigo.localeCompare(b.codigo));
+
+  return {
+    ano,
+    meses,
+    posicoes,
+    proventos,
+    totais: {
+      vendas: arredondar(vendas.reduce((soma, v) => soma + v.valor, 0)),
+      resultado: arredondar(vendas.reduce((soma, v) => soma + v.resultado, 0)),
+      proventos: arredondar(proventos.reduce((soma, p) => soma + p.total, 0)),
+    },
+    imposto: calcularImposto(todasVendas, ano),
+    incompletos,
+    anos,
+  };
+}
+
 router.get(
   '/ir',
   asyncHandler(async (req, res) => {
@@ -235,121 +354,7 @@ router.get(
     const ano = textoAno === undefined ? Number(mesAtual().slice(0, 4)) : inteiroQuery(textoAno);
     if (ano === undefined || ano < 1900 || ano > 2200) throw new HttpError(400, 'Ano inválido');
 
-    // Os movimentos vão até 31/12 do ano: a posição e o custo médio dependem de todo o histórico anterior.
-    const fimDoAno = new Date(Date.UTC(ano + 1, 0, 1));
-
-    const [investimentos, datas, eventosBanco] = await Promise.all([
-      prisma.investimento.findMany({
-        where: { tipo: { in: ['ACAO', 'FII', 'ETF'] } },
-        include: { movimentos: { where: { data: { lt: fimDoAno } } } },
-        orderBy: { nome: 'asc' },
-      }),
-      prisma.movimentoInvestimento.findMany({ distinct: ['data'], select: { data: true }, orderBy: { data: 'asc' } }),
-      prisma.eventoAtivo.findMany({
-        where: { data: { lt: fimDoAno } },
-        select: { investimentoId: true, data: true, fator: true },
-        orderBy: [{ data: 'asc' }, { id: 'asc' }],
-      }),
-    ]);
-
-    const eventosPorAtivo = new Map<number, EventoApuracao[]>();
-    for (const e of eventosBanco) {
-      const lista = eventosPorAtivo.get(e.investimentoId) ?? [];
-      lista.push({ data: e.data, fator: e.fator });
-      eventosPorAtivo.set(e.investimentoId, lista);
-    }
-
-    const anos = Array.from(new Set(datas.map((d) => d.data.getUTCFullYear()))).sort((a, b) => a - b);
-
-    const vendas: Venda[] = [];
-    const todasVendas: Venda[] = [];
-    const posicoes: ItemPosicao[] = [];
-    const proventos: ItemProvento[] = [];
-    const incompletos: ItemIncompleto[] = [];
-
-    for (const inv of investimentos) {
-      const classe = classeDoTipo(inv.tipo);
-      const codigo = (inv.codigo ?? '').trim();
-      if (classe === null || !CODIGO_BOLSA.test(codigo)) continue;
-
-      const totalProventos = arredondar(
-        inv.movimentos
-          .filter((m) => m.tipo === 'RENDIMENTO' && m.data.getUTCFullYear() === ano)
-          .reduce((soma, m) => soma + num(m.valor), 0)
-      );
-      if (totalProventos > 0) {
-        proventos.push({ id: inv.id, codigo, nome: inv.nome, total: totalProventos });
-      }
-
-      const apuracao = apurar(inv.movimentos, eventosPorAtivo.get(inv.id) ?? [], classe);
-      if (apuracao.motivo !== null) {
-        incompletos.push({ codigo, motivo: apuracao.motivo });
-        continue;
-      }
-
-      for (const venda of apuracao.vendas) {
-        todasVendas.push(venda);
-        if (venda.ano === ano) vendas.push(venda);
-      }
-
-      if (apuracao.quantidade > TOLERANCIA) {
-        posicoes.push({
-          id: inv.id,
-          codigo,
-          nome: inv.nome,
-          tipo: inv.tipo,
-          quantidade: Math.round(apuracao.quantidade * 1e8) / 1e8,
-          custoTotal: arredondar(apuracao.custoTotal),
-          custoMedio: arredondar(apuracao.custoTotal / apuracao.quantidade),
-        });
-      }
-    }
-
-    // Vendas agrupadas por mês e classe.
-    const porMes = new Map<string, Map<Classe, { vendas: number; resultado: number }>>();
-    for (const v of vendas) {
-      let porClasse = porMes.get(v.mes);
-      if (!porClasse) {
-        porClasse = new Map();
-        porMes.set(v.mes, porClasse);
-      }
-      const acumulado = porClasse.get(v.classe) ?? { vendas: 0, resultado: 0 };
-      acumulado.vendas += v.valor;
-      acumulado.resultado += v.resultado;
-      porClasse.set(v.classe, acumulado);
-    }
-
-    const meses = Array.from(porMes.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([mes, porClasse]) => {
-        const classes = ORDEM_CLASSES.flatMap((classe) => {
-          const acumulado = porClasse.get(classe);
-          return acumulado
-            ? [{ classe, vendas: arredondar(acumulado.vendas), resultado: arredondar(acumulado.resultado) }]
-            : [];
-        });
-        const vendasAcoes = arredondar(porClasse.get('ACOES')?.vendas ?? 0);
-        return { mes, classes, vendasAcoes, isentoAcoes: vendasAcoes > 0 && vendasAcoes <= LIMITE_ISENCAO_ACOES };
-      });
-
-    posicoes.sort((a, b) => a.codigo.localeCompare(b.codigo));
-    proventos.sort((a, b) => a.codigo.localeCompare(b.codigo));
-    incompletos.sort((a, b) => a.codigo.localeCompare(b.codigo));
-
-    res.json({
-      ano,
-      meses,
-      posicoes,
-      proventos,
-      totais: {
-        vendas: arredondar(vendas.reduce((soma, v) => soma + v.valor, 0)),
-        resultado: arredondar(vendas.reduce((soma, v) => soma + v.resultado, 0)),
-        proventos: arredondar(proventos.reduce((soma, p) => soma + p.total, 0)),
-      },
-      imposto: calcularImposto(todasVendas, ano),
-      incompletos,
-      anos,
-    });
+    res.json(await dadosDoIr(ano));
   })
 );
 

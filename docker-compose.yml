@@ -41,6 +41,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Serviço da Suno (atualizar as carteiras pela tela, com o login da pessoa).
       SUNO_URL: "http://suno:4100"
+      # Pasta do projeto no computador (gravada pelo instalar.ps1): a tela mostra comandos com o caminho completo.
+      PASTA_DO_PROJETO: ${PASTA_DO_PROJETO:-}
       CALCULADORA_RTC_URL: "http://calculadora:8080/api/calculadora"
       SUNO_SEGREDO: ${JWT_SECRET:-troque-este-segredo-de-exemplo}
       PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}

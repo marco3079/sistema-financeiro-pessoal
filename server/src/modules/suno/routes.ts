@@ -195,11 +195,21 @@ function tiposDaCarteira(slug: string): string[] {
   return ['ACAO'];
 }
 
+// Nome da carteira para mostrar. Versões antigas do leitor gravavam a data do cartão ("hoje", "há 2 dias")
+// no lugar do nome: nesse caso o nome sai do slug ("dividendos" -> "Dividendos").
+function nomeDaCarteira(nome: string, slug: string): string {
+  const pareceData = /^(há\s|hoje|ontem|agora|atualizad|\d{1,2}[/.-]\d{1,2}|\d+\s*(min|h|d|dia|hora|semana|m[eê]s))/i;
+  if (nome.trim() && !pareceData.test(nome.trim())) return nome.trim();
+  const legivel = slug.replace(/^(carteira|suno)-/, '').replace(/-/g, ' ').replace(/\bfiis?\b/i, 'FIIs');
+  return legivel.charAt(0).toUpperCase() + legivel.slice(1);
+}
+
 // Grava as carteiras e o plano no perfil em uso. O envio traz todas as carteiras assinadas: as que não vieram
 // (deixaram de ser assinadas) saem. Devolve os nomes das carteiras gravadas.
 async function gravarEnvio(dados: z.infer<typeof envioSchema>): Promise<string[]> {
   const nomes: string[] = [];
-  for (const c of dados.carteiras) {
+  for (const envio of dados.carteiras) {
+    const c = { ...envio, nome: nomeDaCarteira(envio.nome, envio.slug) };
     const conteudo = { recomendada: c.recomendada, encerradas: c.encerradas, outras: c.outras };
     const existente = await prisma.carteiraSuno.findFirst({ where: { slug: c.slug } });
     if (existente) {
@@ -256,7 +266,10 @@ type Situacao =
 router.get(
   '/suno',
   asyncHandler(async (_req, res) => {
-    const carteiras = await prisma.carteiraSuno.findMany({ orderBy: { nome: 'asc' } });
+    const carteiras = (await prisma.carteiraSuno.findMany({ orderBy: { nome: 'asc' } })).map((c) => ({
+      ...c,
+      nome: nomeDaCarteira(c.nome, c.slug),
+    }));
     const investimentos = await prisma.investimento.findMany({
       where: { ativo: true, codigo: { not: null }, quantidade: { gt: 0 } },
       select: { id: true, codigo: true, nome: true, tipo: true, quantidade: true, saldo: true, valorAplicado: true },
