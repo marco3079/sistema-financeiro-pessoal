@@ -63,6 +63,7 @@ export const AREAS_FECHADAS_AO_LEITOR = [
   '/api/avisos',
   '/api/automacoes',
   '/api/acesso-seguro',
+  '/api/servidor',
   '/api/cupom',
   '/api/bancos',
 ];

@@ -36,6 +36,7 @@ function enderecoPronto(estado: EstadoAcessoDTO): boolean {
 // Enquanto a situação pode mudar sozinha, a tela consulta o servidor de novo.
 function precisaAtualizar(estado: EstadoAcessoDTO): boolean {
   if (
+    estado.situacao === 'INDISPONIVEL' ||
     estado.situacao === 'PRECISA_ENTRAR' ||
     estado.situacao === 'INICIANDO' ||
     estado.situacao === 'AGUARDANDO_APROVACAO'
@@ -73,6 +74,34 @@ function BlocoEntrar({
   );
 }
 
+// Pede ao atualizador para criar ou reiniciar o contêiner do acesso seguro (mesma rota da tela Status do servidor).
+function LigarServico() {
+  const [ocupado, setOcupado] = useState(false);
+  const [recado, setRecado] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  async function ligar() {
+    setOcupado(true);
+    setRecado(null);
+    try {
+      await api.post('/servidor/reiniciar', { servico: 'https' });
+      setRecado({ ok: true, texto: 'Pedido enviado. O serviço leva até um minuto para subir; esta tela atualiza sozinha.' });
+    } catch (e) {
+      setRecado({ ok: false, texto: mensagemErro(e) });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <>
+      <Botao desabilitado={ocupado} aoClicar={() => void ligar()}>
+        {ocupado ? 'Pedindo...' : 'Ligar o serviço'}
+      </Botao>
+      {recado && <Aviso tipo={recado.ok ? 'sucesso' : 'erro'}>{recado.texto}</Aviso>}
+    </>
+  );
+}
+
 function ConteudoSituacao({
   estado,
   ocupado,
@@ -97,9 +126,11 @@ function ConteudoSituacao({
       return (
         <>
           <p className="acesso-texto">
-            O serviço de acesso seguro não respondeu. Ele sobe junto com o sistema; atualize o sistema e espere um minuto.
+            O serviço de acesso seguro não respondeu. Ele sobe junto com o sistema e o atualizador o religa sozinho; o
+            motivo aparece logo abaixo.
           </p>
           <div className="acesso-acoes">
+            <LigarServico />
             <Botao variante="secundario" aoClicar={aoTentarDeNovo}>
               Tentar de novo
             </Botao>

@@ -38,6 +38,9 @@ function registrar(texto) {
 function rodar(programa, argumentos, opcoes = {}) {
   return new Promise((resolve) => {
     const filho = spawn(programa, argumentos, { env: opcoes.env ?? process.env });
+    // Com limiteMs, um comando travado é encerrado (a medição dos contêineres não pode ficar presa).
+    const limite = opcoes.limiteMs ? setTimeout(() => filho.kill('SIGKILL'), opcoes.limiteMs) : null;
+    filho.on('close', () => limite && clearTimeout(limite));
     let saida = '';
     let destino = null;
     if (opcoes.paraArquivo) {
@@ -168,6 +171,172 @@ function bater() {
     gravarJson(ARQUIVO_ESTADO, { ...estadoAtual, vigiaVistoEm: agora() });
   } catch {
     // tenta de novo no próximo batimento
+  }
+}
+
+// ---------- Situação dos contêineres (tela Status do servidor) ----------
+
+const ARQUIVO_CONTEINERES = path.join(path.dirname(ARQUIVO_ESTADO), 'conteineres.json');
+const INTERVALO_CONTEINERES_MS = 15000;
+let medindoConteineres = false;
+let ultimaTentativaHttps = 0;
+let reiniciandoAgora = false;
+
+// "2026-11-23 21:13:36 -0300 -03" (formato do Docker) em milissegundos; 0 se não der para ler.
+function criadoEm(texto) {
+  const m = /^(d{4}-d{2}-d{2}) (d{2}:d{2}:d{2}) ([+-]d{2})(d{2})/.exec(String(texto || ''));
+  const data = m ? new Date(`${m[1]}T${m[2]}${m[3]}:${m[4]}`).getTime() : NaN;
+  return Number.isNaN(data) ? 0 : data;
+}
+
+function linhasJson(texto) {
+  const itens = [];
+  for (const linha of texto.split('\n')) {
+    const limpa = linha.trim();
+    if (!limpa.startsWith('{')) continue;
+    try {
+      itens.push(JSON.parse(limpa));
+    } catch {
+      // linha que não é JSON (aviso do Docker): ignora
+    }
+  }
+  return itens;
+}
+
+// Mede os contêineres do projeto (docker compose ps e docker stats) e grava em atualizacao/conteineres.json.
+// A API só lê o arquivo: ela não tem acesso ao Docker.
+async function medirConteineres() {
+  if (medindoConteineres || !projeto) return;
+  medindoConteineres = true;
+  try {
+    const base = ['compose', '--project-directory', pastaNoDocker, '-p', projeto];
+    const [ps, servicos] = await Promise.all([
+      rodar('docker', [...base, 'ps', '-a', '--format', 'json'], { env: ambienteDoCompose(), limiteMs: 20000 }),
+      rodar('docker', [...base, 'config', '--services'], { env: ambienteDoCompose(), limiteMs: 20000 }),
+    ]);
+    if (ps.codigo !== 0) return;
+    // Versões antigas do Compose devolvem uma lista; as novas, um objeto por linha.
+    let itens = [];
+    const textoPs = ps.saida.trim();
+    if (textoPs.startsWith('[')) {
+      try {
+        itens = JSON.parse(textoPs);
+      } catch {
+        itens = [];
+      }
+    } else {
+      itens = linhasJson(textoPs);
+    }
+    const uso = new Map();
+    const ids = itens.map((i) => String(i.ID || '')).filter((id) => /^[0-9a-f]{6,64}$/.test(id));
+    if (ids.length > 0) {
+      const stats = await rodar('docker', ['stats', '--no-stream', '--format', 'json', ...ids], { limiteMs: 20000 });
+      if (stats.codigo === 0) {
+        for (const linha of linhasJson(stats.saida)) {
+          uso.set(String(linha.ID || '').slice(0, 12), { cpu: linha.CPUPerc || null, memoria: linha.MemUsage || null });
+        }
+      }
+    }
+    const conteineres = itens.map((i) => {
+      const u = uso.get(String(i.ID || '').slice(0, 12)) || {};
+      return {
+        servico: String(i.Service || ''),
+        estado: String(i.State || ''),
+        saude: String(i.Health || ''),
+        detalhe: String(i.Status || '').slice(0, 120),
+        criadoEm: String(i.CreatedAt || ''),
+        codigoDeSaida: typeof i.ExitCode === 'number' ? i.ExitCode : null,
+        cpu: u.cpu ? String(u.cpu).slice(0, 20) : null,
+        memoria: u.memoria ? String(u.memoria).slice(0, 40) : null,
+      };
+    });
+    const esperados = servicos.codigo === 0 ? servicos.saida.split('\n').map((x) => x.trim()).filter((x) => /^[a-z0-9_-]+$/i.test(x)) : [];
+    gravarJson(ARQUIVO_CONTEINERES, { medidoEm: agora(), servicos: esperados, conteineres });
+    // Autocorreção do acesso seguro: o contêiner https pode faltar depois de uma atualização feita por um
+    // atualizador antigo, ou ter parado. Fora de uma atualização em andamento, liga de novo sozinho.
+    const https = conteineres.find((c) => c.servico === 'https');
+    const web = conteineres.find((c) => c.servico === 'web');
+    // O https usa a rede do contêiner do site: se o site foi recriado depois dele, o https ficou sem rede
+    // (continua "no ar", mas isolado) e precisa ser recriado.
+    const semRede = Boolean(https && web && criadoEm(web.criadoEm) > criadoEm(https.criadoEm));
+    const semHttps = esperados.includes('https') && (!https || https.estado !== 'running' || semRede);
+    // O https entra na rede do site: só dá para ligar com o site já no ar (senão o Docker recusa).
+    const siteNoAr = conteineres.some((c) => c.servico === 'web' && c.estado === 'running');
+    if (semHttps && siteNoAr && !reiniciandoAgora && estadoAtual.situacao !== 'ATUALIZANDO' && Date.now() - ultimaTentativaHttps > 60000) {
+      ultimaTentativaHttps = Date.now();
+      registrar('Contêiner https fora do ar: ligando.');
+      await ligarHttps(Boolean(https));
+    }
+  } catch (erro) {
+    registrar(`Contêineres não medidos: ${erro instanceof Error ? erro.message : erro}`);
+  } finally {
+    medindoConteineres = false;
+  }
+}
+
+// ---------- Reiniciar contêineres pela tela (Status do servidor) ----------
+
+const ARQUIVO_REINICIO = path.join(path.dirname(ARQUIVO_ESTADO), 'reinicio.json');
+const ARQUIVO_REINICIO_ESTADO = path.join(path.dirname(ARQUIVO_ESTADO), 'reinicio-estado.json');
+
+function gravarReinicio(situacao, servico, mensagem) {
+  try {
+    gravarJson(ARQUIVO_REINICIO_ESTADO, { situacao, servico, mensagem, em: agora() });
+  } catch {
+    // a tela só fica sem o recado
+  }
+}
+
+// Reinicia um contêiner (ou todos, menos o próprio atualizador). O pedido vem da API em atualizacao/reinicio.json.
+async function atenderReinicio() {
+  let servico = '';
+  try {
+    servico = String(JSON.parse(fs.readFileSync(ARQUIVO_REINICIO, 'utf8')).servico ?? '');
+  } catch {
+    servico = '';
+  }
+  fs.rmSync(ARQUIVO_REINICIO, { force: true });
+  reiniciandoAgora = true;
+  if (estadoAtual.situacao === 'ATUALIZANDO') {
+    reiniciandoAgora = false;
+    gravarReinicio('ERRO', servico, 'Há uma atualização em andamento. Tente de novo quando ela terminar.');
+    return;
+  }
+  try {
+    const existentes = (await compose(['config', '--services'])).split('\n').map((x) => x.trim()).filter(Boolean);
+    const todos = servico === 'TODOS';
+    if (!todos && (!existentes.includes(servico) || servico === 'atualizador')) {
+      gravarReinicio('ERRO', servico, 'Serviço desconhecido ou que não pode ser reiniciado por aqui.');
+      reiniciandoAgora = false;
+      return;
+    }
+    gravarReinicio('REINICIANDO', servico, todos ? 'Reiniciando todos os contêineres...' : 'Reiniciando...');
+    if (todos) {
+      // Na ordem de dependência: banco, servidor (espera responder), auxiliares e site. O https vem por último.
+      const ordem = ['db', 'api', 'suno', 'calculadora', 'web'].filter((s) => existentes.includes(s));
+      const outros = existentes.filter((s) => !ordem.includes(s) && s !== 'atualizador' && s !== 'https');
+      for (const s of [...ordem, ...outros]) {
+        gravarReinicio('REINICIANDO', servico, `Reiniciando ${s}...`);
+        await compose(['restart', s]);
+        if (s === 'api') await compose(['up', '-d', '--no-deps', '--wait', 'api']);
+      }
+      if (existentes.includes('https')) await ligarHttps(true);
+    } else if (servico === 'https') {
+      await ligarHttps(true);
+    } else {
+      // "up" antes: um contêiner parado ou que nunca foi criado também volta.
+      await compose(['up', '-d', '--no-deps', servico]);
+      await compose(['restart', servico]);
+      // O https divide a rede com o site: quando o site reinicia, ele precisa ser recriado.
+      if (servico === 'web' && existentes.includes('https')) await ligarHttps(true);
+    }
+    gravarReinicio('OK', servico, todos ? 'Todos os contêineres foram reiniciados.' : 'Contêiner reiniciado.');
+  } catch (erro) {
+    gravarReinicio('ERRO', servico, String(erro instanceof Error ? erro.message : erro).slice(0, 300));
+  } finally {
+    reiniciandoAgora = false;
+    ultimaTentativaHttps = Date.now();
+    void medirConteineres();
   }
 }
 
@@ -381,8 +550,12 @@ async function principal() {
     registrar(`Versão não gravada: ${erro instanceof Error ? erro.message : erro}`);
   }
 
+  void medirConteineres();
+  setInterval(() => void medirConteineres(), INTERVALO_CONTEINERES_MS);
+
   for (;;) {
     if (fs.existsSync(ARQUIVO_PEDIDO)) await atenderPedido();
+    if (fs.existsSync(ARQUIVO_REINICIO)) await atenderReinicio();
     await new Promise((r) => setTimeout(r, INTERVALO_MS));
   }
 }

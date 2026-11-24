@@ -121,6 +121,7 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 
 **Segurança**
 
+- **Status do servidor** (em Configurações): situação de cada contêiner (no ar, parado, com problema), CPU, memória e resposta do banco, com botões para reiniciar um contêiner ou todos. Quem mede e reinicia é o contêiner atualizador.
 - **Verificação em duas etapas** no login, com aplicativo autenticador e códigos de recuperação.
 - **Cópias do banco**: lista das cópias feitas antes de cada atualização, com a opção de restaurar uma delas.
 

@@ -35,6 +35,7 @@ const CAMINHOS_SO_TITULAR = [
   "/app/entrada",
   "/app/automacoes",
   "/app/acesso-seguro",
+  "/app/status-servidor",
   "/app/cupom",
   "/app/avisos",
   "/app/conexoes",

@@ -1,0 +1,140 @@
+/* ===== Tela de status do servidor =====
+   Cores, raios e sombras só por variáveis do tema. Cabe em 360 px sem rolagem horizontal. */
+
+.servidor-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.servidor-item {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+}
+
+.servidor-item-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.servidor-item-titulo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.servidor-item-titulo strong {
+  color: var(--cor-texto);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.servidor-servico {
+  color: var(--cor-texto-suave);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.servidor-descricao {
+  margin: 0;
+  color: var(--cor-texto);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.servidor-detalhe {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.servidor-metricas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  color: var(--cor-texto-suave);
+  font-size: 0.85rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.servidor-metricas strong {
+  color: var(--cor-texto);
+  font-weight: 600;
+}
+
+.servidor-rodape {
+  margin: 1rem 0 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+/* ----- Ações de reinício ----- */
+
+.servidor-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.servidor-acao {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.servidor-discreto {
+  color: var(--cor-texto-suave);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.servidor-dica,
+.servidor-aguarde {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.servidor-confirmacao {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.servidor-confirmacao p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.servidor-confirmacao-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Os indicadores do topo mostram o texto inteiro, quebrando a linha se preciso. */
+.servidor-resumo .resumo-valor {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

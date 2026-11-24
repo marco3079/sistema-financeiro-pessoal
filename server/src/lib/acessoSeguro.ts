@@ -2,6 +2,7 @@
 // próprio e publica o site em https://<nome>.<rede>.ts.net. A API conversa com ele pelo soquete compartilhado
 // (API local do Tailscale), só para ler o estado, pedir o link de entrada na conta e sair da conta.
 
+import { promises as fs } from 'node:fs';
 import http from 'node:http';
 
 const SOQUETE = process.env.TAILSCALE_SOQUETE ?? '/var/run/tailscale/tailscaled.sock';
@@ -67,14 +68,48 @@ function nomeDns(bruto: string | undefined): string | null {
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(nome) ? nome : null;
 }
 
+// Por que o serviço não respondeu, pelo que o atualizador mediu do contêiner https (atualizacao/conteineres.json).
+async function motivoDaIndisponibilidade(): Promise<string[]> {
+  try {
+    const medicao = JSON.parse((await fs.readFile('/atualizacao/conteineres.json', 'utf8')).replace(/^\uFEFF/, '')) as {
+      medidoEm?: string;
+      servicos?: unknown;
+      conteineres?: { servico?: string; estado?: string; detalhe?: string }[];
+    };
+    const recente = medicao.medidoEm && Date.now() - new Date(medicao.medidoEm).getTime() < 120_000;
+    if (!recente) return ['O atualizador não está respondendo; é ele quem liga o serviço de acesso seguro.'];
+    const https = (medicao.conteineres ?? []).find((c) => c.servico === 'https');
+    if (!https) {
+      const previsto = Array.isArray(medicao.servicos) && medicao.servicos.includes('https');
+      return [
+        previsto
+          ? 'O contêiner do acesso seguro ainda não foi criado. O atualizador cria sozinho em cerca de um minuto; o botão Ligar o serviço faz isso agora.'
+          : 'Esta instalação ainda não tem o contêiner do acesso seguro. Atualize o sistema.',
+      ];
+    }
+    const detalhe = typeof https.detalhe === 'string' ? https.detalhe.slice(0, 120) : '';
+    return [
+      https.estado === 'running'
+        ? 'O contêiner do acesso seguro está no ar, mas o servidor não alcança o soquete dele. Reinicie o Servidor em Status do servidor.'
+        : `O contêiner do acesso seguro não está no ar (${detalhe || https.estado || 'sem detalhe'}).`,
+    ];
+  } catch {
+    return ['Sem informação do atualizador sobre o contêiner do acesso seguro. Atualize o sistema.'];
+  }
+}
+
+async function indisponivel(): Promise<EstadoAcesso> {
+  return { ...INDISPONIVEL, avisos: await motivoDaIndisponibilidade() };
+}
+
 export async function estadoDoAcesso(): Promise<EstadoAcesso> {
   let status: StatusTailscale;
   try {
     const resposta = await chamar('GET', '/localapi/v0/status');
-    if (resposta.status !== 200) return INDISPONIVEL;
+    if (resposta.status !== 200) return indisponivel();
     status = JSON.parse(resposta.corpo) as StatusTailscale;
   } catch {
-    return INDISPONIVEL;
+    return indisponivel();
   }
 
   const dns = nomeDns(status.Self?.DNSName);
