@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, matchPath, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { api } from './lib/api';
@@ -8,6 +8,8 @@ import { Login } from './layout/Login';
 import { EsqueciSenha } from './layout/EsqueciSenha';
 import { RedefinirSenha } from './layout/RedefinirSenha';
 import { DesbloquearPerfil, SemPerfil } from './layout/DesbloquearPerfil';
+import { EscolherPerfil } from './layout/EscolherPerfil';
+import { aoPedirEscolhaDePerfil, perfilJaEscolhido } from './lib/escolhaDePerfil';
 import { Carregando, Pagina } from './ui';
 import { AcessoPerfilProvider, useAcessoPerfil } from './lib/acessoPerfil';
 import type { NivelPerfil } from './lib/perfilFinanceiro';
@@ -61,10 +63,16 @@ function rotaLiberada(rota: RotaModulo, perfil: Perfil, nivel: NivelPerfil | nul
 function CascaDoPerfil() {
   const { usuario } = useAuth();
   const { perfis, atual, nivel, erro, recarregar } = useAcessoPerfil();
+  // Tela "Quem está usando?": depois do login (com mais de um perfil) e quando o seletor do topo pede.
+  const [escolhendo, setEscolhendo] = useState(() => !perfilJaEscolhido());
+  useEffect(() => aoPedirEscolhaDePerfil(() => setEscolhendo(true)), []);
   if (!usuario) return <Navigate to="/login" replace />;
   // Primeira carga da lista de perfis: nada na tela por um instante (evita mostrar dados de um perfil bloqueado).
   if (!perfis && !erro) return <Carregando />;
   if (perfis && perfis.length === 0) return <SemPerfil />;
+  if (escolhendo && perfis && perfis.length > 1) {
+    return <EscolherPerfil perfis={perfis} podeGerenciar={usuario.perfil === 'TITULAR'} aoFechar={() => setEscolhendo(false)} />;
+  }
   if (atual?.bloqueado) {
     return <DesbloquearPerfil perfil={atual} outros={(perfis ?? []).filter((p) => p.id !== atual.id)} aoDesbloquear={recarregar} />;
   }

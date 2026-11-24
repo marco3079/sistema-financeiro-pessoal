@@ -1,0 +1,178 @@
+/* Tela cheia de escolha do perfil financeiro ("Quem está usando?"). Prefixo escolha-perfil-.
+   Cores só por variáveis de estilo.css; a cor de cada perfil entra por style no avatar. */
+
+.escolha-perfil {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.escolha-perfil-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.escolha-perfil-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  min-width: 0;
+}
+
+.escolha-perfil-marca img {
+  border-radius: 22%;
+  object-fit: contain;
+}
+
+.escolha-perfil-centro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1rem 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+.escolha-perfil-titulo {
+  margin: 0;
+  font-size: clamp(1.75rem, 5vw, 3rem);
+  font-weight: 700;
+  text-align: center;
+}
+
+.escolha-perfil-lista {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(1rem, 3vw, 2.25rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 62rem;
+}
+
+.escolha-perfil-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  width: clamp(6.5rem, 22vw, 10rem);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  cursor: pointer;
+}
+
+.escolha-perfil-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.6rem;
+  border: 3px solid transparent;
+  box-sizing: border-box;
+  /* A inicial fica legível sobre qualquer cor de perfil. */
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  font-size: clamp(2.5rem, 9vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.escolha-perfil-avatar-novo {
+  background: transparent;
+  border: 3px dashed var(--cor-borda);
+  color: var(--cor-texto-suave);
+  text-shadow: none;
+}
+
+.escolha-perfil-cadeado {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+.escolha-perfil-nome {
+  max-width: 100%;
+  font-size: clamp(0.95rem, 2.4vw, 1.2rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.escolha-perfil-item:hover .escolha-perfil-avatar,
+.escolha-perfil-item:focus-visible .escolha-perfil-avatar {
+  transform: scale(1.06);
+  border-color: var(--cor-texto);
+}
+
+.escolha-perfil-item:hover .escolha-perfil-nome,
+.escolha-perfil-item:focus-visible .escolha-perfil-nome {
+  color: var(--cor-texto);
+}
+
+.escolha-perfil-item:focus-visible {
+  outline: none;
+}
+
+.escolha-perfil-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.escolha-perfil-botao {
+  min-height: var(--altura-toque);
+  padding: 0.5rem 1.5rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.escolha-perfil-botao:hover,
+.escolha-perfil-botao:focus-visible {
+  color: var(--cor-texto);
+  border-color: var(--cor-texto);
+  outline: none;
+}
+
+.escolha-perfil-conta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escolha-perfil-avatar,
+  .escolha-perfil-nome {
+    transition: none;
+  }
+}
