@@ -1,24 +1,219 @@
 .sim-explicacao {
   color: var(--cor-texto-suave);
-  margin: 0 0 1rem;
+  margin: 0;
 }
 
-.sim-campos {
+/* Computador: dados à esquerda, resultados à direita (fixos ao rolar). Celular: um embaixo do outro. */
+.sim-colunas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
 }
 
-.sim-campos > * {
+.sim-entrada,
+.sim-saida {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   min-width: 0;
+}
+
+@media (min-width: 1100px) {
+  .sim-colunas {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+  .sim-saida {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.sim-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  column-gap: 0.9rem;
+  align-items: start;
+}
+
+.sim-grade > * {
+  min-width: 0;
+}
+
+/* Campo + seletor lado a lado, também no celular. */
+.sim-par {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.6rem;
+}
+
+.sim-par > * {
+  min-width: 0;
+}
+
+.sim-nota {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.sim-dica {
+  display: block;
+  margin: -0.6rem 0 0.9rem;
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.sim-meta .sim-dica {
+  margin: 0;
+}
+
+.sim-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sim-link:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ===== Depósitos e retiradas ===== */
+.sim-fluxos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sim-fluxo {
+  border: 1px solid var(--cor-borda);
+  border-left: 4px solid var(--cor-primaria);
+  border-radius: var(--raio-pequeno);
+  padding: 0.75rem 0.9rem 0;
+  background: var(--cor-fundo);
+}
+
+.sim-fluxo-retirada {
+  border-left-color: var(--cor-laranja);
+}
+
+.sim-fluxo-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.sim-remover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cor-perigo);
+  color: #fff;
+  cursor: pointer;
+}
+
+.sim-remover:focus-visible {
+  outline: 2px solid var(--cor-perigo);
+  outline-offset: 2px;
+}
+
+.sim-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.9rem 0 0.5rem;
+}
+
+/* ===== Resultados ===== */
+.sim-destaque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.9rem;
+  margin-bottom: 0.9rem;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-primaria-suave);
+  text-align: center;
+}
+
+.sim-destaque > strong {
+  font-size: 1.9rem;
+  line-height: 1.15;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.sim-destaque > span {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+}
+
+.sim-destaque > span strong {
+  color: var(--cor-texto);
+}
+
+.sim-numeros {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.sim-numeros > div {
+  text-align: center;
+  min-width: 0;
+}
+
+.sim-numeros dt {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+}
+
+.sim-numeros dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* ===== Gráficos, cenários e meta ===== */
+.sim-graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1rem;
+}
+
+.sim-graficos > * {
+  min-width: 0;
+}
+
+.pagina > .sim-subtitulo {
+  margin: 1.25rem 0 0;
+  font-size: 1.05rem;
+}
+
+.pagina > .sim-subtitulo + .sim-cenarios {
+  margin-top: 0.6rem;
 }
 
 .sim-cenarios {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
-  margin-top: 1rem;
 }
 
 .sim-cenarios > * {
@@ -28,4 +223,49 @@
 .sim-cenarios p {
   margin: 0.25rem 0;
   overflow-wrap: anywhere;
+}
+
+.sim-caixa {
+  padding-top: 1.4rem;
+}
+
+.sim-metas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sim-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-fundo);
+  min-width: 0;
+}
+
+.sim-meta-titulo {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.sim-meta strong {
+  font-size: 1.15rem;
+}
+
+.sim-ano-tabela {
+  max-width: 220px;
+}
+
+@media (max-width: 560px) {
+  .sim-caixa {
+    padding-top: 0;
+  }
+  .sim-destaque > strong {
+    font-size: 1.6rem;
+  }
 }

@@ -33,6 +33,7 @@ Na subida, a API aplica o modelo de dados (`prisma db push`), e, se o banco esti
 | `atualizacao` | versão instalada, novidades do GitHub e pedido de atualização |
 | `analise` | dashboard de gastos e ganhos com sugestões |
 | `rendimento` | comparação com os índices, renda fixa pela taxa e projeção |
+| `simulador` | IPCA de 12 meses e Selic atual para o simulador de investimentos (o cálculo fica no cliente, em `client/src/modules/simulador/calculo.ts`) |
 | `rede` | endereço para abrir no celular |
 | `openfinance` | credenciais da Pluggy, token do widget, conexões e sincronização |
 | `painel` | resumo do painel, avisos do sino e busca |
