@@ -2,6 +2,22 @@
 
 Este guia mostra como abrir o sistema no celular quando ele não está na mesma rede Wi-Fi do computador (por exemplo, na rua), e como instalar o sistema como aplicativo no celular.
 
+## Jeito automático (recomendado): pela tela
+
+O sistema já traz um contêiner (`https`) com o Tailscale. Ele entra na sua rede como um aparelho próprio e publica o site com HTTPS, sem instalar nem rodar nada no computador.
+
+1. No painel do Tailscale, em **DNS**, deixe ligados **MagicDNS** e **HTTPS Certificates** (uma vez por rede).
+2. No sistema, abra **Configurações > Acesso seguro (HTTPS)** e clique em **Entrar no Tailscale**. Entre com a sua conta e aprove o aparelho.
+3. A tela mostra o endereço `https://financas.<sua-rede>.ts.net`. Ele também passa a ser o primeiro do QR code de "Abrir no celular".
+4. No celular, com o Tailscale ligado, abra esse endereço. No iPhone: Compartilhar > Adicionar à Tela de Início, e abra pelo ícone para receber notificações.
+
+- O nome `financas` vem de `HTTPS_NOME` no `.env`.
+- Para entrar sem passar pela tela, gere uma chave de autenticação no painel do Tailscale e ponha em `TAILSCALE_AUTHKEY` no `.env`.
+- O acesso vale só para aparelhos da sua rede Tailscale. Se a rede tiver aparelhos de outras pessoas, elas alcançam a tela de login (não entram sem a senha); as regras de acesso (ACL) do Tailscale restringem isso.
+- O login real no Tailscale por este caminho ainda não foi testado de ponta a ponta pelo autor: confira o endereço na tela depois de entrar.
+
+As seções abaixo descrevem o jeito manual, com o Tailscale instalado no computador.
+
 > **Aviso:** os comandos do Tailscale foram escritos a partir da documentação do próprio Tailscale e **devem ser conferidos na versão instalada** (`tailscale --help` e `tailscale serve --help` mostram a sintaxe atual). Não copie sem conferir.
 
 ## O que isso faz e o que NÃO faz

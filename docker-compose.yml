@@ -55,6 +55,8 @@ services:
       - ./atualizacao:/atualizacao
       # Cópias do banco feitas antes de cada atualização (a tela lista; quem restaura é o atualizar.ps1).
       - ./backups:/backups:ro
+      # Soquete do contêiner https (Tailscale): a API lê o estado e o endereço seguro por ele.
+      - soquete_https:/var/run/tailscale
     ports:
       - "127.0.0.1:${API_PORT:-3092}:3000"
     healthcheck:
@@ -72,6 +74,29 @@ services:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-8092}:80"
+    restart: unless-stopped
+
+  # HTTPS automático pelo Tailscale: este contêiner entra na sua rede Tailscale como um aparelho próprio e publica o
+  # site em https://<nome>.<sua-rede>.ts.net, com certificado válido, só para os aparelhos da rede. Não precisa
+  # instalar nem configurar nada no computador: a entrada na conta é feita pela tela (Configurações > Acesso seguro).
+  # Divide a rede com o contêiner do site (por isso encaminha para 127.0.0.1:80) e fala com a API por um soquete.
+  https:
+    image: tailscale/tailscale:stable
+    network_mode: service:web
+    depends_on:
+      - web
+    environment:
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_HOSTNAME: ${HTTPS_NOME:-financas}
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
+    volumes:
+      - dados_https:/var/lib/tailscale
+      - soquete_https:/var/run/tailscale
+      - ./ferramentas/https/serve.json:/config/serve.json:ro
     restart: unless-stopped
 
   # Entra na conta da Suno sem janela (Chromium headless) quando a pessoa pede pela tela e lê as carteiras.
@@ -105,3 +130,5 @@ services:
 
 volumes:
   dados_db:
+  dados_https:
+  soquete_https:

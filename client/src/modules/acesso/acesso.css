@@ -1,0 +1,53 @@
+.acesso-texto {
+  color: var(--cor-texto-suave);
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+}
+
+.acesso-situacao {
+  margin-bottom: 12px;
+}
+
+.acesso-passos {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.acesso-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.acesso-endereco {
+  margin: 8px 0 12px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.acesso-link {
+  color: var(--cor-primaria);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.acesso-copiado {
+  font-size: 0.875rem;
+  color: var(--cor-verde);
+}
+
+.acesso-linha-discreta {
+  margin: 12px 0 0;
+  font-size: 0.875rem;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}

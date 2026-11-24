@@ -338,7 +338,7 @@ Se o celular não abrir, libere a porta `8092` no firewall do computador. O aces
 
 **Instalar como aplicativo.** No Chrome ou no Edge, use o botão de instalar do mesmo popup (ou o ícone de instalar na barra de endereço). No iPhone, abra no Safari, toque em Compartilhar e em **Adicionar à Tela de Início**. Os navegadores só oferecem a instalação em endereço HTTPS ou em `localhost`.
 
-**De fora de casa.** O guia [docs/ACESSO-EXTERNO.md](docs/ACESSO-EXTERNO.md) mostra como publicar o sistema com HTTPS só para os seus aparelhos, pelo Tailscale. Depois, ponha o endereço em `URL_PUBLICA` no `.env`: ele passa a ser o primeiro do QR code.
+**De fora de casa, com HTTPS.** Em **Configurações > Acesso seguro (HTTPS)**, clique em **Entrar no Tailscale**: um contêiner do próprio sistema entra na sua rede Tailscale e publica o site em `https://financas.<sua-rede>.ts.net`, só para os seus aparelhos, sem instalar nada no computador. O endereço vira o primeiro do QR code. Detalhes e o jeito manual em [docs/ACESSO-EXTERNO.md](docs/ACESSO-EXTERNO.md).
 
 ## Foto do cupom
 

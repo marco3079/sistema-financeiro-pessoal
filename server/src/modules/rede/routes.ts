@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../lib/erros';
+import { enderecoSeguro } from '../../lib/acessoSeguro';
 
 // Endereço para abrir o sistema em outro aparelho da mesma rede (celular, tablet).
 // O servidor roda dentro do Docker e não enxerga o IP da máquina; por isso o endereço vem do ambiente:
@@ -36,7 +37,8 @@ router.get(
     const porta = /^\d{1,5}$/.test(bruta) ? bruta : '8092';
     const sufixo = porta === '80' ? '' : ':' + porta;
     const enderecos: { rotulo: string; url: string }[] = [];
-    const publica = urlPublica(process.env.URL_PUBLICA);
+    // URL_PUBLICA do .env tem prioridade; sem ela, vale o endereço que o contêiner https (Tailscale) publicou.
+    const publica = urlPublica(process.env.URL_PUBLICA) ?? urlPublica((await enderecoSeguro().catch(() => null)) ?? undefined);
     if (publica) {
       enderecos.push({ rotulo: 'Endereço seguro (HTTPS)', url: publica });
     }

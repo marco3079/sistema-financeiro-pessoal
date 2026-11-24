@@ -232,6 +232,17 @@ async function reconstruir() {
   await compose(['up', '-d', '--no-deps', '--wait', 'api']);
   gravarEstado('ATUALIZANDO', 'Ligando o site...', 95);
   await compose(['up', '-d', '--no-deps', 'web']);
+  await ligarHttps(true);
+}
+
+// Contêiner https (Tailscale): divide a rede com o do site, então precisa ser recriado quando o site é recriado.
+// Falhar aqui não derruba a atualização: o sistema segue funcionando por http.
+async function ligarHttps(recriar) {
+  try {
+    await compose(['up', '-d', '--no-deps', ...(recriar ? ['--force-recreate'] : []), 'https']);
+  } catch (erro) {
+    registrar(`Contêiner https não ligado: ${erro instanceof Error ? erro.message : erro}`);
+  }
 }
 
 // Se a versão nova muda o próprio atualizador, outro contêiner (de vida curta) o recria depois que este termina.
@@ -296,6 +307,8 @@ async function restaurar(nome) {
   await compose(['exec', '-T', 'db', 'rm', '-f', '/tmp/restaurar.sql']);
   gravarEstado('ATUALIZANDO', 'Ligando o sistema de novo...', 85);
   await compose(['up', '-d', '--no-deps', 'api', 'web']);
+  // O site foi parado e ligado de novo: o contêiner https divide a rede com ele e precisa ser recriado.
+  await ligarHttps(true);
   gravarEstado('OK', `Banco restaurado da cópia ${nome}. O banco de antes ficou em ${anterior}.`, 100);
 }
 
@@ -360,6 +373,8 @@ async function principal() {
       await new Promise((r) => setTimeout(r, 30000));
     }
   }
+  // Garante o contêiner https em instalações que foram atualizadas por uma versão do atualizador que não o conhecia.
+  await ligarHttps(false);
   try {
     await gravarVersao();
   } catch (erro) {
