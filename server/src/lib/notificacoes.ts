@@ -7,11 +7,14 @@ import { lerConfiguracao, limparCacheConfiguracao } from './email';
 import { cifrar, decifrar } from './cripto';
 import { enderecoSeguro } from './acessoSeguro';
 import { dataISO, hoje, intervaloDoMes, mesDe, moeda, num, paraData } from './financas';
+import { PREFIXO_ACERTO, PREFIXO_PREVISTA } from './sincronizacao';
+import { aoChegarNovidade } from './sinais';
 
 // Notificações no celular (Web Push). Cada aparelho se inscreve pelo navegador (InscricaoPush); o servidor guarda
 // um par de chaves VAPID e manda as mensagens pelo serviço de push do navegador (Google, Apple, Mozilla).
 //
-// Um verificador roda a cada 5 minutos em cada perfil financeiro e gera as notificações dos tipos abaixo. Cada
+// Um verificador roda a cada 5 minutos (e logo depois de cada sincronização que trouxe dados novos) em cada perfil
+// financeiro e gera as notificações dos tipos abaixo. Cada
 // notificação tem uma chave estável gravada em NotificacaoEnviada: a mesma não sai duas vezes. A de segurança
 // (novo acesso) sai na hora do login, direto para o usuário.
 
@@ -346,6 +349,56 @@ async function consultar<T>(perfilId: number, caminho: string, esquema: z.ZodTyp
   }
 }
 
+interface Movimentacao {
+  id: number;
+  contaId: number;
+  data: Date;
+  valor: Prisma.Decimal;
+  tipo: string;
+  pendente: boolean;
+  transferencia: boolean;
+  criadoEm: Date;
+  pluggyTransactionId: string | null;
+  chaveImportacao: string | null;
+  conta: { tipo: string };
+}
+
+// Chave estável da notificação de uma movimentação: o id do banco (Open Finance) ou a chave da importação.
+function chaveDaMovimentacao(t: Movimentacao): string {
+  if (t.pluggyTransactionId) return `mov-of-${t.pluggyTransactionId}`;
+  if (t.chaveImportacao) return `mov-imp-${t.chaveImportacao}`;
+  return `mov-${t.id}`;
+}
+
+// "Compra" e "Reembolso" no cartão; "Saída" e "Entrada" nas contas.
+function rotuloDaMovimentacao(t: Movimentacao): string {
+  if (t.conta.tipo === 'CARTAO' && !t.transferencia) return t.tipo === 'DESPESA' ? 'Compra' : 'Reembolso';
+  return t.tipo === 'DESPESA' ? 'Saída' : 'Entrada';
+}
+
+// Compra que o banco mandou primeiro como pendente e depois de novo com outro id (pendente repetida ou já lançada):
+// se a versão pendente, de mesmo valor e na mesma conta, já foi avisada nos últimos dias, esta não avisa de novo.
+async function jaAvisadaComoPendente(perfilId: number, t: Movimentacao): Promise<boolean> {
+  const irmas = await prisma.transacao.findMany({
+    where: {
+      id: { not: t.id },
+      contaId: t.contaId,
+      tipo: t.tipo as 'DESPESA' | 'RECEITA',
+      valor: t.valor,
+      pendente: true,
+      criadoEm: { lt: t.criadoEm },
+      data: { gte: new Date(t.data.getTime() - 3 * DIA_MS), lte: new Date(t.data.getTime() + 3 * DIA_MS) },
+    },
+    select: { id: true, contaId: true, data: true, valor: true, tipo: true, pendente: true, transferencia: true, criadoEm: true, pluggyTransactionId: true, chaveImportacao: true, conta: { select: { tipo: true } } },
+    take: 10,
+  });
+  if (irmas.length === 0) return false;
+  const avisadas = await prisma.notificacaoEnviada.count({
+    where: { perfilId, chave: { in: irmas.flatMap((i) => [chaveDaMovimentacao(i), `mov-${i.id}`]) } },
+  });
+  return avisadas > 0;
+}
+
 // Tudo o que merece notificação agora no perfil (dentro de comPerfil). As chaves repetidas são descartadas depois.
 async function coletar(perfilId: number): Promise<Notificacao[]> {
   const lista: Notificacao[] = [];
@@ -353,26 +406,51 @@ async function coletar(perfilId: number): Promise<Notificacao[]> {
   const mes = mesDe(hojeData);
   const desde = new Date(Date.now() - JANELA_NOVOS_MS);
 
-  // 1. Movimentações novas (Open Finance e importação). Manual não: foi a própria pessoa que lançou.
+  // 1. Movimentações novas (Open Finance, bancos diretos e importação). Manual não: foi a própria pessoa que lançou.
+  // Parcelas previstas e acertos de fatura ficam de fora: o sistema os recria a cada sincronização (com id novo)
+  // e não são movimentações que o banco mandou.
   const novas = await prisma.transacao.findMany({
-    where: { criadoEm: { gte: desde }, oculto: false, provento: false, OR: [{ origem: 'OPEN_FINANCE' }, { importacaoId: { not: null } }] },
-    include: { conta: { select: { nome: true } } },
+    where: {
+      criadoEm: { gte: desde },
+      oculto: false,
+      provento: false,
+      AND: [
+        { OR: [{ origem: 'OPEN_FINANCE' }, { importacaoId: { not: null } }, { chaveImportacao: { startsWith: 'api:' } }] },
+        {
+          OR: [
+            { pluggyTransactionId: null },
+            { NOT: [{ pluggyTransactionId: { startsWith: PREFIXO_PREVISTA } }, { pluggyTransactionId: { startsWith: PREFIXO_ACERTO } }] },
+          ],
+        },
+      ],
+    },
+    include: { conta: { select: { nome: true, tipo: true } } },
     orderBy: { id: 'asc' },
     take: 200,
   });
+  // A chave usa o id do banco (estável), não o id da linha: lançamento apagado e gravado de novo não avisa outra vez.
+  // A chave antiga (mov-<id da linha>) continua valendo para o que já foi avisado antes desta mudança.
   const jaVistas = new Set(
     (
       await prisma.notificacaoEnviada.findMany({
-        where: { perfilId, chave: { in: novas.map((t) => `mov-${t.id}`) } },
+        where: { perfilId, chave: { in: novas.flatMap((t) => [chaveDaMovimentacao(t), `mov-${t.id}`]) } },
         select: { chave: true },
       })
     ).map((l) => l.chave)
   );
-  const ineditas = novas.filter((t) => !jaVistas.has(`mov-${t.id}`));
+  const candidatas = novas.filter((t) => !jaVistas.has(chaveDaMovimentacao(t)) && !jaVistas.has(`mov-${t.id}`));
+  const ineditas: typeof candidatas = [];
+  for (const t of candidatas) {
+    if (await jaAvisadaComoPendente(perfilId, t)) {
+      await prisma.notificacaoEnviada.create({ data: { perfilId, chave: chaveDaMovimentacao(t) } }).catch(() => undefined);
+    } else {
+      ineditas.push(t);
+    }
+  }
   if (ineditas.length > MAXIMO_INDIVIDUAIS) {
     // Resumo: as chaves individuais são gravadas para não saírem depois uma a uma.
     for (const t of ineditas) {
-      await prisma.notificacaoEnviada.create({ data: { perfilId, chave: `mov-${t.id}` } }).catch(() => undefined);
+      await prisma.notificacaoEnviada.create({ data: { perfilId, chave: chaveDaMovimentacao(t) } }).catch(() => undefined);
     }
     const despesas = ineditas.filter((t) => t.tipo === 'DESPESA').reduce((s, t) => s + num(t.valor), 0);
     const receitas = ineditas.filter((t) => t.tipo === 'RECEITA').reduce((s, t) => s + num(t.valor), 0);
@@ -389,8 +467,8 @@ async function coletar(perfilId: number): Promise<Notificacao[]> {
     for (const t of ineditas) {
       lista.push({
         tipo: 'movimentacao',
-        chave: `mov-${t.id}`,
-        titulo: `${t.tipo === 'DESPESA' ? 'Saída' : 'Entrada'} de ${moeda(num(t.valor))}`,
+        chave: chaveDaMovimentacao(t),
+        titulo: `${rotuloDaMovimentacao(t)} de ${moeda(num(t.valor))}`,
         corpo: `${t.descricao} · ${t.conta.nome}`,
         url: '/app/transacoes',
       });
@@ -636,21 +714,42 @@ export async function verificarTudo(): Promise<void> {
 
 let iniciado = false;
 let rodando = false;
+let repetir = false;
+let agendado: NodeJS.Timeout | null = null;
+
+const ESPERA_NOVIDADE_MS = 3 * 1000; // junta avisos seguidos (várias conexões sincronizando) numa rodada só
 
 // Chamado uma vez ao carregar o módulo de notificações.
 export function iniciarVerificador(): void {
   if (iniciado) return;
   iniciado = true;
   const rodar = () => {
-    if (rodando) return;
+    if (rodando) {
+      // Chegou novidade no meio de uma rodada: roda de novo quando ela acabar, para nada ficar esperando 5 minutos.
+      repetir = true;
+      return;
+    }
     rodando = true;
     void verificarTudo()
       .catch((e) => console.error('Falha no verificador de notificações', e instanceof Error ? e.message : e))
       .finally(() => {
         rodando = false;
+        if (repetir) {
+          repetir = false;
+          rodar();
+        }
       });
   };
   // Primeira rodada um minuto depois de subir (o banco e as rotas internas já estão prontos).
   setTimeout(rodar, 60 * 1000).unref();
   setInterval(rodar, INTERVALO_MS).unref();
+  // Sincronização que gravou dados novos: avisa logo, sem esperar a rodada de 5 minutos.
+  aoChegarNovidade(() => {
+    if (agendado) return;
+    agendado = setTimeout(() => {
+      agendado = null;
+      rodar();
+    }, ESPERA_NOVIDADE_MS);
+    agendado.unref();
+  });
 }

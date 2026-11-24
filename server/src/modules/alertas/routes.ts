@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { asyncHandler } from '../../lib/erros';
+import { PREFIXO_ACERTO, PREFIXO_PREVISTA } from '../../lib/sincronizacao';
 import { arredondar, dataISO, intervaloDoMes, mesAtual, mesDe, moeda, num, somarMeses } from '../../lib/financas';
 
 // Detector de cobranças estranhas. Só lê os lançamentos de despesa dos últimos 13 meses
@@ -88,7 +89,16 @@ async function carregarLancamentos(): Promise<Lancamento[]> {
   const inicio = intervaloDoMes(somarMeses(atual, -MESES_ANTES)).inicio;
   const fim = intervaloDoMes(atual).fim;
   const linhas = await prisma.transacao.findMany({
-    where: { tipo: 'DESPESA', transferencia: false, data: { gte: inicio, lt: fim } },
+    // Parcelas previstas e acertos de fatura não são cobranças do banco: o sistema os recria a cada sincronização.
+    where: {
+      tipo: 'DESPESA',
+      transferencia: false,
+      data: { gte: inicio, lt: fim },
+      OR: [
+        { pluggyTransactionId: null },
+        { NOT: [{ pluggyTransactionId: { startsWith: PREFIXO_PREVISTA } }, { pluggyTransactionId: { startsWith: PREFIXO_ACERTO } }] },
+      ],
+    },
     select: {
       id: true,
       data: true,

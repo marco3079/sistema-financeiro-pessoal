@@ -8,6 +8,7 @@ import { montarCategorizador } from '../importacao/categorizar';
 import { CONECTORES } from './conectores';
 import { ErroDoBanco } from './http';
 import { esquecerToken } from './tipos';
+import { avisarNovidade } from '../sinais';
 import type { Credenciais } from './tipos';
 
 // Sincronização das conexões diretas: lê saldo e extrato na API do banco e grava na conta ligada, sem repetir
@@ -115,6 +116,7 @@ async function executar(id: number): Promise<void> {
     await registrarPosicaoPatrimonio();
     if (novos.length > 0) {
       await aplicarAutomacoes({ desde: paraData(de) }).catch(() => undefined);
+      avisarNovidade(); // notificação das movimentações novas sai agora
     }
   } catch (erro) {
     esquecerToken(cache);
@@ -152,11 +154,11 @@ export async function sincronizarTodasDiretas(): Promise<void> {
 
 let automaticaIniciada = false;
 
-// Um minuto e meio depois de subir e, depois, a cada 6 horas (como o Open Finance).
+// Um minuto e meio depois de subir e, depois, a cada 30 minutos (como o Open Finance).
 export function iniciarDiretasAutomaticas(): void {
   if (automaticaIniciada) return;
   automaticaIniciada = true;
   const rodar = () => void sincronizarTodasDiretas().catch(() => undefined);
   setTimeout(rodar, 90_000).unref();
-  setInterval(rodar, 6 * 60 * 60 * 1000).unref();
+  setInterval(rodar, 30 * 60 * 1000).unref();
 }

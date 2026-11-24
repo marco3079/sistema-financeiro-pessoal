@@ -13,6 +13,7 @@ import { ehPagamentoDeFaturaNaConta, marcarPixNoCreditoNasContas } from './pixNo
 import { aplicarAutomacoes } from './automacoes';
 import { gravarProventosDasContas } from './proventosOpenFinance';
 import { arredondar, dataISO, hoje, paraData, registrarPosicaoPatrimonio } from './financas';
+import { avisarNovidade } from './sinais';
 import {
   listarContasDoItem,
   listarFaturasDaConta,
@@ -426,7 +427,7 @@ async function fecharFaturaPelaPrevisao(
   return true;
 }
 
-const PREFIXO_PREVISTA = 'prevista:';
+export const PREFIXO_PREVISTA = 'prevista:';
 
 // Saldo do cartão = o que está em aberto nas faturas (as que não foram pagas), como na importação de fatura.
 // O "saldo" que a Pluggy manda é o limite usado, com todas as parcelas futuras: contado inteiro no patrimônio,
@@ -443,7 +444,7 @@ async function saldoDoCartaoPelasFaturas(contaId: number): Promise<void> {
 // "Saldo em rotativo" fica fora da soma: é o resto da fatura anterior, que o banco não conta no total desta.
 // Só entra a diferença a mais (o banco cobrou mais do que mandou). Quando os lançamentos passam do total, quem está
 // errado costuma ser o total: alguns bancos mandam o que faltava pagar depois de um pagamento antecipado.
-const PREFIXO_ACERTO = 'acerto-fatura:';
+export const PREFIXO_ACERTO = 'acerto-fatura:';
 
 async function acertarFaturasFechadas(contaId: number): Promise<void> {
   const faturas = await prisma.fatura.findMany({
@@ -843,6 +844,8 @@ async function gravarLancamentos(
 // ---------- Sincronização de uma conexão ----------
 
 const emAndamento = new Map<number, Promise<void>>();
+// Última atualização da Pluggy (item.lastUpdatedAt) já lida por conexão. A conferência rápida compara com ela.
+const atualizacaoLida = new Map<number, string | null>();
 
 async function executar(conexaoId: number, opcoes: OpcoesSincronizacao): Promise<void> {
   const pedirAtualizacao = opcoes.pedirAtualizacao ?? false;
@@ -855,6 +858,7 @@ async function executar(conexaoId: number, opcoes: OpcoesSincronizacao): Promise
       await pedirAtualizacaoDoItem(conexao.pluggyItemId).catch(() => undefined);
     }
     const item = await aguardarItem(conexao.pluggyItemId);
+    if (item.status !== 'UPDATING') atualizacaoLida.set(conexao.id, item.lastUpdatedAt ?? null);
     const situacao = situacaoDoItem(item);
     const instituicao = texto(item.connector?.name, 120) ?? conexao.instituicao;
     const instituicaoCor = corDoConector(item.connector?.primaryColor) ?? conexao.instituicaoCor;
@@ -901,6 +905,8 @@ async function executar(conexaoId: number, opcoes: OpcoesSincronizacao): Promise
       data: { status: situacao.status, erro: situacao.erro, ultimaSincronizacao: new Date() },
     });
     await registrarPosicaoPatrimonio();
+    // As notificações de compra e reembolso saem agora, sem esperar a rodada de 5 minutos do verificador.
+    avisarNovidade();
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : 'Falha ao sincronizar';
     console.error(`Falha ao sincronizar a conexão ${conexaoId}:`, mensagem);
@@ -943,11 +949,38 @@ export async function sincronizarTudo(opcoes: { pedirAtualizacao?: boolean } = {
 
 // ---------- Sincronização automática ----------
 
-const INTERVALO_AUTOMATICO_MS = 6 * 60 * 60 * 1000;
+const INTERVALO_AUTOMATICO_MS = 30 * 60 * 1000;
+const INTERVALO_CONFERENCIA_MS = 2 * 60 * 1000;
 const ATRASO_INICIAL_MS = 60 * 1000;
 let automaticaIniciada = false;
+let conferindo = false;
 
-// Sincroniza todas as conexões um minuto depois de o servidor subir e, depois, a cada 6 horas.
+// Conferência rápida: pergunta à Pluggy só a situação de cada conexão (não pede nada ao banco). Quando a Pluggy
+// terminou uma atualização que o sistema ainda não leu (ela atualiza sozinha, ou o MeuPluggy atualizou), sincroniza
+// na hora, e as notificações de compra saem em seguida.
+async function conferirAtualizacoes(): Promise<void> {
+  const conexoes = await prisma.conexaoBancaria.findMany({ select: { id: true, perfilId: true, pluggyItemId: true } });
+  for (const conexao of conexoes) {
+    if (emAndamento.has(conexao.id)) continue;
+    try {
+      const item = await comPerfil(conexao.perfilId, () => obterItem(conexao.pluggyItemId));
+      if (item.status !== 'UPDATED') continue;
+      const atual = item.lastUpdatedAt ?? null;
+      if (!atualizacaoLida.has(conexao.id)) {
+        // Primeira conferência depois de subir: a sincronização inicial (um minuto depois de subir) lê tudo.
+        atualizacaoLida.set(conexao.id, atual);
+        continue;
+      }
+      if (atualizacaoLida.get(conexao.id) === atual) continue;
+      await sincronizarConexao(conexao.id);
+    } catch {
+      // Pluggy fora do ar ou sem credenciais: tenta de novo na próxima conferência.
+    }
+  }
+}
+
+// Sincroniza todas as conexões um minuto depois de o servidor subir e, depois, a cada 30 minutos (pedindo ao banco
+// dados novos). Entre uma e outra, a conferência rápida a cada 2 minutos pega o que a Pluggy já tiver de novo.
 export function iniciarSincronizacaoAutomatica(): void {
   if (automaticaIniciada) return;
   automaticaIniciada = true;
@@ -956,6 +989,16 @@ export function iniciarSincronizacaoAutomatica(): void {
       console.error('Falha na sincronização automática:', erro instanceof Error ? erro.message : erro);
     });
   };
+  const conferir = () => {
+    if (conferindo) return;
+    conferindo = true;
+    conferirAtualizacoes()
+      .catch((erro: unknown) => console.error('Falha na conferência do Open Finance:', erro instanceof Error ? erro.message : erro))
+      .finally(() => {
+        conferindo = false;
+      });
+  };
   setTimeout(rodar, ATRASO_INICIAL_MS).unref();
   setInterval(rodar, INTERVALO_AUTOMATICO_MS).unref();
+  setInterval(conferir, INTERVALO_CONFERENCIA_MS).unref();
 }
