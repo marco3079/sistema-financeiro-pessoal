@@ -291,6 +291,27 @@ if [ "$PRONTO" -ne 1 ]; then
   exit 5
 fi
 
+# Acesso seguro (HTTPS): o conteiner "https" entra na rede Tailscale e publica o site com certificado valido.
+# Opcional: sem Tailscale o sistema segue por http.
+LINHA_HTTPS=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  ESTADO_HTTPS="$(docker compose exec -T https tailscale --socket=/var/run/tailscale/tailscaled.sock status --json 2>/dev/null || true)"
+  LINK_HTTPS="$(printf '%s' "$ESTADO_HTTPS" | grep -o 'https://login\.tailscale\.com/[A-Za-z0-9/_-]*' | head -n 1 || true)"
+  NOME_HTTPS="$(printf '%s' "$ESTADO_HTTPS" | grep -o '"DNSName": *"[a-z0-9.-]*"' | head -n 1 | sed -E 's/.*"([a-z0-9.-]*)"$/\1/; s/\.$//' || true)"
+  if printf '%s' "$ESTADO_HTTPS" | grep -q '"BackendState": *"Running"'; then
+    if [ -n "$NOME_HTTPS" ]; then LINHA_HTTPS="Endereco seguro: https://$NOME_HTTPS (aparelhos da sua rede Tailscale)"; fi
+    break
+  fi
+  if [ -n "$LINK_HTTPS" ]; then
+    LINHA_HTTPS="Acesso seguro (HTTPS), opcional: entre no Tailscale por este link ou pela tela Configuracoes > Acesso seguro: $LINK_HTTPS"
+    if command -v tailscale >/dev/null 2>&1 && command -v xdg-open >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+      xdg-open "$LINK_HTTPS" >/dev/null 2>&1 || true
+    fi
+    break
+  fi
+  sleep 2
+done
+
 # Quadro final
 if [ "$ENV_CRIADO_AGORA" -eq 1 ] || [ -z "$ADMIN_SENHA_EXISTENTE" ] || [ "$ADMIN_SENHA_EXISTENTE" = "demo1234" ]; then
   LINHA_SENHA='Senha:          demo1234 (padrao; troque em "Meu perfil")'
@@ -309,6 +330,7 @@ echo "$LINHA_SENHA"
 echo 'Troque a senha em "Meu perfil" depois do primeiro acesso.'
 echo ""
 echo "No celular (mesma rede Wi-Fi): http://$IP_COMPUTADOR:$PORTA_WEB_FINAL"
+[ -n "$LINHA_HTTPS" ] && echo "$LINHA_HTTPS"
 echo ""
 echo "Parar o sistema:           docker compose down"
 echo "Apagar tudo (inclui banco): docker compose down -v"

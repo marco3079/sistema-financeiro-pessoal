@@ -329,6 +329,42 @@ if (Test-Path -LiteralPath $registrarB3) {
     }
 }
 
+# Acesso seguro (HTTPS): o conteiner "https" entra na rede Tailscale e publica o site com certificado valido.
+# Nada aqui e obrigatorio: sem Tailscale o sistema segue por http.
+$linhasHttps = @()
+try {
+    $estadoHttps = $null
+    for ($i = 0; $i -lt 10; $i++) {
+        $textoHttps = (& docker compose exec -T https tailscale --socket=/var/run/tailscale/tailscaled.sock status --json 2>$null) | Out-String
+        if ($textoHttps.Trim() -ne '') {
+            try { $estadoHttps = $textoHttps | ConvertFrom-Json } catch { $estadoHttps = $null }
+            if ($estadoHttps -and ($estadoHttps.BackendState -eq 'Running' -or $estadoHttps.AuthURL)) { break }
+        }
+        Start-Sleep -Seconds 2
+    }
+    if ($estadoHttps -and $estadoHttps.BackendState -eq 'Running') {
+        $nomeHttps = ([string]$estadoHttps.Self.DNSName).TrimEnd('.')
+        if ($nomeHttps -ne '' -and $estadoHttps.CertDomains -and ($estadoHttps.CertDomains -contains $nomeHttps)) {
+            $linhasHttps += ('Endereco seguro: https://' + $nomeHttps + ' (aparelhos da sua rede Tailscale)')
+        } else {
+            $linhasHttps += 'Acesso seguro: falta ligar MagicDNS e HTTPS Certificates no painel do Tailscale (DNS).'
+        }
+    } elseif ($estadoHttps -and ([string]$estadoHttps.AuthURL) -match '^https://login\.tailscale\.com/[A-Za-z0-9/_-]+$') {
+        $linkHttps = [string]$estadoHttps.AuthURL
+        $temTailscale = [bool](Get-Command tailscale -ErrorAction SilentlyContinue) -or (Test-Path -LiteralPath (Join-Path $env:ProgramFiles 'Tailscale\tailscale.exe'))
+        if ($temTailscale -and -not $SemPerguntas) {
+            # Este computador ja usa Tailscale: abre a pagina de entrada para ligar o HTTPS do sistema.
+            try { Start-Process $linkHttps } catch { }
+            $linhasHttps += 'Acesso seguro (HTTPS): abri o navegador para voce entrar no Tailscale e aprovar o sistema.'
+        } else {
+            $linhasHttps += 'Acesso seguro (HTTPS), opcional: entre no Tailscale por este link ou pela tela Configuracoes > Acesso seguro:'
+        }
+        $linhasHttps += ('  ' + $linkHttps)
+    }
+} catch {
+    # sem o conteiner https o sistema segue por http
+}
+
 # Quadro final
 if ($envCriadoAgora -or $adminSenhaExistente -eq '' -or $adminSenhaExistente -eq 'demo1234') {
     $linhaSenha = 'Senha:          demo1234 (padrao; troque em "Meu perfil")'
@@ -347,6 +383,7 @@ Write-Host $linhaSenha
 Write-Host 'Troque a senha em "Meu perfil" depois do primeiro acesso.'
 Write-Host ''
 Write-Host ('No celular (mesma rede Wi-Fi): http://' + $ipComputador + ':' + $portaWeb)
+foreach ($linhaHttps in $linhasHttps) { Write-Host $linhaHttps }
 Write-Host ''
 Write-Host 'Parar o sistema:           docker compose down'
 Write-Host 'Apagar tudo (inclui banco): docker compose down -v'

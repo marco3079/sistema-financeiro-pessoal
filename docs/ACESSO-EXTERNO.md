@@ -8,10 +8,11 @@ O sistema já traz um contêiner (`https`) com o Tailscale. Ele entra na sua red
 
 1. No painel do Tailscale, em **DNS**, deixe ligados **MagicDNS** e **HTTPS Certificates** (uma vez por rede).
 2. No sistema, abra **Configurações > Acesso seguro (HTTPS)** e clique em **Entrar no Tailscale**. Entre com a sua conta e aprove o aparelho.
-3. A tela mostra o endereço `https://financas.<sua-rede>.ts.net`. Ele também passa a ser o primeiro do QR code de "Abrir no celular".
+3. A tela mostra o endereço `https://financas-<computador>.<sua-rede>.ts.net`. Ele também passa a ser o primeiro do QR code de "Abrir no celular".
 4. No celular, com o Tailscale ligado, abra esse endereço. No iPhone: Compartilhar > Adicionar à Tela de Início, e abra pelo ícone para receber notificações.
 
-- O nome `financas` vem de `HTTPS_NOME` no `.env`.
+- O que é automático: o contêiner sobe na instalação e em toda atualização (o atualizador o recria junto com o site); o nome do aparelho na rede sai do nome do computador (`financas-<computador>`, ou `HTTPS_NOME` no `.env`); o endereço entra sozinho no QR code; e o instalador abre a página de entrada do Tailscale quando o computador já tem o Tailscale instalado.
+- O que continua sendo seu, uma vez: entrar na conta e aprovar o aparelho (passo 2) e ligar MagicDNS e HTTPS Certificates na rede (passo 1). O Tailscale não deixa um programa fazer isso por você sem uma chave.
 - Para entrar sem passar pela tela, gere uma chave de autenticação no painel do Tailscale e ponha em `TAILSCALE_AUTHKEY` no `.env`.
 - O acesso vale só para aparelhos da sua rede Tailscale. Se a rede tiver aparelhos de outras pessoas, elas alcançam a tela de login (não entram sem a senha); as regras de acesso (ACL) do Tailscale restringem isso.
 - O login real no Tailscale por este caminho ainda não foi testado de ponta a ponta pelo autor: confira o endereço na tela depois de entrar.

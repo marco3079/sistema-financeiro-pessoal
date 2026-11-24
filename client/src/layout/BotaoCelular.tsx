@@ -228,6 +228,13 @@ export function BotaoCelular() {
             </div>
           )}
 
+          {rede && !rede.enderecos.some((e) => e.url.startsWith('https://')) && (
+            <p className="botao-celular-texto">
+              Para notificações no iPhone e uso fora de casa é preciso um endereço https.{' '}
+              <a href="/app/acesso-seguro">Ligar o acesso seguro</a>
+            </p>
+          )}
+
           {rede && rede.enderecos.length > 1 && (
             <div className="botao-celular-acoes">
               {rede.enderecos.map((e) => (
