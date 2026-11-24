@@ -85,6 +85,15 @@ services:
     network_mode: service:web
     depends_on:
       - web
+    # O nome do aparelho na rede sai do nome do computador, que pode ter letras maiúsculas, sublinhado ou acento
+    # (ex.: PC_DE_MARCO). O Tailscale só aceita letras minúsculas, números e hífen: o nome é limpo antes de entrar.
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        nome=$$(printf '%s' "$$TS_HOSTNAME" | tr 'A-Z' 'a-z' | sed -e 's/[^a-z0-9-]/-/g' -e 's/--*/-/g' -e 's/^-//' -e 's/-$$//' | cut -c1-63 | sed -e 's/-$$//');
+        export TS_HOSTNAME="$${nome:-financas}";
+        exec /usr/local/bin/containerboot
     environment:
       TS_STATE_DIR: /var/lib/tailscale
       TS_SOCKET: /var/run/tailscale/tailscaled.sock
