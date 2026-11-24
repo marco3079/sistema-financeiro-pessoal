@@ -14,6 +14,7 @@ interface ConteinerDTO {
   descricao: string;
   estado: EstadoConteiner;
   detalhe: string | null;
+  registro?: string | null; // últimas linhas do registro, quando o contêiner não está bem
   desde: string | null;
   cpu: string | null;
   memoria: string | null;
@@ -139,6 +140,12 @@ function ConteinerItem({
       </div>
       <p className="servidor-descricao">{conteiner.descricao}</p>
       {conteiner.detalhe && <p className="servidor-detalhe">{conteiner.detalhe}</p>}
+      {conteiner.registro && (
+        <details className="servidor-registro" open>
+          <summary>Últimas linhas do registro (o motivo costuma estar aqui)</summary>
+          <pre>{conteiner.registro}</pre>
+        </details>
+      )}
       <div className="servidor-metricas">
         {conteiner.cpu !== null && (
           <span>

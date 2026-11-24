@@ -237,6 +237,21 @@ async function medirConteineres() {
         }
       }
     }
+    // Registro (últimas linhas) dos contêineres que não estão bem, para a tela mostrar o motivo.
+    const registros = new Map();
+    for (const i of itens) {
+      const id = String(i.ID || '');
+      const bem = String(i.State || '') === 'running' && String(i.Health || '') !== 'unhealthy';
+      if (bem || !/^[0-9a-f]{6,64}$/.test(id)) continue;
+      const r = await rodar('docker', ['logs', '--tail', '25', id], { limiteMs: 10000 });
+      const limpo = r.saida
+        .replace(/\u001b\[[0-9;]*[A-Za-z]/g, '')
+        // Links de entrada e chaves do Tailscale não vão para a tela.
+        .replace(/https:\/\/login\.tailscale\.com\/\S+/g, 'https://login.tailscale.com/<link>')
+        .replace(/tskey-[A-Za-z0-9_-]+/g, 'tskey-<oculta>')
+        .trim();
+      if (limpo) registros.set(id, limpo.slice(-3000));
+    }
     const conteineres = itens.map((i) => {
       const u = uso.get(String(i.ID || '').slice(0, 12)) || {};
       return {
@@ -248,6 +263,7 @@ async function medirConteineres() {
         codigoDeSaida: typeof i.ExitCode === 'number' ? i.ExitCode : null,
         cpu: u.cpu ? String(u.cpu).slice(0, 20) : null,
         memoria: u.memoria ? String(u.memoria).slice(0, 40) : null,
+        registro: registros.get(String(i.ID || '')) || null,
       };
     });
     const esperados = servicos.codigo === 0 ? servicos.saida.split('\n').map((x) => x.trim()).filter((x) => /^[a-z0-9_-]+$/i.test(x)) : [];

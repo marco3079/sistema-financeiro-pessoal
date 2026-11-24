@@ -128,6 +128,8 @@ router.get(
             desde: m ? dataDoDocker(texto(m.criadoEm, 60)) : null,
             cpu: m ? texto(m.cpu, 20) : null,
             memoria: m ? texto(m.memoria, 40) : null,
+            // Últimas linhas do registro, só para contêiner que não está bem (o atualizador já tira links e chaves).
+            registro: m ? texto(m.registro, 3000) : null,
             essencial: info?.essencial ?? false,
           };
         })

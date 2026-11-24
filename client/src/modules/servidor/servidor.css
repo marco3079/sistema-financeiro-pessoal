@@ -138,3 +138,29 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Registro do contêiner com problema: texto de terminal, com rolagem própria e sem estourar a tela. */
+.servidor-registro {
+  margin-top: 0.5rem;
+  min-width: 0;
+}
+
+.servidor-registro summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.servidor-registro pre {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
