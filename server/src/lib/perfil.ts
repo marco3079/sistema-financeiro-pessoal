@@ -244,11 +244,17 @@ export async function emCadaPerfil(fn: (perfilId: number) => Promise<unknown>): 
 }
 
 // Cria um perfil já com as categorias padrão.
-export async function criarPerfil(nome: string, cor: string): Promise<{ id: number; nome: string; cor: string; criadoEm: Date }> {
+export type TipoDePerfil = 'PESSOAL' | 'EMPRESA';
+
+export async function criarPerfil(
+  nome: string,
+  cor: string,
+  tipo: TipoDePerfil = 'PESSOAL'
+): Promise<{ id: number; nome: string; cor: string; tipo: string; criadoEm: Date }> {
   await idsDosPerfis();
-  const perfil = await prisma.perfilFinanceiro.create({ data: { nome, cor } });
+  const perfil = await prisma.perfilFinanceiro.create({ data: { nome, cor, tipo } });
   // Dentro do perfil novo: a requisição que cria o perfil ainda está no perfil antigo.
-  await comPerfil(perfil.id, () => criarCategoriasPadrao(prisma, perfil.id));
+  await comPerfil(perfil.id, () => criarCategoriasPadrao(prisma, perfil.id, tipo));
   esquecerPerfis();
   return perfil;
 }
@@ -265,6 +271,11 @@ export async function apagarPerfil(perfilId: number): Promise<void> {
         await db.contaFixa.deleteMany({});
         await db.regraCategoria.deleteMany({});
         await db.automacao.deleteMany({});
+        await db.anexoTitulo.deleteMany({});
+        await db.baixaTitulo.deleteMany({});
+        await db.titulo.deleteMany({});
+        await db.parceiro.deleteMany({});
+        await db.centroDeCusto.deleteMany({});
         await db.alocacaoAlvo.deleteMany({});
         await db.orcamento.deleteMany({});
         await db.meta.deleteMany({});

@@ -1,0 +1,132 @@
+/* Contas a pagar e a receber. Só variáveis do tema; cabe em 360 px sem rolagem horizontal. */
+
+.tit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tit-grade {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.tit-grade-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .tit-grade {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tit-grade-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.tit-descricao {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tit-detalhe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85em;
+}
+
+.tit-atraso {
+  color: var(--cor-perigo);
+  font-weight: 600;
+}
+
+.tit-ajuda {
+  margin: 0;
+}
+
+.tit-total {
+  margin: 4px 0 0;
+  text-align: right;
+  font-size: 1.05em;
+}
+
+.tit-dados {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px 16px;
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  .tit-dados {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.tit-dados > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tit-dados dt {
+  font-size: 0.85em;
+  color: var(--cor-texto-suave);
+}
+
+.tit-dados dd {
+  margin: 0;
+}
+
+.tit-secao {
+  margin-top: 20px;
+}
+
+.tit-secao h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.tit-lista {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tit-item {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+}
+
+.tit-item-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tit-item-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

@@ -173,6 +173,15 @@ Você instala no seu computador (ou num servidor seu) com Docker. Os dados ficam
 - Orçamento: limite mensal por categoria, com barra de progresso e os gastos sem limite definido. O botão de **sugestão** propõe limites a partir da média dos seus gastos recentes; você aceita ou ajusta.
 - Metas com valor alvo, valor guardado e prazo. Uma meta pode ser **ligada a uma conta ou a um investimento**: o valor guardado passa a acompanhar o saldo.
 
+**Perfil Empresa**
+
+Cada perfil financeiro tem um tipo, **Pessoal** ou **Empresa**, escolhido ao criar e trocável depois em Perfis (trocar não apaga nada: só muda o menu). No perfil Empresa as telas de pessoa física (investimentos, IR, metas, divisões) saem do menu e entram estas:
+
+- **Contas a pagar e a receber**: parcelas, repetição mensal, número do documento, anexo (PDF ou imagem, até 2 MB) e baixa parcial ou total com juros, multa e desconto. A baixa cria o lançamento na conta escolhida e pode ser estornada.
+- **Clientes e fornecedores** e **centros de custo**, com o resultado de cada centro.
+- **Fluxo de caixa** projetado dia a dia, **DRE** por mês (com a classificação de cada categoria), **inadimplência e vencidos** por faixa de atraso, **orçado x realizado** e **indicadores** (margens, ponto de equilíbrio, prazos médios).
+- **Painel da empresa** na tela inicial: saldo, a receber, a pagar, resultado do mês e próximos vencimentos.
+
 **Painel e sistema**
 
 - Painel com patrimônio, saldo em contas, investimentos e despesas do mês, evolução do patrimônio em 12 meses, lançamentos recentes, os próximos vencimentos, o saldo projetado para três meses e as cobranças que pedem atenção.

@@ -134,6 +134,8 @@ export function criarApp() {
   app.use('/api/importacao', express.json({ limit: '12mb' }));
   // A automação da B3 manda a planilha de movimentação exportada (em base64).
   app.use('/api/b3/automacao', express.json({ limit: '12mb' }));
+  // Anexo de conta a pagar ou a receber (boleto, nota) vai em base64: até 2 MB de arquivo.
+  app.use('/api/titulos', express.json({ limit: '3mb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(registrarAtividade);
   iniciarLimpezaDeLogs();

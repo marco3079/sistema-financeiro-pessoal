@@ -1,0 +1,116 @@
+/* Telas Fluxo de caixa e DRE da empresa: cores só pelas variáveis do tema. */
+
+.caixa-suave {
+  color: var(--cor-texto-suave);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* A tabela da DRE tem rolagem horizontal própria; a página nunca rola para o lado. */
+.caixa-area {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  margin-top: 0.6rem;
+}
+
+.caixa-tabela {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  min-width: 100%;
+}
+
+.caixa-tabela th,
+.caixa-tabela td {
+  padding: 0.4rem 0.55rem;
+  text-align: right;
+  border-bottom: 1px solid var(--cor-borda);
+  color: var(--cor-texto);
+}
+
+.caixa-tabela thead th {
+  color: var(--cor-texto-suave);
+  font-weight: 600;
+  background: var(--cor-superficie);
+}
+
+/* Primeira coluna fixa ao rolar (seletor com duas classes para vencer o alinhamento à direita). */
+.caixa-tabela .caixa-fixa {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+  background: var(--cor-superficie);
+  box-shadow: 1px 0 0 var(--cor-borda);
+}
+
+.caixa-tabela thead .caixa-fixa {
+  z-index: 2;
+}
+
+.caixa-total th,
+.caixa-total td {
+  font-weight: 700;
+}
+
+.caixa-destaque {
+  font-weight: 600;
+}
+
+.caixa-negativo {
+  color: var(--cor-perigo);
+}
+
+.caixa-grupo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.caixa-seta {
+  transition: transform 0.15s ease;
+}
+
+.caixa-seta-aberta {
+  transform: rotate(180deg);
+}
+
+.caixa-sub th,
+.caixa-sub td {
+  color: var(--cor-texto-suave);
+  font-weight: 400;
+}
+
+.caixa-tabela .caixa-subnome {
+  padding-left: 1.6rem;
+}
+
+/* Modal de classificação: uma linha por categoria. */
+.caixa-classificar {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.caixa-classificar:last-child {
+  border-bottom: 0;
+}
+
+.caixa-classificar > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}

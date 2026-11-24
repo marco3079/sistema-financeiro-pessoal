@@ -192,20 +192,23 @@ model Conta {
 }
 
 model Categoria {
-  id       Int           @id @default(autoincrement())
-  perfilId Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
-  nome     String
-  tipo     TipoTransacao
-  cor      String        @default("#64748b")
+  id                   Int           @id @default(autoincrement())
+  perfilId             Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  nome                 String
+  tipo                 TipoTransacao
+  cor                  String        @default("#64748b")
   // Reforma tributária: como os gastos desta categoria são tributados pela CBS/IBS (lib/reformaTributaria).
   // null = o sistema escolhe pelo nome da categoria.
   tratamentoTributario String?
   // Área Impostos: tipo de gasto para estimar os tributos de hoje (lib/impostos) e a alíquota escolhida pela pessoa
   // (% do preço final). null = o sistema escolhe pelo nome / usa a alíquota média do tipo.
   tipoImposto          String?
-  aliquotaImposto      Decimal? @db.Decimal(5, 2)
+  aliquotaImposto      Decimal?      @db.Decimal(5, 2)
   // IRPF: se os gastos da categoria abatem no IR (SAUDE, EDUCACAO, PREVIDENCIA ou NAO). null = palpite pelo nome.
   dedutivelIr          String?
+  // DRE do perfil Empresa: linha em que a categoria entra (RECEITA, DEDUCAO, CUSTO, DESPESA, FINANCEIRO, IMPOSTO).
+  // null = RECEITA para categoria de receita e DESPESA para categoria de despesa.
+  grupoDre             String?
 
   transacoes Transacao[]
   orcamento  Orcamento?
@@ -215,32 +218,34 @@ model Categoria {
 }
 
 model Transacao {
-  id            Int           @id @default(autoincrement())
-  perfilId      Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
-  contaId       Int
-  conta         Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
-  data          DateTime      @db.Date
-  descricao     String
-  valor         Decimal       @db.Decimal(14, 2) // sempre positivo
-  tipo          TipoTransacao
+  id              Int           @id @default(autoincrement())
+  perfilId        Int           @default(1) // perfil financeiro dono do registro (PerfilFinanceiro.id)
+  contaId         Int
+  conta           Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  data            DateTime      @db.Date
+  descricao       String
+  valor           Decimal       @db.Decimal(14, 2) // sempre positivo
+  tipo            TipoTransacao
   // true = movimento entre contas próprias ou pagamento de fatura: não entra em receitas/despesas dos relatórios.
-  transferencia Boolean       @default(false)
+  transferencia   Boolean       @default(false)
   // Crédito de provento na conta da corretora que já virou rendimento do ativo: fica fora da lista de lançamentos
   // (aparece em Carteira > Proventos) e, por ser também transferência, fora das receitas.
-  provento      Boolean       @default(false)
+  provento        Boolean       @default(false)
   // Tirado da lista de lançamentos por uma automação (ação ESCONDER). Vai sempre junto com transferencia = true.
-  oculto        Boolean       @default(false)
+  oculto          Boolean       @default(false)
   // Automacao.id que mexeu neste lançamento. Com valor, as automações não mexem nele de novo (o que a pessoa
   // desfizer à mão fica como ela deixou).
-  automacaoId   Int?
-  pendente      Boolean       @default(false)
-  categoriaId   Int?
-  categoria     Categoria?    @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  faturaId      Int?
-  fatura        Fatura?       @relation(fields: [faturaId], references: [id], onDelete: SetNull)
-  parcela       Int? // número da parcela (1, 2, ...)
-  totalParcelas Int?
-  observacao    String?
+  automacaoId     Int?
+  // Perfil Empresa: centro de custo do lançamento (CentroDeCusto.id, sem chave estrangeira).
+  centroDeCustoId Int?
+  pendente        Boolean       @default(false)
+  categoriaId     Int?
+  categoria       Categoria?    @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  faturaId        Int?
+  fatura          Fatura?       @relation(fields: [faturaId], references: [id], onDelete: SetNull)
+  parcela         Int? // número da parcela (1, 2, ...)
+  totalParcelas   Int?
+  observacao      String?
 
   origem              Origem   @default(MANUAL)
   pluggyTransactionId String?  @unique
@@ -436,16 +441,19 @@ model LogAtividade {
 // pela coluna perfilId (sem chave estrangeira, para o banco que já existe ganhar a coluna sem migração manual);
 // o filtro por perfil é aplicado em lib/prisma.ts.
 model PerfilFinanceiro {
-  id       Int      @id @default(autoincrement())
-  nome     String
-  cor      String   @default("#2563eb")
-  criadoEm DateTime @default(now())
+  id                        Int      @id @default(autoincrement())
+  nome                      String
+  cor                       String   @default("#2563eb")
+  criadoEm                  DateTime @default(now())
+  // PESSOAL (padrão) ou EMPRESA. Só muda o menu e as telas: o perfil Empresa ganha contas a pagar e a receber,
+  // clientes e fornecedores, fluxo de caixa, DRE e indicadores, e esconde as telas de pessoa física.
+  tipo                      String   @default("PESSOAL")
   // Credenciais da Pluggy deste perfil (cada pessoa liga o próprio MeuPluggy). O segredo fica cifrado e nunca sai pela API.
   pluggyClientId            String?
   pluggyClientSecretCifrado String?
-  pluggySandbox             Boolean @default(false)
+  pluggySandbox             Boolean  @default(false)
   // Senha opcional do perfil (bcrypt). Com ela, todo usuário precisa desbloquear o perfil uma vez por login.
-  senhaHash String?
+  senhaHash                 String?
 
   acessos AcessoPerfil[]
 }
@@ -485,6 +493,98 @@ model RegraCategoria {
 
 // Automação: condições + ação aplicadas aos lançamentos (marcar transferência, definir categoria, esconder).
 // `config` guarda as condições em JSON (formato em server/src/lib/automacoes.ts).
+// ===== Perfil Empresa =====
+
+// Cliente ou fornecedor: a quem a empresa deve ou de quem tem a receber.
+model Parceiro {
+  id         Int      @id @default(autoincrement())
+  perfilId   Int      @default(1)
+  nome       String
+  tipo       String   @default("AMBOS") // CLIENTE | FORNECEDOR | AMBOS
+  documento  String? // CPF ou CNPJ, só dígitos
+  email      String?
+  telefone   String?
+  observacao String?
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now())
+
+  @@index([perfilId])
+}
+
+// Centro de custo: área ou projeto para dividir receitas e despesas.
+model CentroDeCusto {
+  id       Int      @id @default(autoincrement())
+  perfilId Int      @default(1)
+  nome     String
+  cor      String   @default("#64748b")
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  @@index([perfilId])
+}
+
+// Conta a pagar (natureza PAGAR) ou a receber (natureza RECEBER). Uma conta parcelada ou recorrente vira vários
+// títulos com o mesmo `grupo`. A situação (aberta, parcial, quitada, vencida) sai das baixas e do vencimento.
+model Titulo {
+  id              Int      @id @default(autoincrement())
+  perfilId        Int      @default(1)
+  natureza        String // PAGAR | RECEBER
+  descricao       String
+  parceiroId      Int? // Parceiro.id (sem chave estrangeira)
+  categoriaId     Int?
+  centroDeCustoId Int?
+  contaId         Int? // conta prevista para o pagamento ou recebimento
+  valor           Decimal  @db.Decimal(14, 2)
+  emissao         DateTime @db.Date
+  vencimento      DateTime @db.Date
+  documento       String? // nota fiscal, boleto, pedido
+  parcela         Int?
+  totalParcelas   Int?
+  grupo           String? // liga as parcelas de uma mesma conta, ou as repetições de uma recorrência
+  recorrente      Boolean  @default(false)
+  observacao      String?
+  cancelado       Boolean  @default(false)
+  criadoEm        DateTime @default(now())
+
+  @@index([perfilId])
+  @@index([perfilId, natureza, vencimento])
+  @@index([grupo])
+}
+
+// Baixa (pagamento ou recebimento, total ou parcial) de um título. Cria o lançamento na conta escolhida.
+model BaixaTitulo {
+  id          Int      @id @default(autoincrement())
+  perfilId    Int      @default(1)
+  tituloId    Int
+  data        DateTime @db.Date
+  valor       Decimal  @db.Decimal(14, 2) // quanto do título foi quitado nesta baixa
+  juros       Decimal  @default(0) @db.Decimal(14, 2)
+  multa       Decimal  @default(0) @db.Decimal(14, 2)
+  desconto    Decimal  @default(0) @db.Decimal(14, 2)
+  contaId     Int
+  transacaoId Int? // lançamento criado pela baixa (valor + juros + multa - desconto)
+  observacao  String?
+  criadoEm    DateTime @default(now())
+
+  @@index([perfilId])
+  @@index([tituloId])
+}
+
+// Anexo de um título (boleto, nota). Fica só neste computador: não entra no arquivo do Drive.
+model AnexoTitulo {
+  id       Int      @id @default(autoincrement())
+  perfilId Int      @default(1)
+  tituloId Int
+  nome     String
+  tipo     String // application/pdf, image/png, image/jpeg
+  tamanho  Int
+  dados    Bytes
+  criadoEm DateTime @default(now())
+
+  @@index([perfilId])
+  @@index([tituloId])
+}
+
 model Automacao {
   id           Int      @id @default(autoincrement())
   perfilId     Int      @default(1)
@@ -720,13 +820,13 @@ model EmailEnviado {
 // Área Impostos > IRPF: dados que o sistema não enxerga (renda bruta, IR retido, INSS, dependentes), por perfil e ano.
 // Campo vazio = o sistema estima (renda bruta = receitas lançadas; o resto, zero).
 model ConfigIrpf {
-  id          Int      @id @default(autoincrement())
-  perfilId    Int      @default(1)
-  ano         Int
-  rendaBruta  Decimal? @db.Decimal(14, 2)
-  irRetido    Decimal? @db.Decimal(14, 2)
-  inss        Decimal? @db.Decimal(14, 2)
-  dependentes Int      @default(0)
+  id           Int      @id @default(autoincrement())
+  perfilId     Int      @default(1)
+  ano          Int
+  rendaBruta   Decimal? @db.Decimal(14, 2)
+  irRetido     Decimal? @db.Decimal(14, 2)
+  inss         Decimal? @db.Decimal(14, 2)
+  dependentes  Int      @default(0)
   // Meta: no máximo este valor de imposto indireto (estimado) no ano.
   metaIndireto Decimal? @db.Decimal(14, 2)
   atualizadoEm DateTime @updatedAt

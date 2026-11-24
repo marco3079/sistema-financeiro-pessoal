@@ -1,0 +1,62 @@
+/* Telas Vencidos, Indicadores e Orçado x realizado: cores só pelas variáveis do tema. Cabe em 360 px sem rolagem horizontal. */
+
+.analise-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analise-topo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.analise-ver {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--cor-primaria);
+}
+
+.analise-sem-dados {
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+}
+
+.analise-periodo {
+  color: var(--cor-texto-suave);
+  margin: 0 0 1rem;
+}
+
+.analise-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analise-indicador-valor {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.analise-indicador-texto {
+  color: var(--cor-texto-suave);
+  margin: 0;
+}
+
+.analise-progresso {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+}
+
+.analise-progresso span {
+  white-space: nowrap;
+}

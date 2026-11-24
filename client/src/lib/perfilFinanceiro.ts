@@ -6,6 +6,8 @@
 export const CHAVE_PERFIL = 'financas.perfil';
 const CHAVE_DESBLOQUEIOS = 'financas.desbloqueios';
 
+export type TipoDePerfil = 'PESSOAL' | 'EMPRESA';
+
 // ADMIN = titular (todos os perfis). EDICAO e LEITURA = nível do membro neste perfil.
 export type NivelPerfil = 'ADMIN' | 'EDICAO' | 'LEITURA';
 
@@ -13,6 +15,7 @@ export interface PerfilDTO {
   id: number;
   nome: string;
   cor: string; // '#rrggbb'
+  tipo: TipoDePerfil; // Empresa troca o menu e as telas
   criadoEm: string;
   atual: boolean; // é o perfil desta requisição
   nivel: NivelPerfil;

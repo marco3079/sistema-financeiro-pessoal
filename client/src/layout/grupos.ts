@@ -13,6 +13,16 @@ export const GRUPOS: GrupoMenu[] = [
     titulo: 'Dia a dia',
     caminhos: ['/app/rapido', '/app/transacoes', '/app/contas', '/app/cartoes', '/app/agenda'],
   },
+  // Perfil Empresa (as rotas /app/empresa/... só existem no menu desse tipo de perfil).
+  {
+    titulo: 'Financeiro',
+    caminhos: ['/app/empresa/pagar', '/app/empresa/receber', '/app/empresa/fluxo', '/app/empresa/vencidos'],
+  },
+  {
+    titulo: 'Resultado',
+    caminhos: ['/app/empresa/dre', '/app/empresa/orcado', '/app/empresa/indicadores', '/app/empresa/centros'],
+  },
+  { titulo: 'Cadastros', caminhos: ['/app/empresa/parceiros'] },
   { titulo: 'Análises', caminhos: ['/app/analise', '/app/ano', '/app/relatorio-mensal', '/app/alertas'] },
   { titulo: 'Investimentos', caminhos: ['/app/carteira', '/app/investimentos', '/app/central/investimentos'] },
   { titulo: 'Planejamento', caminhos: ['/app/orcamento', '/app/metas', '/app/divisoes'] },

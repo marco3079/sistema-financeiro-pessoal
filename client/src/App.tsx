@@ -12,7 +12,7 @@ import { EscolherPerfil } from './layout/EscolherPerfil';
 import { aoPedirEscolhaDePerfil, perfilJaEscolhido } from './lib/escolhaDePerfil';
 import { Carregando, Pagina } from './ui';
 import { AcessoPerfilProvider, useAcessoPerfil } from './lib/acessoPerfil';
-import type { NivelPerfil } from './lib/perfilFinanceiro';
+import type { NivelPerfil, TipoDePerfil } from './lib/perfilFinanceiro';
 import type { RotaModulo } from './lib/rotas';
 import type { Perfil } from './lib/tipos';
 
@@ -47,13 +47,35 @@ const CAMINHOS_SO_TITULAR = [
 // Telas de lançar dados: o membro só abre com nível Edição no perfil em uso.
 const CAMINHOS_DE_EDICAO = ["/app/importar", "/app/rapido", "/app/regras"];
 
+// Telas de pessoa física: somem quando o perfil em uso é do tipo Empresa.
+const CAMINHOS_SO_PESSOAL = [
+  "/app/carteira",
+  "/app/investimentos",
+  "/app/central/investimentos",
+  "/app/ativo",
+  "/app/alvo",
+  "/app/rendimento",
+  "/app/simulador",
+  "/app/suno",
+  "/app/ir",
+  "/app/metas",
+  "/app/divisoes",
+  "/app/cupom",
+  "/app/agenda",
+];
+// Telas do perfil Empresa: só aparecem nele.
+const PREFIXO_EMPRESA = "/app/empresa";
+
 function casa(caminho: string, lista: string[]): boolean {
   return lista.some((c) => caminho === c || caminho.startsWith(c + '/'));
 }
 
 // Uma rota vale para o usuário se o módulo a libera para TITULAR e, no caso do membro, ela não está nas listas acima
 // (as de edição valem com nível Edição).
-function rotaLiberada(rota: RotaModulo, perfil: Perfil, nivel: NivelPerfil | null): boolean {
+function rotaLiberada(rota: RotaModulo, perfil: Perfil, nivel: NivelPerfil | null, tipoDoPerfil: TipoDePerfil): boolean {
+  const deEmpresa = rota.caminho === PREFIXO_EMPRESA || rota.caminho.startsWith(PREFIXO_EMPRESA + '/');
+  if (deEmpresa && tipoDoPerfil !== 'EMPRESA') return false;
+  if (tipoDoPerfil === 'EMPRESA' && casa(rota.caminho, CAMINHOS_SO_PESSOAL)) return false;
   if (!rota.perfis.includes('TITULAR')) return rota.perfis.includes(perfil);
   if (perfil === 'TITULAR') return true;
   if (casa(rota.caminho, CAMINHOS_SO_TITULAR)) return false;
@@ -76,7 +98,7 @@ function CascaDoPerfil() {
   if (atual?.bloqueado) {
     return <DesbloquearPerfil perfil={atual} outros={(perfis ?? []).filter((p) => p.id !== atual.id)} aoDesbloquear={recarregar} />;
   }
-  const liberadas = ROTAS.filter((r) => rotaLiberada(r, usuario.perfil, nivel));
+  const liberadas = ROTAS.filter((r) => rotaLiberada(r, usuario.perfil, nivel, atual?.tipo ?? 'PESSOAL'));
   const menu = liberadas.filter((r) => r.menu !== false);
   // A busca do topo também acha as telas que saíram do menu (menos as que dependem de um item, como a ficha do ativo).
   const telas = liberadas.filter((r) => !r.caminho.includes(':'));
@@ -95,9 +117,9 @@ function LayoutDoPerfil() {
 
 function RotaProtegida({ rota, children }: { rota: RotaModulo; children: ReactNode }) {
   const { usuario } = useAuth();
-  const { nivel } = useAcessoPerfil();
+  const { nivel, atual } = useAcessoPerfil();
   if (!usuario) return <Navigate to="/login" replace />;
-  if (!rotaLiberada(rota, usuario.perfil, nivel)) {
+  if (!rotaLiberada(rota, usuario.perfil, nivel, atual?.tipo ?? 'PESSOAL')) {
     return <Navigate to={caminhoDoPerfil(usuario.perfil)} replace />;
   }
   return <>{children}</>;

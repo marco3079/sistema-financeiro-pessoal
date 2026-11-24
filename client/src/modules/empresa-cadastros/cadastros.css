@@ -1,0 +1,28 @@
+/* Clientes, fornecedores e centros de custo. Só variáveis do tema; cabe em 360 px. */
+
+.cad-ajuda {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
+
+.cad-suave {
+  color: var(--cor-texto-suave);
+}
+
+.cad-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.cad-filtros > .campo {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.cad-mes {
+  margin-bottom: 12px;
+}

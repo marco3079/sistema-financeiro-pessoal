@@ -28,6 +28,7 @@ function FormPerfil({
 }) {
   const [nome, setNome] = useState(perfil?.nome ?? '');
   const [cor, setCor] = useState(perfil?.cor ?? '#2563eb');
+  const [tipo, setTipo] = useState<string>(perfil?.tipo ?? 'PESSOAL');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -45,8 +46,8 @@ function FormPerfil({
     }
     setOcupado(true);
     try {
-      if (perfil) await api.put('/perfis/' + perfil.id, { nome: limpo, cor });
-      else await api.post('/perfis', { nome: limpo, cor });
+      if (perfil) await api.put('/perfis/' + perfil.id, { nome: limpo, cor, tipo });
+      else await api.post('/perfis', { nome: limpo, cor, tipo });
       aoSalvo(perfil);
     } catch (err) {
       setErro(mensagemErro(err));
@@ -59,6 +60,21 @@ function FormPerfil({
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
       <Campo rotulo="Nome" valor={nome} aoMudar={setNome} obrigatorio />
       <CampoCor rotulo="Cor" valor={cor} aoMudar={setCor} />
+      <Selecao
+        rotulo="Tipo de perfil"
+        valor={tipo}
+        aoMudar={setTipo}
+        opcoes={[
+          { valor: 'PESSOAL', rotulo: 'Pessoal' },
+          { valor: 'EMPRESA', rotulo: 'Empresa' },
+        ]}
+      />
+      <p className="fin-suave">
+        {tipo === 'EMPRESA'
+          ? 'Empresa: contas a pagar e a receber, clientes e fornecedores, fluxo de caixa, DRE e indicadores. As telas de pessoa física (investimentos, IR, metas) saem do menu.'
+          : 'Pessoal: contas, cartões, investimentos, orçamento e metas.'}{' '}
+        Trocar o tipo não apaga nada: só muda o menu.
+      </p>
       <div className="pagina-acoes">
         <Botao tipo="submit" desabilitado={ocupado}>
           Salvar

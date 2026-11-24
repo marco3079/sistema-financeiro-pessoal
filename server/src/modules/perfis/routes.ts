@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma, comPerfil, perfilAtual } from '../../lib/prisma';
 import { asyncHandler, HttpError, idParam, validar } from '../../lib/erros';
 import { permitir } from '../../lib/auth';
+import { criarCategoriasPadrao } from '../../../prisma/categorias-padrao';
 import { arredondar, corSchema, textoCurto, totaisPatrimonio } from '../../lib/financas';
 import {
   acessosDoMembro,
@@ -26,7 +27,7 @@ import type { NivelEfetivo } from '../../lib/perfil';
 
 const router = Router();
 
-const perfilSchema = z.object({ nome: textoCurto, cor: corSchema.optional() });
+const perfilSchema = z.object({ nome: textoCurto, cor: corSchema.optional(), tipo: z.enum(['PESSOAL', 'EMPRESA']).optional() });
 
 router.get(
   '/perfis',
@@ -47,6 +48,7 @@ router.get(
           id: p.id,
           nome: p.nome,
           cor: p.cor,
+          tipo: p.tipo === 'EMPRESA' ? 'EMPRESA' : 'PESSOAL',
           criadoEm: p.criadoEm.toISOString(),
           atual: p.id === atual,
           nivel,
@@ -78,8 +80,8 @@ router.post(
     if ((await prisma.perfilFinanceiro.count()) >= 20) throw new HttpError(400, 'O limite é de 20 perfis');
     const repetido = await prisma.perfilFinanceiro.findFirst({ where: { nome: { equals: dados.nome, mode: 'insensitive' } } });
     if (repetido) throw new HttpError(409, 'Já existe um perfil com esse nome');
-    const criado = await criarPerfil(dados.nome, dados.cor ?? '#2563eb');
-    res.status(201).json({ id: criado.id, nome: criado.nome, cor: criado.cor, criadoEm: criado.criadoEm.toISOString() });
+    const criado = await criarPerfil(dados.nome, dados.cor ?? '#2563eb', dados.tipo ?? 'PESSOAL');
+    res.status(201).json({ id: criado.id, nome: criado.nome, cor: criado.cor, tipo: criado.tipo, criadoEm: criado.criadoEm.toISOString() });
   })
 );
 
@@ -97,8 +99,12 @@ router.put(
       });
       if (repetido) throw new HttpError(409, 'Já existe um perfil com esse nome');
     }
-    const atualizado = await prisma.perfilFinanceiro.update({ where: { id }, data: { nome: dados.nome, cor: dados.cor } });
-    res.json({ id: atualizado.id, nome: atualizado.nome, cor: atualizado.cor, criadoEm: atualizado.criadoEm.toISOString() });
+    const atualizado = await prisma.perfilFinanceiro.update({ where: { id }, data: { nome: dados.nome, cor: dados.cor, tipo: dados.tipo } });
+    // Virou Empresa: ganha as categorias de empresa que ainda não tem (as que já existem ficam como estão).
+    if (dados.tipo === 'EMPRESA' && existente.tipo !== 'EMPRESA') {
+      await comPerfil(id, () => criarCategoriasPadrao(prisma, id, 'EMPRESA'));
+    }
+    res.json({ id: atualizado.id, nome: atualizado.nome, cor: atualizado.cor, tipo: atualizado.tipo, criadoEm: atualizado.criadoEm.toISOString() });
   })
 );
 

@@ -209,6 +209,28 @@ Metas aceitam `contaId` ou `investimentoId` (um dos dois): o valor guardado acom
 
 **Usuário somente leitura (`LEITOR`)**: todo método que não seja GET responde 403, exceto sair e trocar a própria senha; as áreas de usuários, MCP, Drive, atualização, segurança, logs, configurações, pasta de entrada, avisos e cupom ficam fechadas também para consulta; o perfil financeiro é o do cadastro do usuário, e o cabeçalho `X-Perfil` é ignorado.
 
+## Perfil Empresa
+
+O perfil financeiro tem `tipo`: `PESSOAL` ou `EMPRESA` (aceito em `POST /perfis` e `PUT /perfis/:id`). As rotas abaixo valem para o perfil em uso.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET, POST, PUT, DELETE | `/parceiros`, `/parceiros/:id` | clientes e fornecedores (`tipo`: `CLIENTE`, `FORNECEDOR`, `AMBOS`); a lista traz `titulosEmAberto` e `saldoEmAberto`; excluir com contas ligadas responde 409 |
+| GET, POST, PUT, DELETE | `/centros-de-custo`, `/centros-de-custo/:id` | centros de custo |
+| GET | `/centros-de-custo/resultado` | receitas, despesas e resultado por centro |
+| PUT | `/centros-de-custo/lancamentos` | `{ ids, centroDeCustoId }` → põe o centro nos lançamentos |
+| GET | `/titulos?natureza=PAGAR\|RECEBER` | lista com `resumo`; filtros `situacao`, `de`, `ate`, `parceiroId`, `grupo`, `busca` |
+| POST | `/titulos` | cria; `parcelas` divide o valor, `recorrenciaMeses` repete o valor nos meses seguintes (não se usam juntos). Responde `{ criados }` |
+| GET, PUT, DELETE | `/titulos/:id` | detalhe com `baixas` e anexos, edição e exclusão (`?grupo=true` apaga também as outras do grupo sem baixa) |
+| POST | `/titulos/:id/cancelar`, `/titulos/:id/reabrir` | cancela (só sem baixa) e reabre |
+| POST | `/titulos/:id/baixas` | `{ data, valor, juros?, multa?, desconto?, contaId }` → cria o lançamento e mexe no saldo da conta |
+| DELETE | `/titulos/:id/baixas/:baixaId` | estorna a baixa |
+| POST, GET, DELETE | `/titulos/:id/anexos`, `/titulos/:id/anexos/:anexoId` | anexo em base64 (PDF, PNG ou JPEG; até 2 MB; 5 por título) |
+| GET | `/empresa/painel`, `/empresa/fluxo?dias=`, `/empresa/dre?ano=`, `/empresa/vencidos?natureza=`, `/empresa/indicadores?meses=`, `/empresa/orcado?mes=` | relatórios |
+| GET, PUT | `/empresa/dre/categorias`, `/empresa/dre/categorias/:id` | grupo da DRE de cada categoria (`grupoDre`, ou `null` para automático) |
+
+Situação do título: `ABERTO`, `PARCIAL`, `QUITADO`, `VENCIDO` ou `CANCELADO`, calculada pelas baixas e pelo vencimento.
+
 ## Automações
 
 | Método | Rota | O que faz |

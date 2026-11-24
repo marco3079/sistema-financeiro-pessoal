@@ -1,0 +1,306 @@
+/* Painel da empresa. Cores, raios e sombras só pelas variáveis do tema. */
+
+.empresa-painel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* ---------- Cabeçalho ---------- */
+
+.empresa-cabecalho {
+  min-width: 0;
+  padding: 4px 0 6px;
+}
+
+.empresa-saudacao {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+.empresa-subtitulo {
+  margin: 6px 0 0;
+  color: var(--cor-texto-suave);
+}
+
+.empresa-traco {
+  display: block;
+  width: 44px;
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--gradiente-primario);
+}
+
+/* ---------- Cartão genérico ---------- */
+
+.empresa-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+}
+
+.empresa-cartao-cabecalho {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.empresa-cartao-icone {
+  flex-shrink: 0;
+  color: var(--cor-primaria);
+}
+
+.empresa-cartao-titulo {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.empresa-nota {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.empresa-vazio-texto {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--cor-texto-suave);
+}
+
+.empresa-ver-todos {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  text-decoration: none;
+}
+
+.empresa-ver-todos:hover {
+  text-decoration: underline;
+}
+
+.empresa-ver-todos:focus-visible,
+.empresa-item:focus-visible,
+.empresa-atalho:focus-visible,
+.empresa-pilula:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+
+/* ---------- Alerta de vencidos ---------- */
+
+.empresa-alerta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  color: var(--cor-perigo);
+  background: color-mix(in srgb, var(--cor-perigo) 12%, var(--cor-superficie));
+  border: 1px solid color-mix(in srgb, var(--cor-perigo) 35%, transparent);
+  border-radius: var(--raio);
+}
+
+.empresa-alerta-texto {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.empresa-pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cor-primaria);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+/* ---------- Duas colunas: próximos e atrasados ---------- */
+
+.empresa-colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.empresa-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empresa-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--cor-texto);
+  background: var(--cor-superficie-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  text-decoration: none;
+}
+
+.empresa-item:hover {
+  border-color: var(--cor-primaria);
+}
+
+.empresa-marca {
+  flex-shrink: 0;
+  width: 10px;
+  align-self: stretch;
+  min-height: 36px;
+  border-radius: 999px;
+}
+
+.empresa-item-texto {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.empresa-item-titulo {
+  display: block;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cor-texto);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empresa-item-corpo {
+  display: block;
+  overflow: hidden;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empresa-item-direita {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.empresa-item-valor {
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-texto);
+  white-space: nowrap;
+}
+
+.empresa-prazo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Cores de texto pelo significado (prazo). */
+.empresa-tom-perigo {
+  color: var(--cor-perigo);
+}
+
+.empresa-tom-aviso {
+  color: var(--cor-aviso);
+}
+
+.empresa-tom-verde {
+  color: var(--cor-verde);
+}
+
+.empresa-tom-suave {
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- Atalhos ---------- */
+
+.empresa-atalhos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 10px;
+}
+
+.empresa-atalho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 84px;
+  padding: 8px;
+  color: var(--cor-primaria);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  text-align: center;
+  text-decoration: none;
+}
+
+.empresa-atalho:hover {
+  border-color: var(--cor-primaria);
+}
+
+.empresa-atalho span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cor-texto);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Celular ---------- */
+
+@media (max-width: 520px) {
+  .empresa-saudacao {
+    font-size: 1.6rem;
+  }
+
+  .empresa-cartao {
+    padding: 14px;
+  }
+
+  .empresa-item-valor {
+    font-size: 0.92rem;
+  }
+}
