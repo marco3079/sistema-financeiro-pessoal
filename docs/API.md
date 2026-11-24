@@ -132,7 +132,7 @@ Todas as rotas autenticadas respondem dentro de um perfil financeiro. O cliente 
 | GET | `/analise?meses=3\|6\|12\|24` | receitas e gastos por mês, por categoria e por estabelecimento, gastos recorrentes, resumo dos investimentos e `sugestoes` (`area`: `GASTOS`, `RECEITAS` ou `INVESTIMENTOS`) |
 | GET | `/rendimento` | carteira, classes e ativos comparados com Selic, IPCA, Ibovespa e IFIX; renda fixa estimada pela taxa; projeção de 12 meses |
 | POST | `/rendimento/atualizar` | busca os índices de novo e devolve o relatório recalculado |
-| GET | `/simulador/indices` | `{ ipca12m, selic }`, cada um `{ taxa, ate }` ou `null`: IPCA dos últimos 12 meses e Selic atual ao ano (fração), para preencher o simulador |
+| GET | `/simulador/indices` | `{ ipca12m, selic, ibov, ifix }`: IPCA dos últimos 12 meses e Selic atual ao ano (`{ taxa, ate }`, fração), e o histórico de até 10 anos do Ibovespa e do IFIX (`{ retornoAnual, volatilidade, anos, de, ate }`); `null` quando falta dado |
 | GET | `/cartoes/previsao` | parcelas ainda não cobradas, por cartão e por mês, somadas às faturas em aberto |
 | GET | `/rede` | `{ porta, enderecos: [{ rotulo, url }] }` para o QR code de acesso pelo celular |
 

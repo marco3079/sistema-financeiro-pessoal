@@ -3,6 +3,18 @@
   margin: 0;
 }
 
+/* Tipo (renda fixa ou variável) e modo (básico ou avançado) lado a lado; no celular, um embaixo do outro. */
+.sim-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 1.5rem;
+}
+
+.sim-topo > .abas {
+  margin-bottom: 0.5rem;
+}
+
 /* Computador: dados à esquerda, resultados à direita (fixos ao rolar). Celular: um embaixo do outro. */
 .sim-colunas {
   display: grid;
@@ -267,5 +279,15 @@
   }
   .sim-destaque > strong {
     font-size: 1.6rem;
+  }
+}
+
+.sim-faixa-numeros {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 420px) {
+  .sim-faixa-numeros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

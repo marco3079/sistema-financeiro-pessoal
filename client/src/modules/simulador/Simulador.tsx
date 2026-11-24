@@ -13,12 +13,16 @@ import {
   depositoParaMeta,
   mesesParaMeta,
   simular,
+  simularFaixa,
   taxaPeriodoDaEfetiva,
 } from './calculo';
-import type { Frequencia, PontoMes, Resultado } from './calculo';
+import type { Faixa, Frequencia, PontoMes, Resultado } from './calculo';
 import {
   FORMULARIO_PADRAO,
   INFLACAO_RESERVA,
+  ISENCAO_ACOES_MES,
+  PADRAO_ATIVO,
+  ROTULO_ATIVO,
   esquecer,
   lerEntrada,
   lerSalvo,
@@ -26,7 +30,7 @@ import {
   percentualParaCampo,
   salvar,
 } from './formulario';
-import type { FluxoForm, Formulario, TipoAumento } from './formulario';
+import type { Ativo, FluxoForm, Formulario, TipoAumento, TipoInvestimento } from './formulario';
 import './simulador.css';
 
 interface ResumoContas {
@@ -38,10 +42,22 @@ interface TaxaReferencia {
   ate: string;
 }
 
+interface Historico {
+  retornoAnual: number;
+  volatilidade: number;
+  anos: number;
+  de: string;
+  ate: string;
+}
+
 interface Indices {
   ipca12m: TaxaReferencia | null;
   selic: TaxaReferencia | null;
+  ibov?: Historico | null;
+  ifix?: Historico | null;
 }
+
+const CAMINHOS_FAIXA = 1000;
 
 // ---------- Formatação ----------
 
@@ -67,6 +83,12 @@ function mesDoAno(iso: string): string {
   return `${mes}/${ano}`;
 }
 
+// Rótulo do eixo X: meses quando o prazo é curto, anos quando é longo.
+function rotuloPonto(mes: number, emMeses: boolean): string {
+  if (emMeses) return String(mes);
+  return mes % 12 === 0 ? String(mes / 12) : (mes / 12).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+}
+
 // ---------- Opções ----------
 
 const FREQUENCIAS: Frequencia[] = ['diaria', 'semanal', 'quinzenal', 'mensal', 'bimestral', 'trimestral', 'semestral', 'anual'];
@@ -79,6 +101,13 @@ function opcoesCapitalizacao(dias: string) {
 }
 
 const OPCOES_FREQUENCIA = FREQUENCIAS.map((f) => ({ valor: f, rotulo: ROTULO_FREQUENCIA[f] }));
+
+const OPCOES_FREQ_DIVIDENDOS = (['mensal', 'trimestral', 'semestral', 'anual'] as Frequencia[]).map((f) => ({
+  valor: f,
+  rotulo: ROTULO_FREQUENCIA[f],
+}));
+
+const OPCOES_ATIVO = (Object.keys(ROTULO_ATIVO) as Ativo[]).map((a) => ({ valor: a, rotulo: ROTULO_ATIVO[a] }));
 
 function opcoesMomento(f: Frequencia) {
   const p = PERIODO_FREQUENCIA[f];
@@ -101,6 +130,12 @@ const OPCOES_IMPOSTO = [
   { valor: 'fixo15', rotulo: '15% sobre o ganho' },
 ];
 
+const NOTA_IMPOSTO_ATIVO: Record<Ativo, string> = {
+  acoes: `*Ações: 15% sobre o ganho na venda. Vendas de até ${formatarReais(ISENCAO_ACOES_MES)} no mês são isentas. Dividendos tratados como isentos (a retenção de 10% criada em 2026 só vale acima de R$ 50 mil por mês da mesma empresa).`,
+  fiis: '*FIIs: 20% sobre o ganho na venda, sem isenção. Os rendimentos mensais são isentos para pessoa física.',
+  etfs: '*ETFs de ações: 15% sobre o ganho na venda, sem a isenção de R$ 20 mil.',
+};
+
 // ---------- Pedaços da tela ----------
 
 // Campo com um seletor ao lado (taxa + "mensal/anual", duração + "anos/meses"), como no app de referência.
@@ -110,6 +145,15 @@ function Par({ children }: { children: ReactNode }) {
 
 function Nota({ children }: { children: ReactNode }) {
   return <p className="sim-nota">{children}</p>;
+}
+
+function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div>
+      <dt>{rotulo}</dt>
+      <dd>{valor}</dd>
+    </div>
+  );
 }
 
 function CampoAumento({
@@ -193,6 +237,7 @@ interface Linha {
   depositos: number;
   retiradas: number;
   juros: number;
+  dividendos: number;
   taxas: number;
   irRetido: number;
   saldo: number;
@@ -207,6 +252,7 @@ function linhaDoMes(m: PontoMes): Linha {
     depositos: m.depositos,
     retiradas: m.retiradas,
     juros: m.juros,
+    dividendos: m.dividendos,
     taxas: m.taxas,
     irRetido: m.irRetido,
     saldo: m.saldo,
@@ -228,6 +274,7 @@ function linhasPorAno(meses: PontoMes[]): Linha[] {
       depositos: soma((m) => m.depositos),
       retiradas: soma((m) => m.retiradas),
       juros: soma((m) => m.juros),
+      dividendos: soma((m) => m.dividendos),
       taxas: soma((m) => m.taxas),
       irRetido: soma((m) => m.irRetido),
       saldo: ultimo.saldo,
@@ -281,6 +328,11 @@ export function Simulador() {
     setForm((f) => ({ ...f, fluxos: f.fluxos.map((x) => (x.id === id ? novo : x)) }));
   }
 
+  // Trocar o tipo de ativo preenche os valores típicos dele.
+  function mudarAtivo(ativo: Ativo) {
+    setForm((f) => ({ ...f, ativo, ...PADRAO_ATIVO[ativo] }));
+  }
+
   function limpar() {
     esquecer();
     valorEditado.current = false;
@@ -290,6 +342,7 @@ export function Simulador() {
     setForm({
       ...FORMULARIO_PADRAO,
       modo: form.modo,
+      tipoInvestimento: form.tipoInvestimento,
       fluxos: [novoFluxo('deposito')],
       valorInicial: investimentos > 0 ? valorParaCampo(investimentos) : '',
       inflacao: percentualParaCampo(ipca ?? INFLACAO_RESERVA / 100),
@@ -308,27 +361,52 @@ export function Simulador() {
     }));
   }
 
+  // Histórico do índice de referência do tipo de ativo. O índice já inclui os proventos reinvestidos:
+  // a valorização do preço é o retorno do índice sem a parte dos dividendos informados.
+  const historicoAtivo: { nome: string; dados: Historico } | null = (() => {
+    const h = form.ativo === 'fiis' ? indices.dados?.ifix : indices.dados?.ibov;
+    return h ? { nome: form.ativo === 'fiis' ? 'IFIX' : 'Ibovespa', dados: h } : null;
+  })();
+
+  function usarHistorico() {
+    if (!historicoAtivo) return;
+    const h = historicoAtivo.dados;
+    setForm((f) => {
+      const etf = f.ativo === 'etfs';
+      const dy = etf ? 0 : (lerValor(f.dividendos.replace('%', '')) ?? 0) / 100;
+      return {
+        ...f,
+        valorizacao: percentualParaCampo((1 + h.retornoAnual) / (1 + dy) - 1),
+        volatilidade: percentualParaCampo(h.volatilidade, 1),
+        dividendos: etf ? '0' : f.dividendos,
+      };
+    });
+  }
+
   // ---------- Contas ----------
 
+  const variavel = form.tipoInvestimento === 'variavel';
   const entrada = useMemo(() => lerEntrada(form), [form]);
   const resultado: Resultado | null = useMemo(
     () => (typeof entrada === 'string' ? null : simular(entrada.params, entrada.diasNoAno)),
     [entrada]
   );
 
+  // Cenários: a taxa de juros (renda fixa) ou a valorização (renda variável) 2 pontos abaixo e acima.
   const cenarios = useMemo(() => {
     if (typeof entrada === 'string' || !resultado) return null;
-    const ef = resultado.taxaAnualEfetiva;
+    const base = resultado.taxaAnualPreco;
+    const nome = entrada.variavel ? 'Valorização' : 'Taxa';
     return [
-      { rotulo: 'Taxa 2 pontos abaixo', efetiva: ef - 0.02 },
-      { rotulo: 'Taxa informada', efetiva: ef },
-      { rotulo: 'Taxa 2 pontos acima', efetiva: ef + 0.02 },
+      { rotulo: `${nome} 2 pontos abaixo`, efetiva: base - 0.02 },
+      { rotulo: `${nome} informada`, efetiva: base },
+      { rotulo: `${nome} 2 pontos acima`, efetiva: base + 0.02 },
     ]
       .filter((c) => c.efetiva > -1)
       .map((c) => ({
         ...c,
         res:
-          c.efetiva === ef
+          c.efetiva === base
             ? resultado
             : simular(
                 {
@@ -355,6 +433,30 @@ export function Simulador() {
     };
   }, [form, entrada, metaValor, medidaMeta]);
 
+  // Faixa de resultados (renda variável com oscilação): mil caminhos sorteados. É a conta mais pesada da tela,
+  // então espera a pessoa parar de digitar.
+  const [faixa, setFaixa] = useState<Faixa | null>(null);
+  const [calculandoFaixa, setCalculandoFaixa] = useState(false);
+  useEffect(() => {
+    if (typeof entrada === 'string' || !entrada.variavel || entrada.volatilidade <= 0) {
+      setFaixa(null);
+      setCalculandoFaixa(false);
+      return;
+    }
+    setCalculandoFaixa(true);
+    const relogio = setTimeout(() => {
+      setFaixa(
+        simularFaixa(entrada.params, entrada.volatilidade, {
+          caminhos: CAMINHOS_FAIXA,
+          alvo: metaValor !== null && metaValor > 0 ? metaValor : null,
+          medida: medidaMeta,
+        })
+      );
+      setCalculandoFaixa(false);
+    }, 450);
+    return () => clearTimeout(relogio);
+  }, [entrada, metaValor, medidaMeta]);
+
   function usarDepositoDaMeta(valor: number) {
     if (form.modo === 'basico') {
       setForm((f) => ({ ...f, depositoMensal: valorParaCampo(valor) }));
@@ -368,19 +470,19 @@ export function Simulador() {
   const pontosGrafico = useMemo(() => {
     if (!resultado || typeof entrada === 'string') return null;
     const meses = resultado.meses;
-    const passo = meses.length <= 36 ? 1 : 12;
-    const escolhidos = meses.filter((m, i) => (i + 1) % passo === 0 || i === meses.length - 1);
+    const emMeses = meses.length <= 36;
+    const escolhidos = meses.filter((m, i) => emMeses || (i + 1) % 12 === 0 || i === meses.length - 1);
     const inicial = entrada.params.valorInicial;
     const pontos = [
       { rotulo: '0', saldo: inicial, real: temInflacao ? inicial : null, aportado: inicial },
       ...escolhidos.map((m) => ({
-        rotulo: passo === 1 ? String(m.mes) : m.mes % 12 === 0 ? String(m.mes / 12) : `${(m.mes / 12).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}`,
+        rotulo: rotuloPonto(m.mes, emMeses),
         saldo: m.saldo,
         real: m.saldoReal,
-        aportado: inicial + m.depositosAcum - m.retiradasAcum,
+        aportado: inicial + m.depositosAcum - m.retiradasAcum - m.dividendosRecebidosAcum,
       })),
     ];
-    return { passo, pontos };
+    return { emMeses, pontos };
   }, [resultado, entrada, temInflacao]);
 
   const linhasTabela = useMemo(() => {
@@ -396,15 +498,18 @@ export function Simulador() {
   }, [anosNaTabela, anoTabela]);
 
   const temRetiradas = (resultado?.totalRetiradas ?? 0) > 0;
-  const temIR = form.imposto !== 'nenhum';
-  const temTaxas = (resultado?.taxasPagas ?? 0) > 0;
+  const temIR = typeof entrada !== 'string' && entrada.params.imposto !== 'nenhum';
+  const temTaxas = (resultado?.taxasPagas ?? 0) + (resultado?.custosCompra ?? 0) > 0;
+  const temDividendos = (resultado?.dividendos ?? 0) > 0;
+  const nomeJuros = variavel ? 'Valorização' : 'Juros';
 
   const colunas: ColunaTabela<Linha>[] = [
     { titulo: 'Período', celula: (l) => l.periodo },
     { titulo: 'Depósitos', celula: (l) => formatarReais(l.depositos), alinhar: 'direita' },
     ...(temRetiradas ? [{ titulo: 'Retiradas', celula: (l: Linha) => formatarReais(l.retiradas), alinhar: 'direita' as const }] : []),
-    { titulo: 'Juros', celula: (l) => formatarReais(l.juros), alinhar: 'direita' },
-    ...(temTaxas ? [{ titulo: 'Taxas', celula: (l: Linha) => formatarReais(l.taxas), alinhar: 'direita' as const }] : []),
+    { titulo: nomeJuros, celula: (l) => formatarReais(l.juros), alinhar: 'direita' },
+    ...(temDividendos ? [{ titulo: 'Dividendos', celula: (l: Linha) => formatarReais(l.dividendos), alinhar: 'direita' as const }] : []),
+    ...(temTaxas ? [{ titulo: 'Taxas e custos', celula: (l: Linha) => formatarReais(l.taxas), alinhar: 'direita' as const }] : []),
     ...(temIR && temRetiradas
       ? [{ titulo: 'IR nas retiradas', celula: (l: Linha) => formatarReais(l.irRetido), alinhar: 'direita' as const }]
       : []),
@@ -420,6 +525,42 @@ export function Simulador() {
   const selic = indices.dados?.selic ?? null;
   const contagem = { deposito: 0, retirada: 0 };
 
+  const camposDeposito = avancado ? null : (
+    <>
+      <Par>
+        <Campo rotulo="Depósito mensal (R$)" valor={form.depositoMensal} aoMudar={mudar('depositoMensal')} />
+        <Selecao
+          rotulo="Depósitos são feitos no"
+          valor={form.momentoBasico}
+          aoMudar={(v) => mudar('momentoBasico')(v as 'inicio' | 'fim')}
+          opcoes={opcoesMomento('mensal')}
+        />
+      </Par>
+      <CampoAumento
+        rotulo="Aumento anual do depósito"
+        tipo={form.aumentoBasico}
+        pctTexto={form.aumentoBasicoPct}
+        aoMudarTipo={mudar('aumentoBasico')}
+        aoMudarPct={mudar('aumentoBasicoPct')}
+      />
+    </>
+  );
+
+  const campoDuracao = (
+    <Par>
+      <Campo rotulo="Duração" valor={form.duracao} aoMudar={mudar('duracao')} tipo="number" />
+      <Selecao
+        rotulo="A duração é em"
+        valor={form.duracaoUnidade}
+        aoMudar={(v) => mudar('duracaoUnidade')(v as 'anos' | 'meses')}
+        opcoes={[
+          { valor: 'anos', rotulo: 'Ano(s)' },
+          { valor: 'meses', rotulo: 'Mês(es)' },
+        ]}
+      />
+    </Par>
+  );
+
   return (
     <Pagina
       titulo="Simulador de investimentos"
@@ -430,116 +571,155 @@ export function Simulador() {
       }
     >
       <p className="sim-explicacao">
-        Juros compostos com depósitos, retiradas, inflação, imposto e taxas. Os valores ficam guardados neste navegador.
+        Renda fixa ou renda variável, com depósitos, retiradas, inflação, imposto e taxas. Os valores ficam guardados neste
+        navegador.
       </p>
 
-      <Abas
-        abas={[
-          { id: 'basico', rotulo: 'Básico' },
-          { id: 'avancado', rotulo: 'Avançado' },
-        ]}
-        ativa={form.modo}
-        aoMudar={(id) => mudar('modo')(id as 'basico' | 'avancado')}
-      />
+      <div className="sim-topo">
+        <Abas
+          abas={[
+            { id: 'fixa', rotulo: 'Renda fixa' },
+            { id: 'variavel', rotulo: 'Renda variável' },
+          ]}
+          ativa={form.tipoInvestimento}
+          aoMudar={(id) => mudar('tipoInvestimento')(id as TipoInvestimento)}
+        />
+        <Abas
+          abas={[
+            { id: 'basico', rotulo: 'Básico' },
+            { id: 'avancado', rotulo: 'Avançado' },
+          ]}
+          ativa={form.modo}
+          aoMudar={(id) => mudar('modo')(id as 'basico' | 'avancado')}
+        />
+      </div>
 
       <div className="sim-colunas">
         <div className="sim-entrada">
-          <Cartao titulo="Dados do investimento">
-            <div className="sim-grade">
-              <Campo rotulo="Valor inicial (R$)" valor={form.valorInicial} aoMudar={mudar('valorInicial')} />
-              <div>
-                <Par>
-                  <Campo rotulo="Taxa de juros (%)" valor={form.taxa} aoMudar={mudar('taxa')} />
-                  <Selecao
-                    rotulo="A taxa de juros é"
-                    valor={form.taxaPeriodo}
-                    aoMudar={(v) => mudar('taxaPeriodo')(v as 'mensal' | 'anual')}
-                    opcoes={[
-                      { valor: 'mensal', rotulo: 'Mensal' },
-                      { valor: 'anual', rotulo: 'Anual' },
-                    ]}
-                  />
-                </Par>
-                {selic && (
-                  <p className="sim-dica">
-                    Selic hoje: {pct(selic.taxa)} ao ano.{' '}
-                    <button type="button" className="sim-link" onClick={usarSelic}>
-                      Usar
-                    </button>
-                  </p>
-                )}
-              </div>
-              <Par>
-                <Campo rotulo="Duração" valor={form.duracao} aoMudar={mudar('duracao')} tipo="number" />
-                <Selecao
-                  rotulo="A duração é em"
-                  valor={form.duracaoUnidade}
-                  aoMudar={(v) => mudar('duracaoUnidade')(v as 'anos' | 'meses')}
-                  opcoes={[
-                    { valor: 'anos', rotulo: 'Ano(s)' },
-                    { valor: 'meses', rotulo: 'Mês(es)' },
-                  ]}
-                />
-              </Par>
-
-              {avancado ? (
-                <>
-                  <Selecao
-                    rotulo="Tipo de ano"
-                    valor={form.diasNoAno}
-                    aoMudar={(v) => mudar('diasNoAno')(v as '360' | '365')}
-                    opcoes={[
-                      { valor: '365', rotulo: 'Anos com 365 dias' },
-                      { valor: '360', rotulo: 'Anos com 360 dias' },
-                    ]}
-                  />
-                  <Selecao
-                    rotulo="Frequência de capitalização"
-                    valor={form.capitalizacao}
-                    aoMudar={(v) => mudar('capitalizacao')(v as Frequencia)}
-                    opcoes={opcoesCapitalizacao(form.diasNoAno)}
-                  />
-                  <Selecao
-                    rotulo="Como ler a taxa"
-                    valor={form.tipoTaxa}
-                    aoMudar={(v) => mudar('tipoTaxa')(v as 'nominal' | 'efetiva')}
-                    opcoes={[
-                      { valor: 'nominal', rotulo: 'Nominal (dividida pela capitalização)' },
-                      { valor: 'efetiva', rotulo: 'Efetiva (juros sobre juros equivalentes)' },
-                    ]}
-                  />
-                </>
-              ) : (
-                <>
+          <Cartao titulo={variavel ? 'Dados do investimento (renda variável)' : 'Dados do investimento (renda fixa)'}>
+            {variavel ? (
+              <>
+                <div className="sim-grade">
+                  <Campo rotulo="Valor inicial (R$)" valor={form.valorInicial} aoMudar={mudar('valorInicial')} />
+                  <Selecao rotulo="Tipo de ativo" valor={form.ativo} aoMudar={(v) => mudarAtivo(v as Ativo)} opcoes={OPCOES_ATIVO} />
+                  <div>
+                    <Par>
+                      <Campo rotulo="Valorização esperada (% ao ano)" valor={form.valorizacao} aoMudar={mudar('valorizacao')} />
+                      <Campo rotulo="Oscilação (% ao ano)" valor={form.volatilidade} aoMudar={mudar('volatilidade')} />
+                    </Par>
+                    {historicoAtivo ? (
+                      <p className="sim-dica">
+                        {historicoAtivo.nome} nos últimos {historicoAtivo.dados.anos.toLocaleString('pt-BR')} anos (até{' '}
+                        {mesDoAno(historicoAtivo.dados.ate)}): {pct(historicoAtivo.dados.retornoAnual)} ao ano com proventos,
+                        oscilação de {pct(historicoAtivo.dados.volatilidade, 1)}.{' '}
+                        <button type="button" className="sim-link" onClick={usarHistorico}>
+                          Usar o histórico
+                        </button>
+                      </p>
+                    ) : (
+                      !indices.carregando && (
+                        <p className="sim-dica">
+                          O histórico do {form.ativo === 'fiis' ? 'IFIX' : 'Ibovespa'} ainda não está no sistema. A busca começou;
+                          volte em alguns minutos.
+                        </p>
+                      )
+                    )}
+                  </div>
                   <Par>
-                    <Campo rotulo="Depósito mensal (R$)" valor={form.depositoMensal} aoMudar={mudar('depositoMensal')} />
+                    <Campo rotulo="Dividendos (% ao ano)" valor={form.dividendos} aoMudar={mudar('dividendos')} />
                     <Selecao
-                      rotulo="Depósitos são feitos no"
-                      valor={form.momentoBasico}
-                      aoMudar={(v) => mudar('momentoBasico')(v as 'inicio' | 'fim')}
-                      opcoes={opcoesMomento('mensal')}
+                      rotulo="Pagos"
+                      valor={form.freqDividendos}
+                      aoMudar={(v) => mudar('freqDividendos')(v as Frequencia)}
+                      opcoes={OPCOES_FREQ_DIVIDENDOS}
                     />
                   </Par>
-                  <CampoAumento
-                    rotulo="Aumento anual do depósito"
-                    tipo={form.aumentoBasico}
-                    pctTexto={form.aumentoBasicoPct}
-                    aoMudarTipo={mudar('aumentoBasico')}
-                    aoMudarPct={mudar('aumentoBasicoPct')}
-                  />
-                </>
-              )}
-            </div>
-            {avancado ? (
-              <>
-                <Nota>*Juros são pagos no mesmo cronograma da frequência de capitalização.</Nota>
+                  <div className="sim-caixa">
+                    <Caixa rotulo="Reinvestir os dividendos" marcado={form.reinvestir} aoMudar={mudar('reinvestir')} />
+                  </div>
+                  {campoDuracao}
+                  <Campo rotulo="Custo de cada compra (% corretagem e B3)" valor={form.custoCompra} aoMudar={mudar('custoCompra')} />
+                  {camposDeposito}
+                </div>
                 <Nota>
-                  *Taxa nominal: 12% ao ano com capitalização mensal vira 1% ao mês (como no app de referência). Taxa efetiva:
-                  12% ao ano rendem exatamente 12% em um ano, como o CDI e o Tesouro.
+                  *Valorização é só a alta do preço; os dividendos vêm à parte. Oscilação é o quanto o retorno varia de um ano
+                  para outro (desvio-padrão): ela não muda o cálculo fixo, só a faixa de resultados.
+                </Nota>
+                <Nota>
+                  *Sem oscilação, o cálculo usa a valorização todos os meses (juros compostos mensais). O custo de compra vale
+                  para o valor inicial, os depósitos e os dividendos reinvestidos.
                 </Nota>
               </>
             ) : (
-              <Nota>*Os cálculos do modo básico assumem meses de 30 dias e uma frequência de capitalização mensal.</Nota>
+              <>
+                <div className="sim-grade">
+                  <Campo rotulo="Valor inicial (R$)" valor={form.valorInicial} aoMudar={mudar('valorInicial')} />
+                  <div>
+                    <Par>
+                      <Campo rotulo="Taxa de juros (%)" valor={form.taxa} aoMudar={mudar('taxa')} />
+                      <Selecao
+                        rotulo="A taxa de juros é"
+                        valor={form.taxaPeriodo}
+                        aoMudar={(v) => mudar('taxaPeriodo')(v as 'mensal' | 'anual')}
+                        opcoes={[
+                          { valor: 'mensal', rotulo: 'Mensal' },
+                          { valor: 'anual', rotulo: 'Anual' },
+                        ]}
+                      />
+                    </Par>
+                    {selic && (
+                      <p className="sim-dica">
+                        Selic hoje: {pct(selic.taxa)} ao ano.{' '}
+                        <button type="button" className="sim-link" onClick={usarSelic}>
+                          Usar
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                  {campoDuracao}
+                  {avancado ? (
+                    <>
+                      <Selecao
+                        rotulo="Tipo de ano"
+                        valor={form.diasNoAno}
+                        aoMudar={(v) => mudar('diasNoAno')(v as '360' | '365')}
+                        opcoes={[
+                          { valor: '365', rotulo: 'Anos com 365 dias' },
+                          { valor: '360', rotulo: 'Anos com 360 dias' },
+                        ]}
+                      />
+                      <Selecao
+                        rotulo="Frequência de capitalização"
+                        valor={form.capitalizacao}
+                        aoMudar={(v) => mudar('capitalizacao')(v as Frequencia)}
+                        opcoes={opcoesCapitalizacao(form.diasNoAno)}
+                      />
+                      <Selecao
+                        rotulo="Como ler a taxa"
+                        valor={form.tipoTaxa}
+                        aoMudar={(v) => mudar('tipoTaxa')(v as 'nominal' | 'efetiva')}
+                        opcoes={[
+                          { valor: 'nominal', rotulo: 'Nominal (dividida pela capitalização)' },
+                          { valor: 'efetiva', rotulo: 'Efetiva (juros sobre juros equivalentes)' },
+                        ]}
+                      />
+                    </>
+                  ) : (
+                    camposDeposito
+                  )}
+                </div>
+                {avancado ? (
+                  <>
+                    <Nota>*Juros são pagos no mesmo cronograma da frequência de capitalização.</Nota>
+                    <Nota>
+                      *Taxa nominal: 12% ao ano com capitalização mensal vira 1% ao mês (como no app de referência). Taxa
+                      efetiva: 12% ao ano rendem exatamente 12% em um ano, como o CDI e o Tesouro.
+                    </Nota>
+                  </>
+                ) : (
+                  <Nota>*Os cálculos do modo básico assumem meses de 30 dias e uma frequência de capitalização mensal.</Nota>
+                )}
+              </>
             )}
           </Cartao>
 
@@ -596,15 +776,28 @@ export function Simulador() {
                   )}
                 </p>
               </div>
-              <Selecao
-                rotulo="Imposto de renda"
-                valor={form.imposto}
-                aoMudar={(v) => mudar('imposto')(v as Formulario['imposto'])}
-                opcoes={OPCOES_IMPOSTO}
+              {variavel ? (
+                <div className="sim-caixa">
+                  <Caixa rotulo="Considerar o imposto de renda" marcado={form.rvImposto} aoMudar={mudar('rvImposto')} />
+                </div>
+              ) : (
+                <Selecao
+                  rotulo="Imposto de renda"
+                  valor={form.imposto}
+                  aoMudar={(v) => mudar('imposto')(v as Formulario['imposto'])}
+                  opcoes={OPCOES_IMPOSTO}
+                />
+              )}
+              <Campo
+                rotulo={variavel ? 'Taxa de administração ou custódia (% ao ano; ETFs)' : 'Taxa de administração ou custódia (% ao ano)'}
+                valor={form.taxaAdm}
+                aoMudar={mudar('taxaAdm')}
               />
-              <Campo rotulo="Taxa de administração ou custódia (% ao ano)" valor={form.taxaAdm} aoMudar={mudar('taxaAdm')} />
             </div>
-            {form.imposto === 'regressiva' && (
+            {variavel && form.rvImposto && (
+              <Nota>{NOTA_IMPOSTO_ATIVO[form.ativo]} Prejuízos não são compensados na simulação.</Nota>
+            )}
+            {!variavel && form.imposto === 'regressiva' && (
               <Nota>
                 *IR sobre o ganho de cada depósito, pelo tempo aplicado: 22,5% até 180 dias, 20% até 360, 17,5% até 720 e 15% acima.
                 Não inclui IOF (resgates com menos de 30 dias) nem come-cotas.
@@ -617,7 +810,7 @@ export function Simulador() {
           {typeof entrada === 'string' && <Aviso tipo="info">{entrada}</Aviso>}
 
           {resultado && (
-            <Cartao titulo="Resultados">
+            <Cartao titulo={variavel ? 'Resultados (sem oscilação)' : 'Resultados'}>
               <div className="sim-destaque">
                 <span>Saldo final{temIR ? ' (bruto)' : ''}</span>
                 <strong>{formatarReais(resultado.saldoFinal)}</strong>
@@ -628,52 +821,28 @@ export function Simulador() {
                 )}
               </div>
               <dl className="sim-numeros">
-                <div>
-                  <dt>Total investido</dt>
-                  <dd>{formatarReais(resultado.totalInvestido)}</dd>
-                </div>
-                <div>
-                  <dt>Juros totais recebidos</dt>
-                  <dd>{formatarReais(resultado.jurosTotais)}</dd>
-                </div>
-                <div>
-                  <dt>Total de depósitos</dt>
-                  <dd>{formatarReais(resultado.totalDepositos)}</dd>
-                </div>
-                <div>
-                  <dt>Taxa anual efetiva</dt>
-                  <dd>{pct(resultado.taxaAnualEfetiva, 3)}</dd>
-                </div>
-                {temRetiradas && (
-                  <div>
-                    <dt>Total de retiradas</dt>
-                    <dd>{formatarReais(resultado.totalRetiradas)}</dd>
-                  </div>
+                <Numero rotulo="Total investido" valor={formatarReais(resultado.totalInvestido)} />
+                <Numero
+                  rotulo={variavel ? 'Valorização total' : 'Juros totais recebidos'}
+                  valor={formatarReais(resultado.jurosTotais)}
+                />
+                <Numero rotulo="Total de depósitos" valor={formatarReais(resultado.totalDepositos)} />
+                <Numero
+                  rotulo={variavel ? 'Retorno anual esperado' : 'Taxa anual efetiva'}
+                  valor={pct(resultado.taxaAnualEfetiva, 3)}
+                />
+                {temDividendos && <Numero rotulo="Dividendos" valor={formatarReais(resultado.dividendos)} />}
+                {resultado.dividendosRecebidos > 0 && (
+                  <Numero rotulo="Dividendos recebidos (não reinvestidos)" valor={formatarReais(resultado.dividendosRecebidos)} />
                 )}
-                {temTaxas && (
-                  <div>
-                    <dt>Taxas pagas</dt>
-                    <dd>{formatarReais(resultado.taxasPagas)}</dd>
-                  </div>
+                {temRetiradas && <Numero rotulo="Total de retiradas" valor={formatarReais(resultado.totalRetiradas)} />}
+                {resultado.taxasPagas > 0 && <Numero rotulo="Taxa de administração paga" valor={formatarReais(resultado.taxasPagas)} />}
+                {resultado.custosCompra > 0 && <Numero rotulo="Custos de compra" valor={formatarReais(resultado.custosCompra)} />}
+                {resultado.taxasPagas > 0 && (
+                  <Numero rotulo="Rendimento anual após a taxa" valor={pct(resultado.taxaAnualLiquidaDeTaxas, 3)} />
                 )}
-                {temTaxas && (
-                  <div>
-                    <dt>Rendimento anual após taxas</dt>
-                    <dd>{pct(resultado.taxaAnualLiquidaDeTaxas, 3)}</dd>
-                  </div>
-                )}
-                {temIR && (
-                  <div>
-                    <dt>IR no resgate (estimado)</dt>
-                    <dd>{formatarReais(resultado.irFinal)}</dd>
-                  </div>
-                )}
-                {temIR && temRetiradas && (
-                  <div>
-                    <dt>IR retido nas retiradas</dt>
-                    <dd>{formatarReais(resultado.irRetiradas)}</dd>
-                  </div>
-                )}
+                {temIR && <Numero rotulo="IR no resgate (estimado)" valor={formatarReais(resultado.irFinal)} />}
+                {temIR && temRetiradas && <Numero rotulo="IR retido nas retiradas" valor={formatarReais(resultado.irRetiradas)} />}
               </dl>
               {resultado.esgotouNoMes !== null && (
                 <Aviso tipo="erro">
@@ -702,13 +871,39 @@ export function Simulador() {
                   icone="investimentos"
                   cor={(resultado.taxaRealAnual ?? 0) >= 0 ? 'azul' : 'vermelho'}
                   valor={pct(resultado.taxaRealAnual ?? 0)}
-                  rotulo="Juro real ao ano (antes do IR)"
+                  rotulo={variavel ? 'Retorno real ao ano (antes do IR)' : 'Juro real ao ano (antes do IR)'}
                 />
               </div>
               <Nota>
                 *Com inflação de {pct(resultado.inflacaoAnual ?? 0)} ao ano. O ganho real compara o saldo de hoje com o que entrou
-                (valor inicial e depósitos, menos retiradas), cada um corrigido para o valor de hoje.
+                (valor inicial e depósitos, menos retiradas{resultado.dividendosRecebidos > 0 ? ' e dividendos recebidos' : ''}),
+                cada um corrigido para o valor de hoje.
               </Nota>
+            </Cartao>
+          )}
+
+          {variavel && typeof entrada !== 'string' && entrada.volatilidade > 0 && (
+            <Cartao titulo="Faixa de resultados">
+              {faixa ? (
+                <>
+                  <dl className="sim-numeros sim-faixa-numeros">
+                    <Numero rotulo="Pessimista (10% piores)" valor={formatarReais(faixa.final.p10)} />
+                    <Numero rotulo="Mediano" valor={formatarReais(faixa.final.p50)} />
+                    <Numero rotulo="Otimista (10% melhores)" valor={formatarReais(faixa.final.p90)} />
+                    <Numero rotulo="Chance de terminar com menos do que aplicou" valor={pct(faixa.chancePerda, 0)} />
+                    {faixa.chanceMeta !== null && <Numero rotulo="Chance de chegar à meta" valor={pct(faixa.chanceMeta, 0)} />}
+                  </dl>
+                  <Nota>
+                    *{faixa.caminhos.toLocaleString('pt-BR')} simulações com oscilação de {pct(entrada.volatilidade, 1)} ao ano.
+                    Valores {temIR ? 'líquidos de IR' : 'finais'}
+                    {medidaMeta === 'liquidoReal' ? ', em valor de hoje' : ''}. O mediano costuma ficar abaixo do cálculo fixo: as
+                    quedas pesam mais que as altas do mesmo tamanho.
+                  </Nota>
+                </>
+              ) : (
+                <p className="sim-dica">Calculando as simulações...</p>
+              )}
+              {calculandoFaixa && faixa && <p className="sim-dica">Atualizando...</p>}
             </Cartao>
           )}
         </div>
@@ -730,9 +925,9 @@ export function Simulador() {
               area
               descricao="Saldo, saldo em valor de hoje e dinheiro aplicado ao longo do tempo."
             />
-            <Nota>{pontosGrafico.passo === 1 ? 'Eixo em meses.' : 'Eixo em anos.'}</Nota>
+            <Nota>{pontosGrafico.emMeses ? 'Eixo em meses.' : 'Eixo em anos.'}</Nota>
           </Cartao>
-          <Cartao titulo="Aportes x juros">
+          <Cartao titulo={variavel ? 'Aportes x rendimento' : 'Aportes x juros'}>
             <GraficoBarras
               rotulos={pontosGrafico.pontos.slice(1).map((p) => p.rotulo)}
               series={[
@@ -742,16 +937,36 @@ export function Simulador() {
                   valores: pontosGrafico.pontos.slice(1).map((p) => Math.max(0, Math.min(p.aportado, p.saldo))),
                 },
                 {
-                  nome: 'Juros',
+                  nome: variavel ? 'Valorização e dividendos' : 'Juros',
                   cor: 'var(--cor-verde)',
                   valores: pontosGrafico.pontos.slice(1).map((p) => Math.max(0, p.saldo - Math.max(0, p.aportado))),
                 },
               ]}
               formato={formatarEixo}
               empilhar
-              descricao="Quanto do saldo é dinheiro aplicado e quanto é juros."
+              descricao="Quanto do saldo é dinheiro aplicado e quanto é rendimento."
             />
           </Cartao>
+          {faixa && resultado && (
+            <Cartao titulo="Faixa do saldo ao longo do tempo">
+              <GraficoLinhas
+                rotulos={faixa.mesesPorPonto.map((m) => rotuloPonto(m, pontosGrafico.emMeses))}
+                series={[
+                  { nome: 'Otimista', cor: 'var(--cor-verde)', valores: faixa.p90 },
+                  { nome: 'Mediano', cor: 'var(--cor-primaria)', valores: faixa.p50 },
+                  { nome: 'Pessimista', cor: 'var(--cor-perigo)', valores: faixa.p10 },
+                  {
+                    nome: 'Sem oscilação',
+                    cor: 'var(--cor-texto-suave)',
+                    valores: faixa.mesesPorPonto.map((m) => (m === 0 ? resultado.totalInvestido : resultado.saldosMes[m - 1])),
+                  },
+                ]}
+                formato={formatarEixo}
+                descricao="Saldo bruto nos cenários pessimista, mediano e otimista, e no cálculo sem oscilação."
+              />
+              <Nota>*Saldo bruto em cada momento: 10% dos caminhos ficam abaixo da linha pessimista e 10% acima da otimista.</Nota>
+            </Cartao>
+          )}
         </div>
       )}
 
@@ -761,11 +976,15 @@ export function Simulador() {
           <div className="sim-cenarios">
             {cenarios.map((c) => (
               <Cartao key={c.rotulo} titulo={c.rotulo}>
-                <p>Taxa efetiva: {pct(c.efetiva)} ao ano</p>
+                <p>
+                  {variavel ? 'Valorização' : 'Taxa efetiva'}: {pct(c.efetiva)} ao ano
+                </p>
                 <p>
                   {temIR ? 'Saldo líquido' : 'Saldo final'}: <strong>{formatarReais(c.res.saldoLiquido)}</strong>
                 </p>
-                <p>Juros: {formatarReais(c.res.jurosTotais)}</p>
+                <p>
+                  {nomeJuros}: {formatarReais(c.res.jurosTotais)}
+                </p>
                 {c.res.saldoLiquidoReal !== null && <p>Em valor de hoje: {formatarReais(c.res.saldoLiquidoReal)}</p>}
               </Cartao>
             ))}
@@ -817,11 +1036,19 @@ export function Simulador() {
                   </>
                 )}
               </div>
+              {faixa && faixa.chanceMeta !== null && (
+                <div className="sim-meta">
+                  <span className="sim-meta-titulo">Chance de chegar, com a oscilação</span>
+                  <strong>{pct(faixa.chanceMeta, 0)}</strong>
+                  <span className="sim-dica">No prazo informado, em {faixa.caminhos.toLocaleString('pt-BR')} simulações.</span>
+                </div>
+              )}
             </div>
           )}
           <Nota>
             *A meta compara com o saldo {temIR ? 'líquido de IR' : 'final'}
-            {form.metaReal && temInflacao ? ', em valor de hoje' : ''}.
+            {form.metaReal && temInflacao ? ', em valor de hoje' : ''}
+            {variavel ? ', no cálculo sem oscilação' : ''}.
           </Nota>
         </Cartao>
       )}
@@ -851,7 +1078,8 @@ export function Simulador() {
       )}
 
       <Aviso tipo="info">
-        Isto é só uma simulação, com taxas constantes. Não é previsão nem recomendação de investimento.
+        Isto é só uma simulação. {variavel ? 'Renda variável não tem rendimento garantido: o passado não garante o futuro. ' : ''}
+        Não é previsão nem recomendação de investimento.
       </Aviso>
     </Pagina>
   );

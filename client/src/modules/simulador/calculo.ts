@@ -5,7 +5,12 @@
 // os juros são pagos no mesmo cronograma da capitalização. Se o prazo terminar no meio de um período,
 // os juros proporcionais entram no fim (como num resgate).
 //
-// Ordem no mesmo instante: juros do período que terminou, taxa de administração, depósitos, retiradas.
+// Renda variável: a "taxa" é a valorização do preço (mensal), que pode mudar mês a mês (`retornos`, usado na
+// faixa de resultados). Dividendos são pagos sobre o saldo e podem ser reinvestidos (comprando mais, com o
+// custo de compra) ou recebidos (saem do investimento).
+//
+// Ordem no mesmo instante: juros/valorização do período que terminou, taxa de administração, dividendos,
+// depósitos, retiradas.
 
 export type Frequencia =
   | 'diaria'
@@ -18,7 +23,7 @@ export type Frequencia =
   | 'anual';
 
 export type Momento = 'inicio' | 'fim';
-export type TipoImposto = 'nenhum' | 'regressiva' | 'fixo15';
+export type TipoImposto = 'nenhum' | 'regressiva' | 'fixo15' | 'fixo20';
 
 export interface Fluxo {
   tipo: 'deposito' | 'retirada';
@@ -31,16 +36,26 @@ export interface Fluxo {
   fimMes: number | null; // para depois de N meses desde o começo da simulação (null = até o fim)
 }
 
+export interface Dividendos {
+  taxaAnual: number; // fração do saldo por ano (dividend yield)
+  porAno: number; // pagamentos por ano
+  reinvestir: boolean;
+}
+
 export interface Parametros {
   valorInicial: number;
-  taxaPeriodo: number; // juros por período de capitalização (fração)
+  taxaPeriodo: number; // juros (ou valorização) por período de capitalização (fração)
   capitalizacoesPorAno: number;
   meses: number; // prazo total em meses
   fluxos: Fluxo[];
   inflacaoAnual: number | null; // fração; null = sem inflação
   taxaAdmAnual: number; // fração do saldo por ano (administração/custódia)
   imposto: TipoImposto;
-  detalhar?: boolean; // false: não monta a lista mês a mês (usado nas buscas de meta)
+  detalhar?: boolean; // false: não monta a lista mês a mês (usado nas buscas de meta e na faixa)
+  retornos?: number[]; // taxa de cada período (substitui taxaPeriodo onde houver)
+  dividendos?: Dividendos | null;
+  custoCompra?: number; // fração cobrada em cada compra (corretagem, emolumentos)
+  isencaoVendasMes?: number; // vendas no mês até este valor não pagam IR (ações: R$ 20 mil)
 }
 
 export interface PontoMes {
@@ -51,10 +66,12 @@ export interface PontoMes {
   depositos: number; // no mês
   retiradas: number;
   juros: number;
-  taxas: number;
+  dividendos: number;
+  taxas: number; // administração + custo de compra
   irRetido: number; // nas retiradas do mês
   depositosAcum: number; // desde o começo (sem o valor inicial)
   retiradasAcum: number;
+  dividendosRecebidosAcum: number; // dividendos que saíram do investimento
   jurosAcum: number;
   taxasAcum: number;
   irRetidoAcum: number;
@@ -68,20 +85,25 @@ export interface Resultado {
   totalInvestido: number; // valor inicial
   totalDepositos: number;
   totalRetiradas: number;
-  jurosTotais: number;
-  taxasPagas: number;
+  jurosTotais: number; // juros (renda fixa) ou valorização (renda variável)
+  dividendos: number; // todos os dividendos pagos
+  dividendosRecebidos: number; // os que não foram reinvestidos
+  taxasPagas: number; // administração
+  custosCompra: number; // corretagem e emolumentos
   irRetiradas: number;
   irFinal: number; // estimado no resgate total no fim
   saldoLiquido: number; // saldoFinal - irFinal
-  taxaAnualEfetiva: number; // bruta, antes das taxas
+  taxaAnualEfetiva: number; // juros, ou valorização + dividendos reinvestidos, antes das taxas
+  taxaAnualPreco: number; // só a parte dos juros/valorização
   taxaAnualLiquidaDeTaxas: number; // depois da taxa de administração (antes do IR)
   inflacaoAnual: number | null;
   saldoLiquidoReal: number | null; // saldo líquido em valor de hoje
-  aportesReais: number | null; // inicial + depósitos - retiradas, cada um em valor de hoje
+  aportesReais: number | null; // inicial + depósitos - retiradas - dividendos recebidos, cada um em valor de hoje
   ganhoReal: number | null; // saldoLiquidoReal - aportesReais
   taxaRealAnual: number | null; // (1 + taxa líquida de taxas) / (1 + inflação) - 1
   esgotouNoMes: number | null; // mês em que as retiradas zeraram o saldo
-  meses: PontoMes[];
+  saldosMes: number[]; // saldo no fim de cada mês (sempre preenchido; barato)
+  meses: PontoMes[]; // detalhe mês a mês (só com detalhar)
 }
 
 const EPS = 1e-9;
@@ -155,10 +177,11 @@ export function taxaPeriodoDaEfetiva(efetivaAnual: number, capitalizacoesPorAno:
   return Math.pow(1 + efetivaAnual, 1 / capitalizacoesPorAno) - 1;
 }
 
-// Tabela regressiva do IR na renda fixa, pelo prazo de cada aplicação em dias corridos.
+// Alíquota do IR sobre o ganho. Regressiva (renda fixa): pelo prazo de cada aplicação em dias corridos.
 export function aliquotaIR(tipo: TipoImposto, dias: number): number {
   if (tipo === 'nenhum') return 0;
   if (tipo === 'fixo15') return 0.15;
+  if (tipo === 'fixo20') return 0.2;
   if (dias <= 180) return 0.225;
   if (dias <= 360) return 0.2;
   if (dias <= 720) return 0.175;
@@ -169,8 +192,8 @@ export function aliquotaIR(tipo: TipoImposto, dias: number): number {
 
 interface EventoFluxo {
   t: number;
-  ordem: number; // 1 = depósito, 2 = retirada
-  valor: number;
+  ordem: number; // 0 = dividendo, 1 = depósito, 2 = retirada
+  valor: number; // dividendo: taxa do pagamento sobre o saldo
 }
 
 // Datas e valores de um fluxo. Os períodos contam a partir do começo do fluxo.
@@ -185,7 +208,7 @@ function eventosDoFluxo(f: Fluxo, T: number, diasNoAno: number, inflacao: number
     const comeco = inicio + j / n;
     const termino = inicio + (j + 1) / n;
     if (termino > fim + EPS) break;
-    const anos = Math.floor((comeco - inicio) + EPS);
+    const anos = Math.floor(comeco - inicio + EPS);
     eventos.push({
       t: f.momento === 'inicio' ? comeco : termino,
       ordem: f.tipo === 'deposito' ? 1 : 2,
@@ -196,7 +219,7 @@ function eventosDoFluxo(f: Fluxo, T: number, diasNoAno: number, inflacao: number
 }
 
 // ---------- Lotes (para o IR) ----------
-// Cada depósito vira um lote com o seu custo e a sua data. Rendem todos igual, então o valor de um lote é
+// Cada compra vira um lote com o seu custo e a sua data. Rendem todos igual, então o valor de um lote é
 // cotas × valor da cota. A cota sobe a cada crédito de juros (e cai com a taxa de administração).
 // Lotes com mais de 720 dias pagam a menor alíquota: são juntados num lote só, para a conta não crescer.
 
@@ -218,9 +241,10 @@ class Carteira {
     this.imposto = imposto;
   }
 
-  aplicar(t: number, valor: number, cotaAgora: number) {
-    if (this.imposto === 'nenhum' || valor <= 0) return;
-    this.lotes.push({ t, custo: valor, cotas: valor / cotaAgora });
+  // `custo`: quanto conta como custo de compra no IR; `aplicado`: quanto entrou no saldo (custo menos corretagem).
+  aplicar(t: number, custo: number, aplicado: number, cotaAgora: number) {
+    if (this.imposto === 'nenhum' || aplicado <= 0) return;
+    this.lotes.push({ t, custo, cotas: aplicado / cotaAgora });
   }
 
   private juntarVelhos(t: number) {
@@ -261,8 +285,8 @@ class Carteira {
     return ir;
   }
 
-  // Retira `valor` dos lotes mais antigos primeiro e devolve o IR retido.
-  retirar(t: number, valor: number, saldo: number, cotaAgora: number): number {
+  // Retira `valor` dos lotes mais antigos primeiro e devolve o IR retido (0 quando `isento`).
+  retirar(t: number, valor: number, saldo: number, cotaAgora: number, isento = false): number {
     if (this.imposto === 'nenhum' || valor <= 0) return 0;
     this.juntarVelhos(t);
     const k = this.escala(saldo, cotaAgora);
@@ -277,7 +301,7 @@ class Carteira {
       const fracao = tirar / valorLote;
       const custo = l.custo * fracao;
       const ganho = tirar - custo;
-      if (ganho > 0) ir += ganho * aliquotaIR(this.imposto, this.dias(l, t));
+      if (ganho > 0 && !isento) ir += ganho * aliquotaIR(this.imposto, this.dias(l, t));
       l.custo -= custo;
       l.cotas -= l.cotas * fracao;
       falta -= tirar;
@@ -292,24 +316,35 @@ class Carteira {
 export function simular(p: Parametros, diasNoAno = 365): Resultado {
   const T = p.meses / 12;
   const cap = p.capitalizacoesPorAno;
-  const r = p.taxaPeriodo;
   const detalhar = p.detalhar !== false;
   const inflacao = p.inflacaoAnual;
   const deflator = (t: number) => (inflacao === null ? 1 : Math.pow(1 + inflacao, t));
+  const custoCompra = p.custoCompra ?? 0;
+  const isencao = p.isencaoVendasMes ?? 0;
+  const div = p.dividendos && p.dividendos.taxaAnual > 0 && p.dividendos.porAno > 0 ? p.dividendos : null;
+  const taxaDe = (periodo: number) => p.retornos?.[periodo] ?? p.taxaPeriodo;
 
   const fluxos: EventoFluxo[] = [];
   for (const f of p.fluxos) fluxos.push(...eventosDoFluxo(f, T, diasNoAno, inflacao));
+  if (div) {
+    const pagamentos = Math.floor(T * div.porAno + EPS);
+    for (let j = 1; j <= pagamentos; j++) fluxos.push({ t: j / div.porAno, ordem: 0, valor: div.taxaAnual / div.porAno });
+  }
   fluxos.sort((a, b) => a.t - b.t || a.ordem - b.ordem);
 
   const carteira = new Carteira(p.imposto);
-  let saldo = p.valorInicial;
-  carteira.aplicar(0, p.valorInicial, 1);
+  const custoInicial = p.valorInicial * custoCompra;
+  let saldo = p.valorInicial - custoInicial;
+  carteira.aplicar(0, p.valorInicial, saldo, 1);
 
   // Acumuladores
   let depositos = 0;
   let retiradas = 0;
   let juros = 0;
+  let dividendos = 0;
+  let dividendosRecebidos = 0;
   let taxas = 0;
+  let custos = custoInicial;
   let irRetido = 0;
   let aportesReais = p.valorInicial;
   let esgotouNoMes: number | null = null;
@@ -318,9 +353,12 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   let mesDep = 0;
   let mesRet = 0;
   let mesJur = 0;
-  let mesTax = 0;
+  let mesDiv = 0;
+  let mesTax = custoInicial;
   let mesIr = 0;
+  let vendasMes = 0; // para a isenção de vendas no mês
   const meses: PontoMes[] = [];
+  const saldosMes: number[] = [];
 
   // Período de capitalização corrente
   let k = 0; // número do período corrente (começa em k / cap)
@@ -338,17 +376,16 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   // Credita os juros do período corrente até `t` (o fim do período, ou o fim do prazo).
   const creditar = (t: number) => {
     somarArea(t);
+    const r = taxaDe(k);
     const j = (r * area) / comprimento;
-    const inicioPeriodo = k / cap;
-    const duracao = t - inicioPeriodo;
-    // A cota sobe na mesma proporção que um real parado o período todo.
-    const cotaAntes = carteira.cota;
+    const duracao = t - k / cap;
     if (j !== 0) {
       saldo += j;
       juros += j;
       mesJur += j;
     }
-    carteira.cota = cotaAntes * (1 + (r * duracao) / comprimento);
+    // A cota sobe na mesma proporção que um real parado o período todo.
+    carteira.cota *= 1 + (r * duracao) / comprimento;
     if (p.taxaAdmAnual > 0 && saldo > 0) {
       const fator = Math.pow(1 - p.taxaAdmAnual, duracao);
       const tx = saldo * (1 - fator);
@@ -360,14 +397,17 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
     area = 0;
   };
 
-  // Cota no instante t, contando os juros proporcionais ainda não creditados (preço de entrada de um depósito).
-  const cotaEm = (t: number) => carteira.cota * (1 + (r * (t - k / cap)) / comprimento);
+  // Cota no instante t, contando os juros proporcionais ainda não creditados (preço de entrada de uma compra).
+  const cotaEm = (t: number) => carteira.cota * (1 + (taxaDe(k) * (t - k / cap)) / comprimento);
+
+  const irAgora = (t: number) => (isencao > 0 && saldo <= isencao ? 0 : carteira.irEstimado(t, saldo, carteira.cota));
 
   const fecharMes = (m: number) => {
     const t = m / 12;
+    saldosMes.push(saldo);
     if (detalhar) {
       // Na fotografia do mês, os juros do período ainda não creditados não entram no saldo.
-      const ir = carteira.irEstimado(t, saldo, carteira.cota);
+      const ir = irAgora(t);
       const d = deflator(t);
       meses.push({
         mes: m,
@@ -377,28 +417,38 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
         depositos: mesDep,
         retiradas: mesRet,
         juros: mesJur,
+        dividendos: mesDiv,
         taxas: mesTax,
         irRetido: mesIr,
         depositosAcum: depositos,
         retiradasAcum: retiradas,
+        dividendosRecebidosAcum: dividendosRecebidos,
         jurosAcum: juros,
-        taxasAcum: taxas,
+        taxasAcum: taxas + custos,
         irRetidoAcum: irRetido,
         irEstimado: ir,
         liquido: saldo - ir,
         liquidoReal: inflacao === null ? null : (saldo - ir) / d,
       });
     }
-    mesDep = mesRet = mesJur = mesTax = mesIr = 0;
+    mesDep = mesRet = mesJur = mesDiv = mesTax = mesIr = vendasMes = 0;
+  };
+
+  // Compra: tira o custo de compra e cria o lote do IR.
+  const comprar = (t: number, valor: number) => {
+    const custo = valor * custoCompra;
+    carteira.aplicar(t, valor, valor - custo, cotaEm(t));
+    saldo += valor - custo;
+    custos += custo;
+    mesTax += custo;
   };
 
   let iFluxo = 0;
   let proximoMes = 1;
   const totalPeriodos = Math.floor(T * cap + EPS);
 
-  // Processa tudo até o instante t (inclusive), na ordem: juros, fluxos, fim de mês.
+  // Processa fluxos e fins de mês até `limite` (inclusive ou não), na ordem do tempo.
   const avancarAte = (limite: number, inclusive: boolean) => {
-    // Fluxos e meses que caem antes de `limite`.
     while (true) {
       const tf = iFluxo < fluxos.length ? fluxos[iFluxo].t : Infinity;
       const tm = proximoMes <= p.meses ? proximoMes / 12 : Infinity;
@@ -409,17 +459,30 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
       if (tf <= tm + EPS) {
         const e = fluxos[iFluxo++];
         somarArea(e.t);
-        if (e.ordem === 1) {
-          carteira.aplicar(e.t, e.valor, cotaEm(e.t));
-          saldo += e.valor;
+        if (e.ordem === 0) {
+          const valor = Math.max(0, saldo) * e.valor;
+          if (valor > 0) {
+            dividendos += valor;
+            mesDiv += valor;
+            if (div?.reinvestir) {
+              comprar(e.t, valor);
+            } else {
+              dividendosRecebidos += valor;
+              aportesReais -= valor / deflator(e.t);
+            }
+          }
+        } else if (e.ordem === 1) {
+          comprar(e.t, e.valor);
           depositos += e.valor;
           mesDep += e.valor;
           aportesReais += e.valor / deflator(e.t);
         } else {
           const tirar = Math.min(e.valor, Math.max(0, saldo));
           if (tirar > 0) {
-            const ir = carteira.retirar(e.t, tirar, saldo, carteira.cota);
+            const isento = isencao > 0 && vendasMes + tirar <= isencao;
+            const ir = carteira.retirar(e.t, tirar, saldo, carteira.cota, isento);
             saldo -= tirar;
+            vendasMes += tirar;
             retiradas += tirar;
             mesRet += tirar;
             irRetido += ir;
@@ -454,9 +517,12 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   // Garante a fotografia do último mês.
   while (proximoMes <= p.meses) fecharMes(proximoMes++);
 
-  const irFinal = carteira.irEstimado(T, saldo, carteira.cota);
+  const irFinal = irAgora(T);
   const saldoLiquido = saldo - irFinal;
-  const efetiva = taxaEfetivaAnual(r, cap);
+  const taxaAnualPreco = taxaEfetivaAnual(p.taxaPeriodo, cap);
+  // Dividendos reinvestidos também rendem: entram na taxa efetiva.
+  const efetiva =
+    div && div.reinvestir ? (1 + taxaAnualPreco) * Math.pow(1 + div.taxaAnual / div.porAno, div.porAno) - 1 : taxaAnualPreco;
   const liquidaDeTaxas = (1 + efetiva) * (1 - p.taxaAdmAnual) - 1;
   const saldoLiquidoReal = inflacao === null ? null : saldoLiquido / deflator(T);
 
@@ -466,11 +532,15 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
     totalDepositos: depositos,
     totalRetiradas: retiradas,
     jurosTotais: juros,
+    dividendos,
+    dividendosRecebidos,
     taxasPagas: taxas,
+    custosCompra: custos,
     irRetiradas: irRetido,
     irFinal,
     saldoLiquido,
     taxaAnualEfetiva: efetiva,
+    taxaAnualPreco,
     taxaAnualLiquidaDeTaxas: liquidaDeTaxas,
     inflacaoAnual: inflacao,
     saldoLiquidoReal,
@@ -478,6 +548,7 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
     ganhoReal: saldoLiquidoReal === null ? null : saldoLiquidoReal - aportesReais,
     taxaRealAnual: inflacao === null ? null : (1 + liquidaDeTaxas) / (1 + inflacao) - 1,
     esgotouNoMes,
+    saldosMes,
     meses,
   };
 }
@@ -517,7 +588,7 @@ export function depositoParaMeta(
   const zero = com(0);
   if (zero >= alvo) return 0;
   // Quase sempre o saldo cresce em linha reta com o depósito: uma regra de três resolve com poucas simulações.
-  // Quando não (retiradas que zeram o saldo), cai na busca por metades.
+  // Quando não (retiradas que zeram o saldo, isenção de IR), cai na busca por metades.
   const mil = com(1000);
   if (mil > zero) {
     const palpite = Math.ceil(((alvo - zero) / (mil - zero)) * 1000 * 100) / 100;
@@ -553,4 +624,104 @@ export function mesesParaMeta(
     if (v >= alvo - 0.005) return m.mes;
   }
   return null;
+}
+
+// ---------- Faixa de resultados (renda variável) ----------
+// Sorteia muitos caminhos de valorização mês a mês e mostra os resultados ruins, típicos e bons.
+// Cada mês: ln(1 + retorno) tem distribuição normal com desvio σ/√12, centrada para que a média do
+// retorno seja a valorização informada. A semente é fixa: os mesmos dados dão sempre a mesma faixa.
+
+export interface Faixa {
+  caminhos: number;
+  mesesPorPonto: number[]; // meses de cada ponto do gráfico (0, 12, 24...)
+  p10: number[]; // saldo (bruto) em cada ponto
+  p50: number[];
+  p90: number[];
+  final: { p10: number; p50: number; p90: number }; // na medida pedida (líquido ou em valor de hoje)
+  chanceMeta: number | null; // fração dos caminhos que chegam ao alvo
+  chancePerda: number; // fração que termina com menos do que entrou
+}
+
+function sorteador(semente: number) {
+  // mulberry32
+  let a = semente >>> 0;
+  const uniforme = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  let guardado: number | null = null;
+  const normal = () => {
+    if (guardado !== null) {
+      const g = guardado;
+      guardado = null;
+      return g;
+    }
+    let u = 0;
+    while (u === 0) u = uniforme();
+    const v = uniforme();
+    const raio = Math.sqrt(-2 * Math.log(u));
+    guardado = raio * Math.sin(2 * Math.PI * v);
+    return raio * Math.cos(2 * Math.PI * v);
+  };
+  return normal;
+}
+
+function percentil(ordenados: number[], q: number): number {
+  if (ordenados.length === 0) return 0;
+  const pos = (ordenados.length - 1) * q;
+  const i = Math.floor(pos);
+  const resto = pos - i;
+  return i + 1 < ordenados.length ? ordenados[i] * (1 - resto) + ordenados[i + 1] * resto : ordenados[i];
+}
+
+// `p` precisa ter capitalização mensal (12 por ano): a valorização de cada mês é sorteada.
+export function simularFaixa(
+  p: Parametros,
+  volatilidadeAnual: number,
+  opcoes: { caminhos?: number; semente?: number; alvo?: number | null; medida?: MedidaMeta } = {}
+): Faixa {
+  const caminhos = opcoes.caminhos ?? 1000;
+  const normal = sorteador(opcoes.semente ?? 20261124);
+  const sigma = volatilidadeAnual / Math.sqrt(12);
+  const media = Math.log(1 + p.taxaPeriodo) - (sigma * sigma) / 2;
+  const passo = p.meses <= 36 ? 1 : 12;
+  const mesesPorPonto: number[] = [0];
+  for (let m = passo; m <= p.meses; m += passo) mesesPorPonto.push(m);
+  if (mesesPorPonto[mesesPorPonto.length - 1] !== p.meses) mesesPorPonto.push(p.meses);
+
+  const porPonto: number[][] = mesesPorPonto.map(() => []);
+  const finais: number[] = [];
+  let chegam = 0;
+  let perdem = 0;
+  for (let c = 0; c < caminhos; c++) {
+    const retornos: number[] = new Array(p.meses);
+    for (let m = 0; m < p.meses; m++) retornos[m] = Math.exp(media + sigma * normal()) - 1;
+    const res = simular({ ...p, retornos, detalhar: false });
+    mesesPorPonto.forEach((m, i) => porPonto[i].push(m === 0 ? res.totalInvestido : res.saldosMes[m - 1]));
+    const v = opcoes.medida === 'liquidoReal' && res.saldoLiquidoReal !== null ? res.saldoLiquidoReal : res.saldoLiquido;
+    finais.push(v);
+    if (opcoes.alvo && v >= opcoes.alvo) chegam++;
+    const saiu = res.saldoLiquido + res.totalRetiradas + res.dividendosRecebidos;
+    if (saiu < res.totalInvestido + res.totalDepositos - 0.005) perdem++;
+  }
+  const ordenar = (xs: number[]) => xs.slice().sort((a, b) => a - b);
+  const ordenadosPorPonto = porPonto.map(ordenar);
+  const finaisOrdenados = ordenar(finais);
+  return {
+    caminhos,
+    mesesPorPonto,
+    p10: ordenadosPorPonto.map((xs) => percentil(xs, 0.1)),
+    p50: ordenadosPorPonto.map((xs) => percentil(xs, 0.5)),
+    p90: ordenadosPorPonto.map((xs) => percentil(xs, 0.9)),
+    final: {
+      p10: percentil(finaisOrdenados, 0.1),
+      p50: percentil(finaisOrdenados, 0.5),
+      p90: percentil(finaisOrdenados, 0.9),
+    },
+    chanceMeta: opcoes.alvo ? chegam / caminhos : null,
+    chancePerda: perdem / caminhos,
+  };
 }

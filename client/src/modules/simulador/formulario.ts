@@ -6,6 +6,8 @@ import type { Fluxo, Frequencia, Momento, Parametros, TipoImposto } from './calc
 
 export type Modo = 'basico' | 'avancado';
 export type TipoAumento = 'nenhum' | 'inflacao' | 'fixo';
+export type TipoInvestimento = 'fixa' | 'variavel';
+export type Ativo = 'acoes' | 'fiis' | 'etfs';
 
 export interface FluxoForm {
   id: string;
@@ -21,6 +23,7 @@ export interface FluxoForm {
 
 export interface Formulario {
   modo: Modo;
+  tipoInvestimento: TipoInvestimento;
   valorInicial: string;
   taxa: string;
   taxaPeriodo: 'mensal' | 'anual';
@@ -36,6 +39,15 @@ export interface Formulario {
   momentoBasico: Momento;
   aumentoBasico: TipoAumento;
   aumentoBasicoPct: string;
+  // Renda variável
+  ativo: Ativo;
+  valorizacao: string; // % ao ano
+  dividendos: string; // % ao ano
+  freqDividendos: Frequencia;
+  reinvestir: boolean;
+  volatilidade: string; // % ao ano
+  custoCompra: string; // % de cada compra
+  rvImposto: boolean;
   // Inflação, imposto e taxas (os dois modos)
   inflacao: string;
   imposto: TipoImposto;
@@ -66,8 +78,28 @@ export function novoFluxo(tipo: 'deposito' | 'retirada', valor = ''): FluxoForm 
   };
 }
 
+// Valores padrão de cada tipo de ativo (a pessoa pode trocar). Valorização sem os proventos.
+export const PADRAO_ATIVO: Record<
+  Ativo,
+  Pick<Formulario, 'valorizacao' | 'dividendos' | 'freqDividendos' | 'volatilidade' | 'custoCompra'>
+> = {
+  acoes: { valorizacao: '6', dividendos: '5', freqDividendos: 'trimestral', volatilidade: '25', custoCompra: '0,03' },
+  fiis: { valorizacao: '1', dividendos: '10', freqDividendos: 'mensal', volatilidade: '12', custoCompra: '0,03' },
+  etfs: { valorizacao: '10', dividendos: '0', freqDividendos: 'trimestral', volatilidade: '22', custoCompra: '0,03' },
+};
+
+export const ROTULO_ATIVO: Record<Ativo, string> = {
+  acoes: 'Ações',
+  fiis: 'Fundos imobiliários (FIIs)',
+  etfs: 'ETFs',
+};
+
+// Vendas de ações de até R$ 20 mil no mês não pagam IR sobre o ganho.
+export const ISENCAO_ACOES_MES = 20000;
+
 export const FORMULARIO_PADRAO: Formulario = {
   modo: 'basico',
+  tipoInvestimento: 'fixa',
   valorInicial: '',
   taxa: '1',
   taxaPeriodo: 'mensal',
@@ -81,6 +113,10 @@ export const FORMULARIO_PADRAO: Formulario = {
   momentoBasico: 'inicio',
   aumentoBasico: 'nenhum',
   aumentoBasicoPct: '',
+  ativo: 'acoes',
+  ...PADRAO_ATIVO.acoes,
+  reinvestir: true,
+  rvImposto: true,
   inflacao: '',
   imposto: 'nenhum',
   taxaAdm: '',
@@ -129,6 +165,8 @@ export interface Entrada {
   params: Parametros;
   diasNoAno: number;
   momentoMeta: Momento;
+  variavel: boolean;
+  volatilidade: number; // renda variável: oscilação ao ano (fração); renda fixa: 0
 }
 
 function percentual(texto: string): number | null {
@@ -157,7 +195,7 @@ export function lerEntrada(f: Formulario, semDepositoBasico = false): Entrada | 
   const valorInicial = f.valorInicial.trim() === '' ? 0 : lerValor(f.valorInicial);
   if (valorInicial === null || valorInicial < 0) return 'Confira o valor inicial (zero ou mais).';
 
-  const taxa = percentual(f.taxa);
+  const taxa = f.tipoInvestimento === 'variavel' ? 0 : percentual(f.taxa);
   if (taxa === null || taxa <= -1) return 'Confira a taxa de juros.';
 
   const duracaoTexto = f.duracao.trim();
@@ -183,10 +221,37 @@ export function lerEntrada(f: Formulario, semDepositoBasico = false): Entrada | 
   }
 
   const avancado = f.modo === 'avancado';
-  const diasNoAno = avancado ? Number(f.diasNoAno) : 360;
-  const capitalizacao: Frequencia = avancado ? f.capitalizacao : 'mensal';
+  const variavel = f.tipoInvestimento === 'variavel';
+
+  // Renda variável: valorização ao ano (efetiva) vira uma taxa mensal; dividendos, custo de compra e o IR do tipo.
+  let rv: Pick<Parametros, 'dividendos' | 'custoCompra' | 'isencaoVendasMes' | 'imposto'> | null = null;
+  let valorizacao = 0;
+  let volatilidade = 0;
+  if (variavel) {
+    const v = percentual(f.valorizacao);
+    if (v === null || v <= -1) return 'Confira a valorização esperada.';
+    valorizacao = v;
+    const dy = f.dividendos.trim() === '' ? 0 : percentual(f.dividendos);
+    if (dy === null || dy < 0 || dy >= 1) return 'Confira os dividendos (de 0% a 99% ao ano).';
+    const vol = f.volatilidade.trim() === '' ? 0 : percentual(f.volatilidade);
+    if (vol === null || vol < 0 || vol > 2) return 'Confira a oscilação (de 0% a 200% ao ano).';
+    volatilidade = vol;
+    const custo = f.custoCompra.trim() === '' ? 0 : percentual(f.custoCompra);
+    if (custo === null || custo < 0 || custo >= 0.5) return 'Confira o custo de cada compra (de 0% a 50%).';
+    rv = {
+      dividendos: dy > 0 ? { taxaAnual: dy, porAno: vezesPorAno(f.freqDividendos, 365), reinvestir: f.reinvestir } : null,
+      custoCompra: custo,
+      imposto: f.rvImposto ? (f.ativo === 'fiis' ? 'fixo20' : 'fixo15') : 'nenhum',
+      isencaoVendasMes: f.rvImposto && f.ativo === 'acoes' ? ISENCAO_ACOES_MES : 0,
+    };
+  }
+
+  const diasNoAno = variavel ? 365 : avancado ? Number(f.diasNoAno) : 360;
+  const capitalizacao: Frequencia = !variavel && avancado ? f.capitalizacao : 'mensal';
   const capitalizacoesPorAno = vezesPorAno(capitalizacao, diasNoAno);
-  const taxaPeriodo = taxaPorPeriodo(taxa, f.taxaPeriodo, capitalizacoesPorAno, avancado ? f.tipoTaxa : 'nominal');
+  const taxaPeriodo = variavel
+    ? taxaPorPeriodo(valorizacao, 'anual', 12, 'efetiva')
+    : taxaPorPeriodo(taxa, f.taxaPeriodo, capitalizacoesPorAno, avancado ? f.tipoTaxa : 'nominal');
 
   const fluxos: Fluxo[] = [];
   if (avancado) {
@@ -240,9 +305,12 @@ export function lerEntrada(f: Formulario, semDepositoBasico = false): Entrada | 
       inflacaoAnual,
       taxaAdmAnual,
       imposto: f.imposto,
+      ...rv,
     },
     diasNoAno,
     momentoMeta: avancado ? 'inicio' : f.momentoBasico,
+    variavel,
+    volatilidade,
   };
 }
 
