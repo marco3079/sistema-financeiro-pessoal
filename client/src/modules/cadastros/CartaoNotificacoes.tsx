@@ -79,11 +79,18 @@ export function CartaoNotificacoes() {
     setOcupado(true);
     setMensagem(null);
     try {
-      const r = await api.post<{ entregues: number }>('/notificacoes/push/teste');
+      const r = await api.post<{ entregues: number; falhas?: { status: number | null; motivo: string; servico: string }[] }>('/notificacoes/push/teste');
+      const motivos = (r.falhas ?? []).map((f) => `${f.servico}${f.status ? ' ' + f.status : ''}: ${f.motivo}`);
       setMensagem(
         r.entregues > 0
           ? { tipo: 'sucesso', texto: `Enviada para ${r.entregues} aparelho(s).` }
-          : { tipo: 'erro', texto: 'Nenhum aparelho recebeu. Ligue as notificações de novo.' },
+          : {
+              tipo: 'erro',
+              texto:
+                motivos.length > 0
+                  ? `O serviço de notificações recusou o envio (${motivos.join(' | ')}).`
+                  : 'Nenhum aparelho recebeu. Ligue as notificações de novo.',
+            },
       );
     } catch (e) {
       setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Falha no teste.' });

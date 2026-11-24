@@ -19,6 +19,11 @@ export function motivoSemPush(situacao: SituacaoPush): string | null {
   return null;
 }
 
+interface RespostaTeste {
+  entregues: number;
+  falhas?: { aparelho: string | null; status: number | null; motivo: string; servico: string }[];
+}
+
 // Botão "Testar notificação neste aparelho": confere a permissão, pede se ainda não tiver (o toque no botão é o
 // gesto que o navegador exige), inscreve o aparelho e manda uma notificação de teste.
 export function TesteNotificacao() {
@@ -43,17 +48,25 @@ export function TesteNotificacao() {
         setMensagem({ ok: false, texto: motivo });
         return;
       }
-      let r = await api.post<{ entregues: number }>('/notificacoes/push/teste');
+      let r = await api.post<RespostaTeste>('/notificacoes/push/teste');
       if (r.entregues === 0) {
         // O servidor pode não ter a inscrição deste aparelho: reenvia e tenta mais uma vez.
         await renovarPush();
-        r = await api.post<{ entregues: number }>('/notificacoes/push/teste');
+        r = await api.post<RespostaTeste>('/notificacoes/push/teste');
       }
-      setMensagem(
-        r.entregues > 0
-          ? { ok: true, texto: 'Notificação enviada. Ela deve aparecer neste aparelho em instantes.' }
-          : { ok: false, texto: 'O envio não chegou a nenhum aparelho. Desligue e ligue as notificações em Meu perfil.' }
-      );
+      if (r.entregues > 0) {
+        setMensagem({ ok: true, texto: 'Notificação enviada. Ela deve aparecer neste aparelho em instantes.' });
+      } else {
+        // Mostra o motivo que o serviço de push devolveu, para dar para corrigir.
+        const motivos = (r.falhas ?? []).map((f) => `${f.servico}${f.status ? ' ' + f.status : ''}: ${f.motivo}`);
+        setMensagem({
+          ok: false,
+          texto:
+            motivos.length > 0
+              ? `O serviço de notificações recusou o envio (${motivos.join(' | ')}).`
+              : 'O servidor não tem nenhum aparelho inscrito para esta conta. Desligue e ligue as notificações em Meu perfil.',
+        });
+      }
     } catch (e) {
       setMensagem({ ok: false, texto: e instanceof Error ? e.message : 'Não foi possível testar agora.' });
     } finally {

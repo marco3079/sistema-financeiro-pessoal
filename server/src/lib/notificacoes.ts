@@ -5,6 +5,7 @@ import { prisma, comPerfil } from './prisma';
 import { chamarApiInterna } from './mcp';
 import { lerConfiguracao, limparCacheConfiguracao } from './email';
 import { cifrar, decifrar } from './cripto';
+import { enderecoSeguro } from './acessoSeguro';
 import { dataISO, hoje, intervaloDoMes, mesDe, moeda, num, paraData } from './financas';
 
 // Notificações no celular (Web Push). Cada aparelho se inscreve pelo navegador (InscricaoPush); o servidor guarda
@@ -50,11 +51,28 @@ const TEMPO_DE_VIDA_S = 24 * 60 * 60; // o serviço de push guarda a mensagem po
 
 // ---------- Chaves VAPID ----------
 
-let vapidPronto: { publica: string } | null = null;
+let vapidPronto: { publica: string; privada: string } | null = null;
+
+// Identificação que vai junto com cada envio (campo "sub" do VAPID). A Apple recusa o envio (BadJwtToken) quando
+// ela não é um endereço https de verdade ou um e-mail de domínio real: "algo@financas.local" não serve.
+// Ordem: endereço do site nas Configurações, endereço seguro do Tailscale, e-mail do titular, e-mail neutro.
+async function identificacaoVapid(enderecoSite: string | null): Promise<string> {
+  if (enderecoSite && /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(:\d+)?\/?$/i.test(enderecoSite)) return enderecoSite;
+  const seguro = await enderecoSeguro().catch(() => null);
+  if (seguro) return seguro;
+  const email = (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+  if (/^[^@\s]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(email) && !/\.(local|localhost|lan|test|invalid)$/.test(email)) return `mailto:${email}`;
+  return 'mailto:avisos@example.com';
+}
 
 // Lê (ou gera, no primeiro uso) o par de chaves VAPID e configura o web-push.
 export async function chavesVapid(): Promise<{ publica: string }> {
-  if (vapidPronto) return vapidPronto;
+  if (vapidPronto) {
+    // As chaves não mudam; a identificação pode mudar (o endereço seguro passa a existir depois do login no Tailscale).
+    const atual = await lerConfiguracao();
+    webpush.setVapidDetails(await identificacaoVapid(atual.enderecoSite ?? null), vapidPronto.publica, vapidPronto.privada);
+    return { publica: vapidPronto.publica };
+  }
   const config = await lerConfiguracao();
   let publica = config.vapidPublica;
   let privada = config.vapidPrivadaCifrada ? decifrar(config.vapidPrivadaCifrada) : null;
@@ -69,10 +87,9 @@ export async function chavesVapid(): Promise<{ publica: string }> {
     });
     limparCacheConfiguracao();
   }
-  const site = config.enderecoSite && /^https:\/\//i.test(config.enderecoSite) ? config.enderecoSite : null;
-  webpush.setVapidDetails(site ?? 'mailto:avisos@financas.local', publica, privada);
-  vapidPronto = { publica };
-  return vapidPronto;
+  webpush.setVapidDetails(await identificacaoVapid(config.enderecoSite ?? null), publica, privada);
+  vapidPronto = { publica, privada };
+  return { publica };
 }
 
 // ---------- Preferências ----------
@@ -133,12 +150,34 @@ export async function desinscrever(usuarioId: number, endpoint: string): Promise
   await prisma.inscricaoPush.deleteMany({ where: { usuarioId, endpoint } });
 }
 
+export interface FalhaDeEnvio {
+  aparelho: string | null;
+  status: number | null;
+  motivo: string;
+  servico: string;
+}
+
+// Nome do serviço de push pelo endereço da inscrição (só o nome: o endereço completo identifica o aparelho).
+function servicoDePush(endpoint: string): string {
+  try {
+    const host = new URL(endpoint).hostname;
+    if (host.endsWith('push.apple.com')) return 'Apple';
+    if (host.endsWith('googleapis.com')) return 'Google';
+    if (host.endsWith('mozilla.com')) return 'Mozilla';
+    if (host.endsWith('windows.com')) return 'Microsoft';
+    return 'outro';
+  } catch {
+    return 'outro';
+  }
+}
+
 // Manda uma notificação a todos os aparelhos de um usuário, respeitando as preferências dele.
 // Devolve quantos aparelhos receberam. `forcar` ignora o tipo desligado (usado no teste).
 export async function enviarParaUsuario(
   usuarioId: number,
   n: Omit<Notificacao, 'chave'> & { chave?: string },
-  forcar = false
+  forcar = false,
+  falhas?: FalhaDeEnvio[]
 ): Promise<number> {
   const inscricoes = await prisma.inscricaoPush.findMany({ where: { usuarioId } });
   if (inscricoes.length === 0) return 0;
@@ -170,6 +209,15 @@ export async function enviarParaUsuario(
         await prisma.inscricaoPush.delete({ where: { id: i.id } }).catch(() => undefined);
       } else {
         console.error('Falha ao enviar notificação', status ?? '', erro instanceof Error ? erro.message : erro);
+      }
+      if (falhas) {
+        const corpo = (erro as { body?: unknown }).body;
+        falhas.push({
+          aparelho: i.aparelho ?? null,
+          status: typeof status === 'number' ? status : null,
+          motivo: (typeof corpo === 'string' && corpo.trim() ? corpo : erro instanceof Error ? erro.message : 'erro desconhecido').slice(0, 200),
+          servico: servicoDePush(i.endpoint),
+        });
       }
     }
   }

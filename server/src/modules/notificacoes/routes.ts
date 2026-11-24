@@ -9,8 +9,7 @@ import {
   iniciarVerificador,
   inscrever,
   lerPreferencias,
-  salvarPreferencias,
-} from '../../lib/notificacoes';
+  salvarPreferencias, type FalhaDeEnvio } from '../../lib/notificacoes';
 import { prisma } from '../../lib/prisma';
 
 // Notificações no celular (Web Push): chave pública, inscrição do aparelho, preferências e teste.
@@ -78,12 +77,15 @@ router.put(
 router.post(
   '/notificacoes/push/teste',
   asyncHandler(async (req, res) => {
+    const falhas: FalhaDeEnvio[] = [];
     const entregues = await enviarParaUsuario(
       req.usuario.id,
       { tipo: 'seguranca', titulo: 'Notificações ligadas ✅', corpo: 'É assim que os avisos vão chegar neste aparelho.', url: '/app' },
-      true
+      true,
+      falhas
     );
-    res.json({ entregues });
+    // As falhas vão junto para a tela dizer o motivo (ex.: "Apple 403 BadJwtToken").
+    res.json({ entregues, falhas });
   })
 );
 
