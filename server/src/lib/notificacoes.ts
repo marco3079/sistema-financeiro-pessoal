@@ -96,6 +96,7 @@ export async function chavesVapid(): Promise<{ publica: string }> {
 
 export interface Preferencias {
   desligados: TipoNotificacao[];
+  perfisLigados: number[]; // perfis financeiros habilitados por esta pessoa
   silencioAtivo: boolean;
   silencioInicio: number;
   silencioFim: number;
@@ -107,6 +108,10 @@ export async function lerPreferencias(usuarioId: number): Promise<Preferencias> 
     desligados: (linha?.desligados ?? '')
       .split(',')
       .filter((t): t is TipoNotificacao => IDS_TIPOS.has(t)),
+    perfisLigados: (linha?.perfisLigados ?? '')
+      .split(',')
+      .map((t) => Number(t))
+      .filter((n) => Number.isInteger(n) && n > 0),
     silencioAtivo: linha?.silencioAtivo ?? false,
     silencioInicio: linha?.silencioInicio ?? 22,
     silencioFim: linha?.silencioFim ?? 7,
@@ -116,6 +121,7 @@ export async function lerPreferencias(usuarioId: number): Promise<Preferencias> 
 export async function salvarPreferencias(usuarioId: number, p: Preferencias): Promise<void> {
   const dados = {
     desligados: p.desligados.filter((t) => IDS_TIPOS.has(t)).join(','),
+    perfisLigados: [...new Set(p.perfisLigados.filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b).join(','),
     silencioAtivo: p.silencioAtivo,
     silencioInicio: p.silencioInicio,
     silencioFim: p.silencioFim,
@@ -177,11 +183,14 @@ export async function enviarParaUsuario(
   usuarioId: number,
   n: Omit<Notificacao, 'chave'> & { chave?: string },
   forcar = false,
-  falhas?: FalhaDeEnvio[]
+  falhas?: FalhaDeEnvio[],
+  perfilId?: number
 ): Promise<number> {
   const inscricoes = await prisma.inscricaoPush.findMany({ where: { usuarioId } });
   if (inscricoes.length === 0) return 0;
   const pref = await lerPreferencias(usuarioId);
+  // Aviso de um perfil financeiro só sai para quem habilitou esse perfil.
+  if (perfilId !== undefined && !pref.perfisLigados.includes(perfilId)) return 0;
   if (!forcar && pref.desligados.includes(n.tipo)) return 0;
   await chavesVapid();
   const silenciosa = n.tipo !== 'seguranca' && emSilencio(pref);
@@ -248,7 +257,7 @@ async function notificarPerfil(perfilId: number, nomePerfil: string | null, n: N
   const titulo = nomePerfil ? `${n.titulo} · ${nomePerfil}` : n.titulo;
   const url = `${n.url}${n.url.includes('?') ? '&' : '?'}perfil=${perfilId}`;
   for (const usuarioId of await destinatariosDoPerfil(perfilId)) {
-    await enviarParaUsuario(usuarioId, { ...n, titulo, url });
+    await enviarParaUsuario(usuarioId, { ...n, titulo, url }, false, undefined, perfilId);
   }
 }
 

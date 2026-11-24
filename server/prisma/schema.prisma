@@ -755,6 +755,9 @@ model InscricaoPush {
 model PreferenciaNotificacao {
   usuarioId      Int     @id
   desligados     String  @default("") // tipos desligados, separados por vírgula (ver lib/notificacoes.ts)
+  // Perfis financeiros de que a pessoa quer receber avisos (ids separados por vírgula). Vazio = nenhum: os avisos
+  // de movimentações, contas e metas só saem dos perfis que a pessoa habilitou.
+  perfisLigados  String  @default("")
   silencioAtivo  Boolean @default(false)
   silencioInicio Int     @default(22) // hora (0-23): dentro do intervalo as notificações chegam sem som
   silencioFim    Int     @default(7)

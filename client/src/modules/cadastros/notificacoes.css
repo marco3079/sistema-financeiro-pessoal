@@ -178,3 +178,13 @@ p.notif-suave {
 .notif-teste-erro {
   color: var(--cor-perigo);
 }
+
+/* Bolinha com a cor do perfil financeiro na lista "De quais perfis avisar". */
+.notif-perfil-cor {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}

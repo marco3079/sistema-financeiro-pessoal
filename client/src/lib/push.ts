@@ -10,6 +10,7 @@ export interface TipoNotificacaoDTO {
 
 export interface PreferenciasPushDTO {
   desligados: string[];
+  perfisLigados: number[]; // perfis financeiros de que a pessoa quer receber avisos
   silencioAtivo: boolean;
   silencioInicio: number;
   silencioFim: number;
@@ -20,6 +21,7 @@ export interface ConfigPushDTO {
   tipos: TipoNotificacaoDTO[];
   preferencias: PreferenciasPushDTO;
   aparelhos: number;
+  perfis: { id: number; nome: string; cor: string; ligado: boolean }[];
 }
 
 export type SituacaoPush =

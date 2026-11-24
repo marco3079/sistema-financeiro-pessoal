@@ -110,6 +110,12 @@ export function CartaoNotificacoes() {
     }
   }
 
+  function alternarPerfil(id: number, ligado: boolean) {
+    if (!pref) return;
+    const perfisLigados = ligado ? [...new Set([...pref.perfisLigados, id])] : pref.perfisLigados.filter((p) => p !== id);
+    void salvar({ ...pref, perfisLigados });
+  }
+
   function alternarTipo(id: string, ligado: boolean) {
     if (!pref) return;
     const desligados = ligado ? pref.desligados.filter((t) => t !== id) : [...pref.desligados, id];
@@ -150,6 +156,36 @@ export function CartaoNotificacoes() {
             )}
           </div>
           {mensagem && <Aviso tipo={mensagem.tipo}>{mensagem.texto}</Aviso>}
+
+          <h3 className="notif-subtitulo">De quais perfis avisar</h3>
+          <p className="notif-suave">
+            Você só recebe avisos de movimentações, contas, limites e metas dos perfis ligados aqui. O aviso de novo
+            acesso à sua conta chega sempre.
+          </p>
+          {pref.perfisLigados.length === 0 && (
+            <Aviso tipo="info">Nenhum perfil ligado: por enquanto só chegam os avisos de segurança.</Aviso>
+          )}
+          <ul className="notif-tipos">
+            {config.dados.perfis.map((p) => (
+              <li key={p.id}>
+                <label className="notif-tipo">
+                  <span className="notif-tipo-texto">
+                    <span className="notif-tipo-rotulo">
+                      <span className="notif-perfil-cor" style={{ background: p.cor }} aria-hidden="true" />
+                      {p.nome}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="notif-chave"
+                    checked={pref.perfisLigados.includes(p.id)}
+                    onChange={(e) => alternarPerfil(p.id, e.target.checked)}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
 
           <h3 className="notif-subtitulo">O que avisar</h3>
           <ul className="notif-tipos">
