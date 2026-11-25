@@ -896,8 +896,8 @@ export function Simulador() {
                   <Nota>
                     *{faixa.caminhos.toLocaleString('pt-BR')} simulações com oscilação de {pct(entrada.volatilidade, 1)} ao ano.
                     Valores {temIR ? 'líquidos de IR' : 'finais'}
-                    {medidaMeta === 'liquidoReal' ? ', em valor de hoje' : ''}. O mediano costuma ficar abaixo do cálculo fixo: as
-                    quedas pesam mais que as altas do mesmo tamanho.
+                    {medidaMeta === 'liquidoReal' ? ', em valor de hoje' : ''}. No caminho mediano, a valorização é a informada (como o
+                    retorno ao ano de um histórico); a oscilação espalha os resultados para os dois lados.
                   </Nota>
                 </>
               ) : (

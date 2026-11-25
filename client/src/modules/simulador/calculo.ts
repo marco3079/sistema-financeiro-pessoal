@@ -285,8 +285,8 @@ class Carteira {
     return ir;
   }
 
-  // Retira `valor` dos lotes mais antigos primeiro e devolve o IR retido (0 quando `isento`).
-  retirar(t: number, valor: number, saldo: number, cotaAgora: number, isento = false): number {
+  // Retira `valor` dos lotes mais antigos primeiro e devolve o IR sobre o ganho (a isenção fica com quem chama).
+  retirar(t: number, valor: number, saldo: number, cotaAgora: number): number {
     if (this.imposto === 'nenhum' || valor <= 0) return 0;
     this.juntarVelhos(t);
     const k = this.escala(saldo, cotaAgora);
@@ -301,7 +301,7 @@ class Carteira {
       const fracao = tirar / valorLote;
       const custo = l.custo * fracao;
       const ganho = tirar - custo;
-      if (ganho > 0 && !isento) ir += ganho * aliquotaIR(this.imposto, this.dias(l, t));
+      if (ganho > 0) ir += ganho * aliquotaIR(this.imposto, this.dias(l, t));
       l.custo -= custo;
       l.cotas -= l.cotas * fracao;
       falta -= tirar;
@@ -356,7 +356,11 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   let mesDiv = 0;
   let mesTax = custoInicial;
   let mesIr = 0;
-  let vendasMes = 0; // para a isenção de vendas no mês
+  // Isenção de vendas no mês: vale para o mês inteiro. Enquanto o total vendido no mês fica no limite, o IR das
+  // vendas fica guardado em `irDispensadoMes`; se o mês passar do limite, ele é cobrado junto da venda que passou.
+  let vendasMes = 0;
+  let irDispensadoMes = 0;
+  let ultimoMes = { vendas: 0, dispensado: 0 }; // do último mês fechado (para o resgate total no fim do prazo)
   const meses: PontoMes[] = [];
   const saldosMes: number[] = [];
 
@@ -400,14 +404,17 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   // Cota no instante t, contando os juros proporcionais ainda não creditados (preço de entrada de uma compra).
   const cotaEm = (t: number) => carteira.cota * (1 + (taxaDe(k) * (t - k / cap)) / comprimento);
 
-  const irAgora = (t: number) => (isencao > 0 && saldo <= isencao ? 0 : carteira.irEstimado(t, saldo, carteira.cota));
+  // IR se resgatar tudo em `t`, somando o resgate às vendas do mês: dentro do limite, isento; acima, paga também
+  // o IR que as vendas anteriores do mês tinham dispensado.
+  const irAgora = (t: number, vendas: number, dispensado: number) =>
+    isencao > 0 && vendas + saldo <= isencao + EPS ? 0 : carteira.irEstimado(t, saldo, carteira.cota) + dispensado;
 
   const fecharMes = (m: number) => {
     const t = m / 12;
     saldosMes.push(saldo);
     if (detalhar) {
       // Na fotografia do mês, os juros do período ainda não creditados não entram no saldo.
-      const ir = irAgora(t);
+      const ir = irAgora(t, vendasMes, irDispensadoMes);
       const d = deflator(t);
       meses.push({
         mes: m,
@@ -431,7 +438,8 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
         liquidoReal: inflacao === null ? null : (saldo - ir) / d,
       });
     }
-    mesDep = mesRet = mesJur = mesDiv = mesTax = mesIr = vendasMes = 0;
+    ultimoMes = { vendas: vendasMes, dispensado: irDispensadoMes };
+    mesDep = mesRet = mesJur = mesDiv = mesTax = mesIr = vendasMes = irDispensadoMes = 0;
   };
 
   // Compra: tira o custo de compra e cria o lote do IR.
@@ -479,10 +487,16 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
         } else {
           const tirar = Math.min(e.valor, Math.max(0, saldo));
           if (tirar > 0) {
-            const isento = isencao > 0 && vendasMes + tirar <= isencao;
-            const ir = carteira.retirar(e.t, tirar, saldo, carteira.cota, isento);
+            let ir = carteira.retirar(e.t, tirar, saldo, carteira.cota);
             saldo -= tirar;
             vendasMes += tirar;
+            if (isencao > 0 && vendasMes <= isencao + EPS) {
+              irDispensadoMes += ir;
+              ir = 0;
+            } else {
+              ir += irDispensadoMes;
+              irDispensadoMes = 0;
+            }
             retiradas += tirar;
             mesRet += tirar;
             irRetido += ir;
@@ -517,7 +531,8 @@ export function simular(p: Parametros, diasNoAno = 365): Resultado {
   // Garante a fotografia do último mês.
   while (proximoMes <= p.meses) fecharMes(proximoMes++);
 
-  const irFinal = irAgora(T);
+  // O resgate total no fim cai no último mês: conta com as vendas que já houve nele.
+  const irFinal = p.meses > 0 ? irAgora(T, ultimoMes.vendas, ultimoMes.dispensado) : irAgora(T, vendasMes, irDispensadoMes);
   const saldoLiquido = saldo - irFinal;
   const taxaAnualPreco = taxaEfetivaAnual(p.taxaPeriodo, cap);
   // Dividendos reinvestidos também rendem: entram na taxa efetiva.
@@ -628,8 +643,9 @@ export function mesesParaMeta(
 
 // ---------- Faixa de resultados (renda variável) ----------
 // Sorteia muitos caminhos de valorização mês a mês e mostra os resultados ruins, típicos e bons.
-// Cada mês: ln(1 + retorno) tem distribuição normal com desvio σ/√12, centrada para que a média do
-// retorno seja a valorização informada. A semente é fixa: os mesmos dados dão sempre a mesma faixa.
+// Cada mês: ln(1 + retorno) tem distribuição normal com desvio σ/√12, centrada na valorização informada:
+// o caminho mediano cresce à taxa informada, como o retorno ao ano de um histórico (média geométrica).
+// A semente é fixa: os mesmos dados dão sempre a mesma faixa.
 
 export interface Faixa {
   caminhos: number;
@@ -686,7 +702,7 @@ export function simularFaixa(
   const caminhos = opcoes.caminhos ?? 1000;
   const normal = sorteador(opcoes.semente ?? 20261124);
   const sigma = volatilidadeAnual / Math.sqrt(12);
-  const media = Math.log(1 + p.taxaPeriodo) - (sigma * sigma) / 2;
+  const media = Math.log(1 + p.taxaPeriodo);
   const passo = p.meses <= 36 ? 1 : 12;
   const mesesPorPonto: number[] = [0];
   for (let m = passo; m <= p.meses; m += passo) mesesPorPonto.push(m);
