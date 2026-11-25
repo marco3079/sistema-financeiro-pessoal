@@ -258,7 +258,7 @@ if ($envExiste) {
         ('ADMIN_SENHA=' + $senhaAdmin),
         ('WEB_PORT=' + $portaWeb),
         ('API_PORT=' + $portaApi),
-        'DB_PORT=5433'
+        'DB_PORT=5434'
     )
     $conteudo = [string]::Join("`n", $linhas) + "`n"
     [System.IO.File]::WriteAllText($arquivoEnv, $conteudo, (New-Object System.Text.UTF8Encoding($false)))
@@ -367,7 +367,7 @@ try {
 
 # Quadro final
 if ($envCriadoAgora -or $adminSenhaExistente -eq '' -or $adminSenhaExistente -eq 'demo1234') {
-    $linhaSenha = 'Senha:          demo1234 (padrao; troque em "Meu perfil")'
+    $linhaSenha = 'Senha:          demo1234 (padrao; o site pede uma senha nova no primeiro acesso)'
 } else {
     $linhaSenha = 'Senha:          a senha esta no arquivo .env, variavel ADMIN_SENHA'
 }

@@ -12,7 +12,7 @@ cd server
 npm run teste
 ```
 
-Por padrão ela entra com `demo@financas.local` / `demo1234`. Para outro usuário ou outro endereço da API, defina antes:
+Por padrão ela entra com `demo@financas.local` / `demo1234`, que só funciona antes do primeiro acesso: o login com a senha padrão pede uma senha nova. Depois de trocá-la, passe a senha em `TESTE_SENHA`. Para outro usuário ou outro endereço da API, defina antes:
 
 - `TESTE_EMAIL` e `TESTE_SENHA`: usuário de login.
 - `TESTE_API`: endereço da API (padrão `http://localhost:3092/api`).

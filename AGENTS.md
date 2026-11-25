@@ -40,7 +40,7 @@ Opções úteis. Portas: `-PortaWeb N` e `-PortaApi N` (ou `--porta-web N` e `--
 - O endereço do site (`http://localhost:<WEB_PORT>`).
 - O e-mail do titular (`demo@financas.local`, ou o valor de `ADMIN_EMAIL` do `.env`).
 - A senha do titular: `demo1234` (padrão, ou o valor de `ADMIN_SENHA` do `.env` se a pessoa tiver definido outra).
-- Que ela deve trocar a senha em "Meu perfil" logo no primeiro acesso.
+- Que, ao entrar com a senha padrão, o site pede uma senha nova (8 caracteres ou mais) antes de liberar o acesso.
 
 ## Regras para o assistente
 

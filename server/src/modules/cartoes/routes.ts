@@ -119,7 +119,6 @@ router.post(
     if (fatura.status === 'PAGA') throw new HttpError(400, 'Esta fatura já está paga');
 
     const dataPagamento = dados.pagaEm ? paraData(dados.pagaEm) : hoje();
-    const total = num(fatura.total);
 
     let contaPagamentoId: number | null = null;
     if (dados.contaPagamentoId !== undefined) {
@@ -132,14 +131,22 @@ router.post(
     }
 
     const atualizada = await prisma.$transaction(async (db) => {
+      // Trava a fatura até o fim da transação e confere de novo: com dois pedidos ao mesmo tempo (clique duplo),
+      // o segundo espera o primeiro terminar e encontra a fatura já paga.
+      await db.$queryRaw`SELECT id FROM "Fatura" WHERE id = ${id} FOR UPDATE`;
+      const atual = await db.fatura.findUnique({ where: { id }, select: { status: true, total: true } });
+      if (!atual) throw new HttpError(404, 'Fatura não encontrada');
+      if (atual.status === 'PAGA') throw new HttpError(400, 'Esta fatura já está paga');
+      const total = num(atual.total);
+
       const paga = await db.fatura.update({
         where: { id },
         data: { status: 'PAGA', pagaEm: dataPagamento },
         include: INCLUIR_CONTA,
       });
-      // A dívida do cartão diminui, sem ficar negativa.
-      const novoSaldo = Math.max(0, arredondar(num(fatura.conta.saldo) - total));
-      await db.conta.update({ where: { id: fatura.contaId }, data: { saldo: novoSaldo } });
+      // A dívida do cartão diminui sobre o saldo atual (não sobre o lido antes), sem ficar negativa.
+      const cartao = await db.conta.update({ where: { id: fatura.contaId }, data: { saldo: { decrement: total } } });
+      if (num(cartao.saldo) < 0) await db.conta.update({ where: { id: fatura.contaId }, data: { saldo: 0 } });
       if (contaPagamentoId !== null && total > 0) {
         await db.transacao.create({
           data: {

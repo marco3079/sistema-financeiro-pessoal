@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
-import { ErroCodigo, useAuth } from '../lib/auth';
+import { ErroCodigo, ErroNovaSenha, useAuth } from '../lib/auth';
 import { usePlataforma } from '../lib/plataforma';
 import { Aviso, Botao, Campo } from '../ui';
 import { Icone } from '../ui/icones';
@@ -18,21 +18,35 @@ export function Login() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  // Segundo passo (verificação em duas etapas) na mesma tela.
-  const [etapa, setEtapa] = useState<'senha' | 'codigo'>('senha');
+  // Segundo passo (verificação em duas etapas) e troca da senha padrão, na mesma tela.
+  const [etapa, setEtapa] = useState<'senha' | 'codigo' | 'novaSenha'>('senha');
   const [codigo, setCodigo] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmacao, setConfirmacao] = useState('');
 
   if (usuario) return <Navigate to={caminhoDoPerfil(usuario.perfil)} replace />;
 
   async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setErro(null);
+    if (etapa === 'novaSenha') {
+      if (novaSenha.length < 8) {
+        setErro('A senha nova precisa ter 8 caracteres ou mais.');
+        return;
+      }
+      if (novaSenha !== confirmacao) {
+        setErro('As duas senhas novas não são iguais.');
+        return;
+      }
+    }
     setEnviando(true);
     try {
-      await entrar(email, senha, etapa === 'codigo' ? codigo : undefined);
+      await entrar(email, senha, codigo.trim() || undefined, etapa === 'novaSenha' ? novaSenha : undefined);
     } catch (e) {
       if (e instanceof ErroCodigo) {
         setEtapa('codigo');
+      } else if (e instanceof ErroNovaSenha) {
+        setEtapa('novaSenha');
       }
       setErro(e instanceof Error ? e.message : 'Erro inesperado');
       setEnviando(false);
@@ -42,6 +56,8 @@ export function Login() {
   function voltar() {
     setEtapa('senha');
     setCodigo('');
+    setNovaSenha('');
+    setConfirmacao('');
     setErro(null);
   }
 
@@ -89,10 +105,18 @@ export function Login() {
           <p className="entrada-apoio">
             {etapa === 'codigo'
               ? 'Abra o aplicativo autenticador e digite o código de 6 dígitos, ou use um código de recuperação.'
-              : 'Use seu e-mail e sua senha.'}
+              : etapa === 'novaSenha'
+                ? 'Você entrou com a senha padrão, que qualquer pessoa conhece. Escolha uma senha nova (8 caracteres ou mais) para continuar.'
+                : 'Use seu e-mail e sua senha.'}
           </p>
           <Campo rotulo="E-mail" tipo="email" valor={email} aoMudar={setEmail} obrigatorio />
           <Campo rotulo="Senha" tipo="password" valor={senha} aoMudar={setSenha} obrigatorio />
+          {etapa === 'novaSenha' && (
+            <>
+              <Campo rotulo="Senha nova" tipo="password" valor={novaSenha} aoMudar={setNovaSenha} obrigatorio />
+              <Campo rotulo="Repita a senha nova" tipo="password" valor={confirmacao} aoMudar={setConfirmacao} obrigatorio />
+            </>
+          )}
           {etapa === 'codigo' && (
             // Campo da ui não aceita inputMode/autoComplete: usa a mesma marcação com os atributos do celular.
             <label className="campo">
@@ -111,9 +135,9 @@ export function Login() {
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
           <div className="entrada-botao">
             <Botao tipo="submit" desabilitado={enviando}>
-              {enviando ? 'Entrando...' : 'Entrar'}
+              {enviando ? 'Entrando...' : etapa === 'novaSenha' ? 'Salvar e entrar' : 'Entrar'}
             </Botao>
-            {etapa === 'codigo' && (
+            {etapa !== 'senha' && (
               <Botao variante="secundario" aoClicar={voltar} desabilitado={enviando}>
                 Voltar
               </Botao>

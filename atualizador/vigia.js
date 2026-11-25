@@ -184,7 +184,7 @@ let reiniciandoAgora = false;
 
 // "2026-11-23 21:13:36 -0300 -03" (formato do Docker) em milissegundos; 0 se não der para ler.
 function criadoEm(texto) {
-  const m = /^(d{4}-d{2}-d{2}) (d{2}:d{2}:d{2}) ([+-]d{2})(d{2})/.exec(String(texto || ''));
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{2})(\d{2})/.exec(String(texto || ''));
   const data = m ? new Date(`${m[1]}T${m[2]}${m[3]}:${m[4]}`).getTime() : NaN;
   return Number.isNaN(data) ? 0 : data;
 }

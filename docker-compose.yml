@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16-alpine
+    # Volta sozinho depois de reiniciar o computador ou o Docker (sem ele, a API não sobe).
+    restart: unless-stopped
     environment:
       POSTGRES_USER: financas
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-financas}

@@ -26,9 +26,17 @@ export class ErroCodigo extends Error {
   }
 }
 
+// Login com a senha padrão: o servidor só entrega o acesso depois de a pessoa definir outra (precisaNovaSenha).
+export class ErroNovaSenha extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'ErroNovaSenha';
+  }
+}
+
 interface AuthContexto {
   usuario: UsuarioLogado | null;
-  entrar(email: string, senha: string, codigo?: string): Promise<void>;
+  entrar(email: string, senha: string, codigo?: string, novaSenha?: string): Promise<void>;
   sair(): void;
   atualizarFoto(foto: string | null): void;
 }
@@ -82,16 +90,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, [usuario, atualizarFoto]);
 
-  async function entrar(email: string, senha: string, codigo?: string): Promise<void> {
-    // Fetch direto (e não api.post) para ler o campo precisaCodigo da resposta de erro.
-    const corpo: { email: string; senha: string; codigo?: string } = { email, senha };
+  async function entrar(email: string, senha: string, codigo?: string, novaSenha?: string): Promise<void> {
+    // Fetch direto (e não api.post) para ler os campos precisaCodigo e precisaNovaSenha da resposta de erro.
+    const corpo: { email: string; senha: string; codigo?: string; novaSenha?: string } = { email, senha };
     if (codigo) corpo.codigo = codigo;
+    if (novaSenha) corpo.novaSenha = novaSenha;
     const http = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpo),
     });
-    let dados: { erro?: string; precisaCodigo?: boolean; token?: string; usuario?: UsuarioBruto } | null = null;
+    let dados: {
+      erro?: string;
+      precisaCodigo?: boolean;
+      precisaNovaSenha?: boolean;
+      token?: string;
+      usuario?: UsuarioBruto;
+    } | null = null;
     try {
       dados = await http.json();
     } catch {
@@ -100,6 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!http.ok) {
       if (dados?.precisaCodigo === true) {
         throw new ErroCodigo(dados.erro ?? 'Informe o código de verificação');
+      }
+      if (dados?.precisaNovaSenha === true) {
+        throw new ErroNovaSenha(dados.erro ?? 'Defina uma senha nova para entrar.');
       }
       throw new Error(dados?.erro ?? 'Erro inesperado');
     }

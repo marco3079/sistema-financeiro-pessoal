@@ -34,6 +34,8 @@ const ESPERA_APOS_ALTERAR_MS = 8 * 1000;
 const TABELAS = [
   'perfilFinanceiro',
   'usuario',
+  // Acessos dos membros aos perfis: apagar usuários e perfis na carga apaga estes junto (cascata), então viajam também.
+  'acessoPerfil',
   'configuracaoPlataforma',
   'conexaoBancaria',
   'conta',
@@ -63,6 +65,7 @@ type Tabela = (typeof TABELAS)[number];
 const NOME_NO_BANCO: Record<Tabela, string> = {
   perfilFinanceiro: 'PerfilFinanceiro',
   usuario: 'Usuario',
+  acessoPerfil: 'AcessoPerfil',
   configuracaoPlataforma: 'ConfiguracaoPlataforma',
   conexaoBancaria: 'ConexaoBancaria',
   conta: 'Conta',
@@ -91,13 +94,19 @@ const NOME_NO_BANCO: Record<Tabela, string> = {
 type Linhas = Record<string, unknown>[];
 // O Prisma não tem um tipo comum para "qualquer modelo"; este é o mínimo usado aqui.
 interface Modelo {
-  findMany(args?: { orderBy?: { id: 'asc' } }): Promise<Linhas>;
+  findMany(args?: { orderBy?: Record<string, 'asc'> | Record<string, 'asc'>[] }): Promise<Linhas>;
   deleteMany(args?: Record<string, never>): Promise<unknown>;
   createMany(args: { data: Linhas }): Promise<unknown>;
   count(): Promise<number>;
 }
 function modelo(cliente: unknown, tabela: Tabela): Modelo {
   return (cliente as Record<Tabela, Modelo>)[tabela];
+}
+
+// Tabelas com chave composta, sem coluna `id` (nem sequência para acertar).
+const SEM_ID: ReadonlySet<Tabela> = new Set<Tabela>(['acessoPerfil']);
+function ordem(tabela: Tabela): Record<string, 'asc'> | Record<string, 'asc'>[] {
+  return tabela === 'acessoPerfil' ? [{ usuarioId: 'asc' }, { perfilFinanceiroId: 'asc' }] : { id: 'asc' };
 }
 
 interface EstadoRemoto {
@@ -187,7 +196,7 @@ async function montarFotografia(): Promise<{ arquivo: Buffer; registros: number 
   await db.$transaction(
     async (tx) => {
       for (const tabela of TABELAS) {
-        const linhas = await modelo(tx, tabela).findMany({ orderBy: { id: 'asc' } });
+        const linhas = await modelo(tx, tabela).findMany({ orderBy: ordem(tabela) });
         tabelas[tabela] = linhas;
         registros += linhas.length;
       }
@@ -254,10 +263,19 @@ async function receber(remoto: EstadoRemoto, exigirLimpo = false): Promise<boole
     await db.$transaction(
     async (tx) => {
       if (exigirLimpo && (await tx.estadoDrive.findUnique({ where: { id: 1 } }))?.sujo) throw new MudouDuranteACarga();
+      // Arquivo gravado por uma versão que ainda não levava os acessos: mantém os deste computador (os que ainda
+      // apontam para um usuário e um perfil do arquivo), em vez de perdê-los na cascata.
+      const acessosLocais = Array.isArray(tabelas.acessoPerfil) ? null : await modelo(tx, 'acessoPerfil').findMany();
       for (const tabela of [...TABELAS].reverse()) await modelo(tx, tabela).deleteMany({});
       for (const tabela of TABELAS) {
-        const linhas = tabelas[tabela] ?? [];
+        let linhas = tabelas[tabela] ?? [];
+        if (tabela === 'acessoPerfil' && acessosLocais) {
+          const usuarios = new Set((tabelas.usuario ?? []).map((u) => u.id));
+          const perfis = new Set((tabelas.perfilFinanceiro ?? []).map((p) => p.id));
+          linhas = acessosLocais.filter((a) => usuarios.has(a.usuarioId) && perfis.has(a.perfilFinanceiroId));
+        }
         for (let i = 0; i < linhas.length; i += 1000) await modelo(tx, tabela).createMany({ data: linhas.slice(i, i + 1000) });
+        if (SEM_ID.has(tabela)) continue;
         // Os próximos registros criados aqui continuam a numeração de onde ela parou.
         const nome = NOME_NO_BANCO[tabela];
         await tx.$executeRawUnsafe(

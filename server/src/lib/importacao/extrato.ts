@@ -218,8 +218,15 @@ export function ehMovimentoProprio(descricao: string): boolean {
   return ehPagamentoDeFatura(descricao) || TRECHOS_MOVIMENTO_PROPRIO.some((t) => d.includes(t));
 }
 
+// Espaços repetidos viram um só antes das expressões da parcela. Com vários `\s*` seguidos e âncora no fim, uma
+// descrição com milhares de espaços levaria segundos (ou minutos) para ser lida e travaria a API.
+function compactar(texto: string): string {
+  return texto.replace(/\s+/g, ' ').trim();
+}
+
 // Parcela na descrição ou num campo próprio: "Parcela 6/10", "- 2/2", "(03/10)", "5 de 6", "PARC 02/06".
-export function lerParcela(texto: string): { parcela: number; total: number } | null {
+export function lerParcela(textoBruto: string): { parcela: number; total: number } | null {
+  const texto = compactar(textoBruto);
   const m =
     /parc(?:ela)?\.?\s*(\d{1,2})\s*(?:\/|de)\s*(\d{1,2})/i.exec(texto) ??
     /(?:^|[\s\-(])(\d{1,2})\s*\/\s*(\d{1,2})\)?\s*$/.exec(texto) ??
@@ -233,7 +240,7 @@ export function lerParcela(texto: string): { parcela: number; total: number } | 
 
 // Tira da descrição o trecho da parcela ("Loja - Parcela 2/5" -> "Loja").
 function semParcela(descricao: string): string {
-  return descricao
+  return compactar(descricao)
     .replace(/\s*[-–]?\s*\(?parc(?:ela)?\.?\s*\d{1,2}\s*(?:\/|de)\s*\d{1,2}\)?\s*$/i, '')
     .replace(/\s*[-–]?\s*\(?\d{1,2}\s*\/\s*\d{1,2}\)?\s*$/, '')
     .trim();

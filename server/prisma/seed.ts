@@ -50,9 +50,10 @@ async function main(): Promise<void> {
   console.log('==== TITULAR CRIADO ====');
   console.log(`E-mail: ${email}`);
   if (padrao) {
-    console.log(`Senha padrão: ${SENHA_PADRAO}`);
+    console.log(`Senha padrão: ${SENHA_PADRAO} (o primeiro login com ela pede uma senha nova)`);
+  } else {
+    console.log('Troque a senha em "Meu perfil" depois do primeiro acesso.');
   }
-  console.log('Troque a senha em "Meu perfil" depois do primeiro acesso.');
   console.log('=======================');
 
 }

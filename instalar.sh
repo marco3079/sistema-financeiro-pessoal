@@ -314,7 +314,7 @@ done
 
 # Quadro final
 if [ "$ENV_CRIADO_AGORA" -eq 1 ] || [ -z "$ADMIN_SENHA_EXISTENTE" ] || [ "$ADMIN_SENHA_EXISTENTE" = "demo1234" ]; then
-  LINHA_SENHA='Senha:          demo1234 (padrao; troque em "Meu perfil")'
+  LINHA_SENHA='Senha:          demo1234 (padrao; o site pede uma senha nova no primeiro acesso)'
 else
   LINHA_SENHA="Senha:          a senha esta no arquivo .env, variavel ADMIN_SENHA"
 fi

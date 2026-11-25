@@ -100,7 +100,15 @@ const loginSchema = z.object({
   email: z.string().min(1),
   senha: z.string().min(1),
   codigo: z.string().max(40).optional(),
+  // Só quando o servidor pediu (precisaNovaSenha): a senha que substitui a padrão.
+  novaSenha: z.string().max(200).optional(),
 });
+
+// Senha com que a conta do titular nasce (prisma/seed.ts). É pública (está no repositório): quem entra com ela
+// precisa definir outra no mesmo login, antes de receber o acesso. Assim o site aberto na rede não fica entrando
+// com a senha padrão.
+const SENHA_PADRAO = 'demo1234';
+const NOVA_SENHA_MINIMO = 8;
 
 // Lista de hashes dos códigos de recuperação ainda não usados (JSON no banco).
 function hashesDeRecuperacao(bruto: string | null): string[] {
@@ -116,7 +124,7 @@ function hashesDeRecuperacao(bruto: string | null): string[] {
 publico.post(
   '/auth/login',
   asyncHandler(async (req, res) => {
-    const { email, senha, codigo } = validar(loginSchema, req.body);
+    const { email, senha, codigo, novaSenha } = validar(loginSchema, req.body);
     const contexto = contextoRequisicao(req);
     const chave = (req.ip ?? '') + '|' + email.toLowerCase();
     const agora = Date.now();
@@ -186,6 +194,22 @@ publico.post(
       }
     }
     falhasLogin.delete(chave);
+    // Senha padrão: não entrega o acesso enquanto a pessoa não definir outra (no mesmo pedido, em `novaSenha`).
+    if (senha === SENHA_PADRAO) {
+      const nova = novaSenha ?? '';
+      if (nova === '') {
+        res.status(403).json({ erro: 'Esta é a senha padrão. Defina uma senha nova para entrar.', precisaNovaSenha: true });
+        return;
+      }
+      if (nova.length < NOVA_SENHA_MINIMO || nova === SENHA_PADRAO) {
+        res.status(400).json({
+          erro: `A senha nova precisa ter ${NOVA_SENHA_MINIMO} caracteres ou mais e ser diferente da padrão.`,
+          precisaNovaSenha: true,
+        });
+        return;
+      }
+      await prisma.usuario.update({ where: { id: usuario.id }, data: { senhaHash: await bcrypt.hash(nova, 10) } });
+    }
     const dados = paraUsuarioResposta(usuario);
     const token = gerarToken({ id: dados.id, perfil: dados.perfil });
     registrarLog({
@@ -364,7 +388,10 @@ router.get(
 
 const trocarSenhaSchema = z.object({
   senhaAtual: z.string().min(1),
-  novaSenha: z.string().min(6),
+  novaSenha: z
+    .string()
+    .min(6)
+    .refine((s) => s !== SENHA_PADRAO, 'Escolha uma senha diferente da padrão.'),
 });
 
 router.post(

@@ -224,7 +224,7 @@ O passo a passo completo, com perguntas frequentes, está em [INSTALAR.md](INSTA
 - E-mail: `demo@financas.local`
 - Senha: `demo1234`
 
-Troque a senha em **Meu perfil** logo no primeiro acesso. Depois, envie a fatura do cartão e a planilha da B3 em **Importar**, ou cadastre suas contas à mão em **Contas**.
+Com a senha padrão, o site pede uma senha nova (8 caracteres ou mais) antes de entrar: ela é conhecida por qualquer pessoa, e o site fica aberto na rede. Depois, envie a fatura do cartão e a planilha da B3 em **Importar**, ou cadastre suas contas à mão em **Contas**.
 
 ## Importar arquivos
 
